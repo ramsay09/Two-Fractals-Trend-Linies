@@ -40,7 +40,6 @@ fr_size             = input.int(1, title='Fractal Size', minval=1, step=1, toolt
 sr_tf               = input.timeframe('W', title='Time Frame Of Fractals', options=['60', '120', '240', '480', 'D', 'W', 'M', '3M', '6M'], tooltip='The time frame of fractals used to plot the SR-levels.
                      Select always: \'Time Frame Of Fractals\' >= current time frame', group='SR lines:')
 fr_source           = input.string('high/low', title='Fractal Source', options=['high/low', 'close'], tooltip='The source of fractals used to plot the SR-levels.', group='SR lines:')
-max_sr_lines        = input.int(60, title='Max SR Lines (cap)', minval=5, maxval=450, group='SR lines:')
 
 //ema cloud, hma, dmi adx inputs
 en_cloud            = input.bool(true, title='EMA Cloud', group='MA cloud, HMA slope, DMI ADX:', tooltip='This EMA cloud works as dynamic support and resistance and as trend indication.
@@ -221,35 +220,12 @@ dn_fr_sr            = request.security(syminfo.tickerid, fractal_tf, ta.pivotlow
 fr_up               = request.security(syminfo.tickerid, fractal_tf, ta.valuewhen(up_fr_sr, high[fractal_size], 0))
 fr_dn               = request.security(syminfo.tickerid, fractal_tf, ta.valuewhen(dn_fr_sr, low[fractal_size], 0))
 
-// --- Optimized SR line drawing ---
-// Create horizontal lines only when the HTF fractal level CHANGES and keep a bounded history.
-var line[] sr_up_lines = array.new_line()
-var line[] sr_dn_lines = array.new_line()
-sr_ext = not extend ? extend.right : extend.both
 
-f_push_capped(_arr, _line, _cap) =>
-    array.push(_arr, _line)
-    if array.size(_arr) > _cap
-        _old = array.shift(_arr)
-        line.delete(_old)
-    na
+up_fr_line          = plot_sr_lines ? line.new(x1=bar_index[2], x2=bar_index[1], y1=fr_up, y2=fr_up, extend= not extend ? extend.right : extend.both, color=color.new(color.blue, transp_sr),
+                     style=line.style_solid, width=width_sr) : na
 
-if plot_sr_lines
-    // Only create when the level changes to avoid per-bar allocations
-    if not na(fr_up) and ta.change(fr_up)
-        _l = line.new(x1=bar_index, x2=bar_index + 1, y1=fr_up, y2=fr_up, extend=sr_ext, color=color.new(color.blue, transp_sr), style=line.style_solid, width=width_sr)
-        f_push_capped(sr_up_lines, _l, max_sr_lines)
-    if not na(fr_dn) and ta.change(fr_dn)
-        _l = line.new(x1=bar_index, x2=bar_index + 1, y1=fr_dn, y2=fr_dn, extend=sr_ext, color=color.new(color.blue, transp_sr), style=line.style_solid, width=width_sr)
-        f_push_capped(sr_dn_lines, _l, max_sr_lines)
-else
-    // Feature off -> cleanup existing SR lines
-    for _i = 0 to array.size(sr_up_lines) - 1
-        line.delete(array.get(sr_up_lines, _i))
-    for _i = 0 to array.size(sr_dn_lines) - 1
-        line.delete(array.get(sr_dn_lines, _i))
-    array.clear(sr_up_lines)
-    array.clear(sr_dn_lines)
+dn_fr_line          = plot_sr_lines ? line.new(x1=bar_index[2], x2=bar_index[1], y1=fr_dn, y2=fr_dn, extend= not extend ? extend.right : extend.both, color=color.new(color.blue, transp_sr),
+                     style=line.style_solid, width=width_sr) : na
 
 
 // Calculation All Time High
@@ -396,8 +372,8 @@ tie_buy_pref     = fr_conflict and macd_slow_up          // conflict resolved by
 tie_sell_pref    = fr_conflict and macd_slow_dn          // conflict resolved by MACD slope down
 
 // Filter conditions for trend line signals ('auto' entry direction)
-//auto_long    = (adx_up_c and hma_slo_up) or (adx_up_c and ema_x_up) or (hma_slo_up and ema_x_up)
-//auto_short   = (adx_dn_c and not hma_slo_up) or (adx_dn_c and not ema_x_up) or (not hma_slo_up and not ema_x_up)
+auto_long    = (adx_up_c and hma_slo_up) or (adx_up_c and ema_x_up) or (hma_slo_up and ema_x_up)
+auto_short   = (adx_dn_c and not hma_slo_up) or (adx_dn_c and not ema_x_up) or (not hma_slo_up and not ema_x_up)
 
 
 //----------------------------------------------------------- last 12 bar ----------------------------------------------------------
@@ -571,145 +547,80 @@ plotchar(plot_f_bar ? f_dn and (not f_dn[1] or not f_dn[2] or not f_dn[3]) or f_
 
 //----------------------------------------------------------------- segments --------------------------------------------------------------
 
-// Optimized "Segments": compute anchors, draw/replace lines only when anchors change
+count1_l                    = 0
+count2_l                    = 0
+segment_1_stat_l            = false
+segment_2_stat_l            = false
+segment_3_stat_l            = false
+
+higher_low                  = low[0] > low[1]
+
 var line segment_low_1_l    = na
 var line segment_low_2_l    = na
 var line segment_low_3_l    = na
-var line segment_high_1     = na
-var line segment_high_2     = na
-var line segment_high_3     = na
 
-var int last_i1_l = na, last_i2_l = na, last_i3_l = na
-var int last_i1_s = na, last_i2_s = na, last_i3_s = na
-
-// flags
-segment_1_stat_l = false
-segment_2_stat_l = false
-segment_3_stat_l = false
-segment_1_stat_s = false
-segment_2_stat_s = false
-segment_3_stat_s = false
-
-// helper functions to find anchors (mirror the original nested-loop logic)
-f_find_i1_low(_sb) =>
-    _res = na
-    for i = 0 to _sb
-        if low[1] > low[i + 2]
-            _res := i
-            break
-    _res
-f_find_i2_low(_sb, _i1) =>
-    _res = na
-    if not na(_i1)
-        for i = _i1 to _sb + _i1
-            // maps to: low[1 + count1_l] > low[i + 2] with count1_l = _i1 + 1
-            if low[1 + (_i1 + 1)] > low[i + 2]
-                _res := i
-                break
-    _res
-f_find_i3_low(_sb, _i1, _i2) =>
-    _res = na
-    if not na(_i1) and not na(_i2)
-        for i = _i2 to _sb + _i2
-            // maps to: low[1 + count1_l + count2_l] > low[i + 2 + count1_l]
-            if low[1 + (_i1 + 1) + (i - _i2 + 1)] > low[i + 2 + (_i1 + 1)]
-                _res := i
-                break
-    _res
-
-f_find_i1_high(_sb) =>
-    _res = na
-    for i = 0 to _sb
-        if high[1] < high[i + 2]
-            _res := i
-            break
-    _res
-f_find_i2_high(_sb, _i1) =>
-    _res = na
-    if not na(_i1)
-        for i = _i1 to _sb + _i1
-            if high[1 + (_i1 + 1)] < high[i + 2]
-                _res := i
-                break
-    _res
-f_find_i3_high(_sb, _i1, _i2) =>
-    _res = na
-    if not na(_i1) and not na(_i2)
-        for i = _i2 to _sb + _i2
-            if high[1 + (_i1 + 1) + (i - _i2 + 1)] < high[i + 2 + (_i1 + 1)]
-                _res := i
-                break
-    _res
-
-if plot_segments
-    // LONG side
-    i1 = f_find_i1_low(sb)
-    if not na(i1)
-        if i1 != last_i1_l
-            if not na(segment_low_1_l)
-                line.delete(segment_low_1_l)
-            segment_low_1_l := line.new(x1=bar_index[2 + i1], y1=low[2 + i1], x2=bar_index[1], y2=low[1], color=color.new(color_seg, transp_seg), width=3)
-            last_i1_l := i1
+// long segments
+for i = 0 to sb by 1
+    count1_l := count1_l + 1
+    if low[1] > low[i + 2]  //and higher_low
+        segment_low_1_l := line.new(x1=bar_index[2 + i], y1=low[2 + i], x2=bar_index[1], y2=low[1], color=color.new(color_seg, transp_seg), width=3)
         segment_1_stat_l := true
-        i2 = f_find_i2_low(sb, i1)
-        if not na(i2)
-            if i2 != last_i2_l
-                if not na(segment_low_2_l)
-                    line.delete(segment_low_2_l)
-                // x1 = bar at [2 + i2], x2 = pivot from loop #1 at [2 + i1]
-                segment_low_2_l := line.new(x1=bar_index[2 + i2], y1=low[2 + i2], x2=bar_index[2 + i1], y2=low[2 + i1], color=color.new(color_seg, transp_seg), width=2)
-                last_i2_l := i2
-            segment_2_stat_l := true
-            i3 = f_find_i3_low(sb, i1, i2)
-            if not na(i3)
-                if i3 != last_i3_l
-                    if not na(segment_low_3_l)
-                        line.delete(segment_low_3_l)
-                    // x1 = bar at [i3 + i1 + 3], x2 = pivot from loop #2 at [i2 + 2]
-                    segment_low_3_l := line.new(x1=bar_index[i3 + i1 + 3], y1=low[i3 + i1 + 3], x2=bar_index[i2 + 2], y2=low[i2 + 2], color=color.new(color_seg, transp_seg), width=1)
-                    last_i3_l := i3
-                segment_3_stat_l := true
-            else
-                if not na(segment_low_3_l)
-                    line.delete(segment_low_3_l), segment_low_3_l := na
-                last_i3_l := na, segment_3_stat_l := false
-        else
-            if not na(segment_low_2_l)
-                line.delete(segment_low_2_l), segment_low_2_l := na
-            if not na(segment_low_3_l)
-                line.delete(segment_low_3_l), segment_low_3_l := na
-            last_i2_l := na, last_i3_l := na
-            segment_2_stat_l := false, segment_3_stat_l := false
-    else
-        // no i1 -> clear all long lines
-        if not na(segment_low_1_l)
-            line.delete(segment_low_1_l), segment_low_1_l := na
-        if not na(segment_low_2_l)
-            line.delete(segment_low_2_l), segment_low_2_l := na
-        if not na(segment_low_3_l)
-            line.delete(segment_low_3_l), segment_low_3_l := na
-        last_i1_l := na, last_i2_l := na, last_i3_l := na
-        segment_1_stat_l := false, segment_2_stat_l := false, segment_3_stat_l := false
+        break
 
-    // SHORT side
-    j1 = f_find_i1_high(sb)
-    if not na(j1)
-        if j1 != last_i1_s
-            if not na(segment_high_1)
-                line.delete(segment_high_1)
-            segment_high_1 := line.new(x1=bar_index[2 + j1], y1=high[2 + j1], x2=bar_index[1], y2=high[1], color=color.new(color_seg, transp_seg), width=3)
-            last_i1_s := j1
+for i = count1_l to sb + count1_l by 1
+    count2_l := count2_l + 1
+    if low[1 + count1_l] > low[i + 2] and segment_1_stat_l
+        segment_low_2_l := line.new(x1=bar_index[2 + i], y1=low[2 + i], x2=bar_index[1 + count1_l], y2=low[1 + count1_l], color=color.new(color_seg, transp_seg), width=2)
+        segment_2_stat_l := true
+        break
+
+for i = count2_l to sb + count2_l by 1
+    if low[1 + count1_l + count2_l] > low[i + 2 + count1_l] and segment_2_stat_l
+        segment_low_3_l := line.new(x1=bar_index[i + 2 + count1_l], y1=low[i + 2 + count1_l], x2=bar_index[1 + count1_l + count2_l], y2=low[1 + count1_l + count2_l], color=color.new(color_seg, transp_seg), width=1)
+        segment_3_stat_l := true
+        break
+
+line.delete(plot_segments ? segment_low_1_l[1] : segment_low_1_l[0])
+line.delete(plot_segments ? segment_low_2_l[1] : segment_low_2_l[0])
+line.delete(plot_segments ? segment_low_3_l[1] : segment_low_3_l[0])
+
+
+// short segments
+count1_s                = 0
+count2_s                = 0
+segment_1_stat_s        = false
+segment_2_stat_s        = false
+segment_3_stat_s        = false
+
+lower_high              = high[0] < high[1]
+
+var line segment_high_1 = na
+var line segment_high_2 = na
+var line segment_high_3 = na
+
+for i = 0 to sb by 1
+    count1_s := count1_s + 1
+    if high[1] < high[i + 2]  //and lower_high
+        segment_high_1 := line.new(x1=bar_index[2 + i], y1=high[2 + i], x2=bar_index[1], y2=high[1], color=color.new(color_seg, transp_seg), width=3)
         segment_1_stat_s := true
-        j2 = f_find_i2_high(sb, j1)
-        if not na(j2)
-            if j2 != last_i2_s
-                if not na(segment_high_2)
-                    line.delete(segment_high_2)
-                segment_high_2 := line.new(x1=bar_index[2 + j2], y1=high[2 + j2], x2=bar_index[2 + j1], y2=high[2 + j1], color=color.new(color_seg, transp_seg), width=2)
-                last_i2_s := j2
-            segment_2_stat_s := true
-            j3 = f_find_i3_high(sb, j1, j2)
-            if not na(j3)
+        break
+
+for i = count1_s to sb + count1_s by 1
+    count2_s := count2_s + 1
+    if high[1 + count1_s] < high[i + 2] and segment_1_stat_s
+        segment_high_2 := line.new(x1=bar_index[2 + i], y1=high[2 + i], x2=bar_index[1 + count1_s], y2=high[1 + count1_s], color=color.new(color_seg, transp_seg), width=2)
+        segment_2_stat_s := true
+        break
+
+for i = count2_s to sb + count2_s by 1
+    if high[1 + count1_s + count2_s] < high[i + 2 + count1_s] and segment_2_stat_s
+        segment_high_3 := line.new(x1=bar_index[i + 2 + count1_s], y1=high[i + 2 + count1_s], x2=bar_index[1 + count1_s + count2_s], y2=high[1 + count1_s + count2_s], color=color.new(color_seg, transp_seg), width=1)
+        segment_3_stat_s := true
+        break
+
+line.delete(plot_segments ? segment_high_1[1] : segment_high_1[0])
+line.delete(plot_segments ? segment_high_2[1] : segment_high_2[0])
+line.delete(plot_segments ? segment_high_3[1] : segment_high_3[0])
 
 
 // OR signals
