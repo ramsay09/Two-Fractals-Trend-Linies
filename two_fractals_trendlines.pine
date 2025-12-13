@@ -1,30 +1,57 @@
 //@version=5
 
-indicator('Two Fractals Trendlines', overlay=true, shorttitle='fr lines', max_bars_back=2000, max_lines_count=500)
+indicator('Two Fractals Trend Lines', overlay=true, shorttitle='fr lines', max_bars_back=2000, max_lines_count=500, max_boxes_count=500)
 
-general_info        = input.bool(title='General Description', defval=false, tooltip='Use the signals in confluence and as an indication of market tension, which will discharged in higher volatility or trend continuation. 
-                     ... context matters.')
+general_info        = input.bool(title='General Description', defval=false, tooltip='Use the signals in confluence and as an indication of market tension, which will discharged in higher volatility or trend continuation. ... context matters.
+                     Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
 
-//adx, hma and ema1 x ema2 mtf trend info panel
+// adx, hma and ema1 x ema2 mtf trend info panel
 adx_trend           = input.bool(title='MTF Info Panel', defval=false, 
-                     tooltip='Provides an overview of multi time frame trends as DMI ADX, HMA slope and EMA1 cross EMA2 (down(red), consolidation(gray), up(blue)) for the current 
-                     (C = current tf, these parameters are optimizable) and the supported higher time frames (4H, D, W, M, these indicator parameters are fixed and optimized for Bitcoin).')
+                     tooltip='Provides an overview of multi time frame trends as DMI ADX, HMA slope and EMA1 cross EMA2 (down(red), consolidation(gray), up(blue)) for the current (C = current tf, these parameters are optimizable) and the supported higher time frames (4H, D, W, M, these indicator parameters are fixed and optimized for Bitcoin).')
 
-//fractals input
+// fractals input
 fracals_plot        = input.bool(title='Bill Williams Fractals', defval=true, tooltip='Symbol: white triangle. Works as support and resistance level.')
-plot_af_bar         = input.bool(false, title='Anticipated Fractal', tooltip='Letter: a. An anticipated Fractal (two bar breakout). Very early trend indication.')
 
-selected_bg_signal  = input.string("None", title="Background Color Signal", options=
-                     ["None", "Bill Williams Fractals BG", "Anticipated Fractal BG", "Last 12 Bar BG", "DMI ADX BG", "HMA Slope BG", "MACD Slow Slope BG", "MACD Slope/Fractal Break BG (OR)", "Trend Line/Fractal Break BG (OR)", "Segments BG",
+// MTF CANDLE OVERLAY INPUTS
+grp_mtf_candle    = "MTF Candle Overlay"
+show_mtf_candles  = input.bool(false, "MTF Candle Overlay", group=grp_mtf_candle, tooltip="Two time frames at a glance. It's like looking into a candle with an X-ray.")
+mtf_tf_sel        = input.string("1h", "Overlay Timeframe", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], group=grp_mtf_candle)
+mtf_opacity       = input.int(15, "Overlay Opacity %", minval=0, maxval=100, group=grp_mtf_candle, tooltip="0% = Invisible, 100% = Solid")
+
+// Additional Context Inputs 
+grp_add         = "Additional Context"
+show_pch_pcl    = input.bool(false, "Previous Candle High/Low", group=grp_add, tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe.")
+pch_pcl_tf      = input.timeframe("D", "Previous Candle Timeframe", group=grp_add, tooltip="Select the timeframe for the Previous Candle High/Low calculation.")
+
+show_last_frac  = input.bool(false, "Last Fractal S/R", group=grp_add, tooltip="Draws lines at the last confirmed Up/Down Fractals similar to PDH/PDL. Every new trend begins with the breaking of a fractal. (Time Frame dependent).")
+last_frac_tf    = input.timeframe("", "Last Fractal Timeframe", group=grp_add, tooltip="Select the timeframe for the Last Fractal calculation.")
+
+show_vol        = input.bool(true, "High Volume Spikes", group=grp_add, tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
+vol_mult        = input.float(2.0, "Volume Threshold (x Avg)", group=grp_add)
+
+// FVG Inputs 
+grp_fvg      = "Price Imbalance (Fair Value Gaps)"
+plot_fvg     = input.bool(true, title="Price Imbalance", group=grp_fvg, tooltip="Indicates a potential pullback area after an strong price movement (Displacement).")
+fvg_tf_sel   = input.timeframe("", title="Imbalance Timeframe", group=grp_fvg, tooltip="Select the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
+fvg_len      = input.int(1, title="Box Length (Bars)", minval=1, group=grp_fvg, tooltip="Length of the box in units of the selected timeframe.")
+
+// Alert Inputs 
+grp_alert      = "Real-time Alerts"
+use_rt_alert   = input.bool(false, title="Alert on 5th Fractal Candle (Real-time)", group=grp_alert, tooltip="Triggers an alert signal while the 5th candle of a fractal pattern is forming (Real-time). Select 'Any function call' when creating the alert.")
+
+// Background Color Filter INPUT
+selected_bg_signal  = input.string("None", title="Background Color Filter", options=
+                     ["None", "Bill Williams Fractals BG", "Anticipated Fractal BG", "Last 12 Bar BG", "Parabolic SAR BG", "DMI ADX BG", "HMA Slope BG", "MACD Slow Slope BG", "MACD Slope/Fractal Break BG (OR)", "Trend Line/Fractal Break BG (OR)", "Fractals Trend Lines", "Segments BG", 
                      "Segments/Fractals BG (OR)", "Segments/Trend Line BG (OR)", "Segments/Fractals/Trend Line BG (OR)",
-                     "Segments/Fractals BG (AND)", "Segments/Trend Line BG (AND)", "Segments/Fractals/Trend Line BG (AND)", "Segments/MACD Slope BG (AND)", "MACD Slope/Fractals Break BG (AND)"],
-                     group="Background Color Signals:", tooltip="Signals that are alternatively displayed as a background color as a quick verification and a kind of 'backtest'.")
+                     "Segments/Fractals BG (AND)", "Segments/Trend Line BG (AND)", "Segments/Fractals/Trend Line BG (AND)", "Segments/MACD Slope BG (AND)", "MACD Slope/Fractals Break BG (AND)"], 
+                     group="Background Color Filters:", tooltip="Signals that are alternatively displayed as a background color as a quick verification and a kind of 'backtest'.")
 
 
-//Bollinger Bands
+bg_tf_select        = input.timeframe("", title="Background Filter Timeframe", group="Background Color Filters:", tooltip="Select the timeframe for the background signals calculations. Empty = Current Chart Timeframe.")
+
+// Bollinger Bands
 BB_plot             = input.bool(true, title='Bollinger Bands', group='Bollinger Bands:', tooltip='Works as support and resistence, as reversal zone and as squeeze indicator.')
-BB_calc_tog         = input.bool(true, title='Toggle BB Calculation (Standard/Exponential)', group='Bollinger Bands:', tooltip='Works as support and resistence, as reversal zone and as squeeze indicator.
-                     Standard -> checked')
+BB_calc_tog         = input.bool(true, title='Toggle BB Calculation (Standard/Exponential)', group='Bollinger Bands:', tooltip='Works as support and resistence, as reversal zone and as squeeze indicator. Standard -> checked')
 near_bb             = input.bool(true, title='Touched BBs only', group='Bollinger Bands:', tooltip='This maintains a better chart overview and works as reversal zone indicator.')
 BB_length_1         = input.int(20, minval=1, title='BB Length', group='Bollinger Bands:', tooltip='')
 BB_sdev_1           = input.float(2.0, minval=0.001, maxval=3.8, step= 0.2, title='BB 1 StdDev', group='Bollinger Bands:', tooltip='')
@@ -32,18 +59,16 @@ BB_sdev_2           = 3//input.float(3.0, minval=0.001, title='BB 2 StdDev', gro
 BB_sdev_3           = 4//input.float(4.0, minval=0.001, title='BB 3 StdDev', group='Bollinger Bands:', tooltip='')
 BB_sdev_4           = 5//input.float(5.0, minval=0.001, title='BB 4 StdDev', group='Bollinger Bands:', tooltip='')
 
-//sr lines inputs
+// sr lines inputs
 plot_sr_lines       = input.bool(false, title='SR Lines', tooltip='Plot horizontal support and resistance levels.', group='SR lines:')
 auto_adaption       = input.bool(true, title='Auto Adaption', tooltip='Automatically adapt the Fractal Size and Time Frame based on the current chart timeframe.', group='SR lines:')
 extend              = input.bool(false, title='Toggle Line Extention', tooltip='Toggle line extention both/right. To the right = default = not selected', group='SR lines:')
 fr_size             = input.int(1, title='Fractal Size', minval=1, step=1, tooltip='The Size of fractals used to plot the SR-levels. The lower the value the more line are drawn.', group='SR lines:')
-sr_tf               = input.timeframe('W', title='Time Frame Of Fractals', options=['60', '120', '240', '480', 'D', 'W', 'M', '3M', '6M'], tooltip='The time frame of fractals used to plot the SR-levels.
-                     Select always: \'Time Frame Of Fractals\' >= current time frame', group='SR lines:')
+sr_tf               = input.timeframe('W', title='Time Frame Of Fractals', options=['3','5', '15', '30', '60', '120', '240', '480', 'D', 'W', 'M', '3M', '6M'], tooltip='The time frame of fractals used to plot the SR-levels. Select always: \'Time Frame Of Fractals\' >= current time frame', group='SR lines:')
 fr_source           = input.string('high/low', title='Fractal Source', options=['high/low', 'close'], tooltip='The source of fractals used to plot the SR-levels.', group='SR lines:')
 
-//ema cloud, hma, dmi adx inputs
-en_cloud            = input.bool(true, title='EMA Cloud', group='MA cloud, HMA slope, DMI ADX:', tooltip='This EMA cloud works as dynamic support and resistance and as trend indication.
-                     A wide cloud indicates high volatility, a narrow cloud indicates low volatility and breakout potential.')
+// ema cloud, hma, dmi adx inputs
+en_cloud            = input.bool(true, title='EMA Cloud', group='MA cloud, HMA slope, DMI ADX:', tooltip='This EMA cloud works as dynamic support and resistance and as trend indication. A wide cloud indicates high volatility, a narrow cloud indicates low volatility and breakout potential. Interesting pairs: 8/21, 40/97')
 sig_plot            = input.bool(true, title='EMA Cloud Color Signal', group='MA cloud, HMA slope, DMI ADX:', tooltip='EMA1 cross EMA2 color signal')
 sma1_plot           = input.bool(true, title='SMA', group='MA cloud, HMA slope, DMI ADX:', tooltip='SMA with slope color')
 
@@ -52,65 +77,69 @@ ema_inp2            = input.int(21, title='EMA2 Length', minval=1, group='MA clo
 sma1_inp            = input.int(50, title='SMA', minval=1, group='MA cloud, HMA slope, DMI ADX:', tooltip="SMA with slope color")
 di_len              = input.int(7, title='ADX DI Length', minval=1, group='MA cloud, HMA slope, DMI ADX:', tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
 len_smo             = input.int(7, title='ADX Smoothing', minval=1, group='MA cloud, HMA slope, DMI ADX:', tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
-hma_inp             = input.int(15, title='HMA Length', minval=1, group='MA cloud, HMA slope, DMI ADX:', tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
+hma_inp             = input.int(20, title='HMA Length', minval=1, group='MA cloud, HMA slope, DMI ADX:', tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
 
-//two fractals trendlines inputs
+// two fractals trendlines inputs
 plot_trendline      = input.bool(false, title='Fractal Trend Lines', group='Trend lines:', tooltip='The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal.')
-//plot_tl_fr_sig      = input.bool(false, title='Trend Line Or Farctal Break Signal', tooltip='A signal is plotted when a line or a fractal is crossed. Letter: ls = sell, lb = buy', group='Trend lines:')
-fractalBarsPerSide  = input.int(2, title="Fractal Size: Bars Per Side", minval=1, maxval=10, group='Trend lines:',
-                     tooltip="Number of bars to the left and right of the fractal bar for trendlines. Total size = 2*n + 1. Default is 2 (5-bar fractal). Min=1 (3 bars), Max=10 (21 bars).")
+fractalBarsPerSide  = input.int(2, title="Fractal Size: Bars Per Side", minval=0, maxval=10, group='Trend lines:', tooltip="Number of bars to the left and right of the fractal bar for trendlines. Default is 2 (5-bar fractal). 
+                     Min=0 (Fractal(2) using anchored linear regression, follow the highs/lows of the subsequent candles to align with the current trend), Max=10 (21 bars).")
 
-//divergence signal inputs
-plot_div            = input.bool(true, title='Divergence Signal Arrow', group='Divergences:',
-                     tooltip='These divergences are very early signals and must be used in confluence with other signals. hd = hidden divergence, cd = classic divergence')
+// divergence signal inputs
+plot_div            = input.bool(true, title='Divergence Signal Arrow', group='Divergences:', tooltip='These divergences are very early signals and must be used in confluence with other signals. hd = hidden divergence, cd = classic divergence')
 div_indi            = input.string('rsi', title='Divergence Indicator', options=['rsi', 'macd(fast_line)', 'macd(slow_line)'], tooltip='Select an Indicators for divergence calculation.', group='Divergences:')
 rsi_length          = input.int(14, title='RSI Length', minval=1, step=2, group='Divergences:')
 bar_div_p           = input.int(25, title='Bar Period', minval=1, step=1, tooltip='The number of bars in which divergences are detected.', group='Divergences:')
 src_div             = input.string('high/low', title='Bar Divergence Source', options=['high/low', 'close'], tooltip='The bar source for divergence calculation.', group='Divergences:')
 
-
-//bar signals inputs
+// bar signals inputs
 plot_l12_bar        = input.bool(true, title='Last 12 Bar (L12)', tooltip='Letter: L, L12 => highest low of last 12 bars -> long. Lowest high of last 12 bars -> short. Indicates a new trend.', group='Bar signals:')
 L12_input           = input.int(12, minval=1, title='"Last 12"', group='Bar signals:', tooltip='"Last 12 Bar" Bar count.')
 plot_nr_bar         = input.bool(true, title='Narrow Range Bar (NR7)', tooltip='Letter: n, NR7 = narrowest range of a bar of the last seven bars. Indicates market tension.', group='Bar signals:')
 plot_i_bar          = input.bool(true, title='Inside Bar', tooltip='Letter: i. An inside bar is a triangle formation on smaller time frame.', group='Bar signals:')
-plot_o_bar          = input.bool(true, title='Outside Bar', tooltip='Letter: o. An outside bar is an opening funnel formation on smaller time frames.
-                     gray-> normal outside bar, valid for the next bar: red-> short, green-> long', group='Bar signals:')
+plot_o_bar          = input.bool(true, title='Outside Bar', tooltip='Letter: o. An outside bar is an opening funnel formation on smaller time frames. gray-> normal outside bar, valid for the next bar: red-> short, green-> long', group='Bar signals:')
 plot_s_bar          = input.bool(true, title='Sandwich Bar', tooltip='Letter: s. Indicates market tension.', group='Bar signals:')
 plot_f_bar          = input.bool(true, title='Fakey', tooltip='Letter: F. An inside bar false breakout.', group='Bar signals:')
-//plot_ef_bar         = input.bool(true, title='Early Fakey', tooltip='Letter: f. A possible inside bar false breakout', group='Bar signals:')
-//plot_p_bar          = input.bool(false, title='Pin Bar', tooltip='Letter: p. Market rejects a price level. A pin bar is a V formation on smaller time frame.', group='Bar signals:')
-//plot_r_fractal      = input.bool(false, title='Reverse Fractal', tooltip='Letter: r. A bottom fishing signal.', group='Bar signals:')
-//p_bar_sens_1        = input.float(0.6, title='Pin bar sensitivity 1', step=0.02, tooltip='Condition: candle wick > candle body * \'Pin bar sensitivity\' .
-//                     The smaller the factor, the more wicks are detected as part of a pin bar.', group='Bar signals:')
-//p_bar_sens_2        = input.int(1, title='Pin bar sensitivity 2', step=1, minval=0, tooltip='Defines the amount of candles that must be higher or lower to the left of the pin bar.', group='Bar signals:')
 
-
-//segments inputs
-plot_segments       = input.bool(false, title='Segments', tooltip='Gray lines that follow the highest highs and lowest lows. This is a subtle way to detect a new trend.
-                     The higher the timeframe the more reliable the signal.', group='Segment signal:')
+// segments inputs
+plot_segments       = input.bool(false, title='Segments', tooltip='Gray lines that follow the highest highs and lowest lows. This is a subtle way to detect a new trend. The higher the timeframe the more reliable the signal.', group='Segment signal:')
 sb                  = input.int(10 ,title='Max Segment Bars', minval=0, step=1, tooltip='Max bars between two segment highs or segment lows.', group='Segment signal:')
 
-//pivot points inputs
-//plot_pivots_d       = input.bool(false, title= "1 day classic pivot points", group= "Pivot points:",
-//                     tooltip= "1 day classic pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.")
-plot_pivots_w       = input.bool(true, title= "1 Week Classic Pivot Points", group= "Pivot points:",
-                     tooltip= "1 week classic Pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.")
-plot_pivots_m       = input.bool(true, title='1 Month Classic Pivot Points', group='Pivot points:',
-                     tooltip='1 month classic pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.')
-plot_pivots_3m      = input.bool(true, title='3 Month Classic Pivot Points', group='Pivot points:',
-                     tooltip='3 month classic pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.')
-plot_pivots_6m      = input.bool(true, title='6 Month Classic Pivot Points', group='Pivot points:',
-                     tooltip='6 month classic pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.')
-plot_pivots_12m     = input.bool(true, title='12 Month Classic Pivot Points', group='Pivot points:',
-                     tooltip='12 month classic pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.')
+// pivot points inputs
+plot_pivots_w       = input.bool(true, title= "1 Week Classic Pivot Points", group= "Pivot points:", tooltip= "1 week classic Pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.")
+plot_pivots_m       = input.bool(true, title='1 Month Classic Pivot Points', group='Pivot points:', tooltip='1 month classic pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.')
+plot_pivots_3m      = input.bool(true, title='3 Month Classic Pivot Points', group='Pivot points:', tooltip='3 month classic pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.')
+plot_pivots_6m      = input.bool(true, title='6 Month Classic Pivot Points', group='Pivot points:', tooltip='6 month classic pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.')
+plot_pivots_12m     = input.bool(true, title='12 Month Classic Pivot Points', group='Pivot points:', tooltip='12 month classic pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.')
 
+// TRADING SESSIONS INPUTS ---
+grp_sess      = "Trading Sessions"
+sess_timezone = input.string("Europe/Berlin", title="Timezone", tooltip="Standard: Europe/Berlin. Change to 'UTC' or 'America/New_York' if needed.", group=grp_sess)
+sess_style    = input.string("Vertical Line", title="Session Style", options=["Vertical Line", "Box", "Background"], group=grp_sess, tooltip="Choose between a high/low box, a vertical background area or a vertical line.")
 
-//attributes inputs
+// London - ORANGE
+london_show   = input.bool(false, title="London Session ...", group=grp_sess, inline="lon")
+london_sess   = input.session("0900-1730", title="", group=grp_sess, inline="lon")
+london_col    = input.color(color.new(color.orange, 95), title="", group=grp_sess, inline="lon")
+
+// New York - BLUE
+ny_show       = input.bool(false, title="New York Session .", group=grp_sess, inline="ny")
+ny_sess       = input.session("1530-2200", title="", group=grp_sess, inline="ny")
+ny_col        = input.color(color.new(color.blue, 95), title="", group=grp_sess, inline="ny")
+
+// Tokio - YELLOW
+tokyo_show    = input.bool(false, title="Tokio Session ......", group=grp_sess, inline="tok")
+tokyo_sess    = input.session("0100-0900", title="", group=grp_sess, inline="tok")
+tokyo_col     = input.color(color.new(color.yellow, 95), title="", group=grp_sess, inline="tok")
+
+// Sydney - RED
+sydney_show   = input.bool(false, title="Sydney Session ....", group=grp_sess, inline="syd")
+sydney_sess   = input.session("2200-0700", title="", group=grp_sess, inline="syd")
+sydney_col    = input.color(color.new(color.red, 95), title="", group=grp_sess, inline="syd")
+
+// attributes inputs
 color_fr            = input.color(color.white, "Fractal Color", group= "Attributes of drawn objects:")
 transp_fr           = input.int(40, "Fractal Transparency", minval=1, maxval= 100, group= "Attributes of drawn objects:")
 
-//color_sr            = input.color(color.blue, 'SR line color', group='Attributes of drawn objects:')
 width_sr            = input.int(1, 'SR Line Width', minval=1, group='Attributes of drawn objects:')
 transp_sr           = input.int(50, 'SR Line Transparency', minval=1, maxval= 100, group='Attributes of drawn objects:')
 
@@ -129,7 +158,7 @@ transp_seg          = input.int(65, 'Segment Line Transparency', minval=1, maxva
 transp_bg           = input.int(85, 'Background Color Transparency', minval=1, maxval= 100, group='Attributes of drawn objects:')
 
 
-//-------------------------------------------------------- williams fractals --------------------------------------------------------------
+//-------------------------------------------------------- williams fractals (Visuals for Chart) --------------------------------------------------------------
 
 up_fr               = ta.pivothigh(2, 2)
 dn_fr               = ta.pivotlow(2, 2)
@@ -141,30 +170,17 @@ last_dn_fr_level    = ta.valuewhen(dn_fr, low[2], 0)
 plotshape(fracals_plot ? up_fr : na, style=shape.triangleup, location=location.abovebar, offset=-2, color=color.new(color_fr, transp_fr), title='Fractal up')
 plotshape(fracals_plot ? dn_fr : na, style=shape.triangledown, location=location.belowbar, offset=-2, color=color.new(color_fr, transp_fr), title='Fractal down')
 
-// --- Define Bill Williams Fractal BREAKOUT Conditions ---
-bw_fr_buy_break  = ta.crossover(high, last_up_fr_level)
-bw_fr_sell_break = ta.crossunder(low, last_dn_fr_level)
 
-
-//---------------------------------------------------- macd and rsi divergences -------------------------------------------------------------
+//---------------------------------------------------- macd and rsi divergences (Visuals for Chart) -------------------------------------------------------------
 
 rsi_d               = ta.rsi(close, rsi_length)
 
-fast_length         = 12  //input(title="Fast Length", type=input.integer, defval=12, group= "Divergence signal:")
-slow_length         = 26  //input(title="Slow Length", type=input.integer, defval=26, group= "Divergence signal:")
-signal_length       = 9  //input(title="Signal Smoothing", type=input.integer, minval = 1, maxval = 50, defval = 9, group= "Divergence signal:")
-src                 = close  //input(title="Source", type=input.source, defval=close, group= "Divergence signal:")
+fast_length         = 12 
+slow_length         = 26 
+signal_length       = 9  
+src                 = close 
 
 [macdLine, signalLine, histLine] = ta.macd(src, fast_length, slow_length, signal_length)
-// MACD Slow Line Slope
-macd_slow_slope     = ta.change(signalLine)
-macd_slow_up        = macd_slow_slope > 0
-macd_slow_dn        = macd_slow_slope < 0
-// MACD Slow Slope *events* (edge-only)
-macd_slow_up_evt    = ta.crossover(macd_slow_slope, 0)
-macd_slow_dn_evt    = ta.crossunder(macd_slow_slope, 0)
-
-
 
 bar_scr_bear        = src_div == 'close' ? close : high
 bar_scr_bull        = src_div == 'close' ? close : low
@@ -180,32 +196,32 @@ h_div_bear          = bar_scr_bear < ta.highest(bar_scr_bear, bar_div_p)[1] and 
 h_div_bull          = bar_scr_bull > ta.lowest(bar_scr_bull, bar_div_p)[1] and indi_scr < ta.lowest(indi_scr, bar_div_p)[1]
 
 
-plotshape(plot_div ? c_div_bear : na, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,
- textcolor=color.new(color.red, 0),  color=color.new(color.red, 0), title='Classic bear divergence')  // text='cd',
-
-plotshape(plot_div ? c_div_bull : na, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,
- textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Classic bull divergence')  // text='cd',
-
-plotshape(plot_div ? h_div_bear : na, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,
- textcolor=color.new(color.red, 0), color=color.new(color.red, 0), title='Hidden bear divergence')  // text='hd',
-
-plotshape(plot_div ? h_div_bull : na, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,
- textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Hidden bull divergence')  // text='hd',
+plotshape(plot_div ? c_div_bear : na, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,  textcolor=color.new(color.red, 0),  color=color.new(color.red, 0), title='Classic bear divergence') 
+plotshape(plot_div ? c_div_bull : na, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,  textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Classic bull divergence') 
+plotshape(plot_div ? h_div_bear : na, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,  textcolor=color.new(color.red, 0), color=color.new(color.red, 0), title='Hidden bear divergence') 
+plotshape(plot_div ? h_div_bull : na, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,  textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Hidden bull divergence') 
 
 
-//------------------------------------------------------- plot horizontal sr levels/lines -----------------------------------------------------
+//------------------------------------------------------- plot horizontal sr levels/lines (Visuals for Chart) -----------------------------------------------------
 
 // Auto Adaption logic for SR lines
-auto_fr_size = 2
+auto_fr_size = 2  
 
 // Determine appropriate timeframe based on current chart timeframe
-auto_sr_tf = timeframe.isintraday and timeframe.multiplier <= 15 ? '60' :
-             timeframe.isintraday and timeframe.multiplier <= 60 ? '240' :
-             timeframe.isintraday and timeframe.multiplier <= 240 ? 'D' :
-             timeframe.isdaily ? 'W' :
-             timeframe.isweekly ? 'M' :
-             timeframe.ismonthly and timeframe.multiplier == 1 ? '3M' :
-             timeframe.ismonthly and timeframe.multiplier == 3 ? '6M' :
+auto_sr_tf = 
+             timeframe.isintraday and timeframe.multiplier <= 2 ? '15' : 
+             timeframe.isintraday and timeframe.multiplier <= 3 ? '25' : 
+             timeframe.isintraday and timeframe.multiplier <= 5 ? '30' : 
+             timeframe.isintraday and timeframe.multiplier <= 15 ? '120' : 
+             timeframe.isintraday and timeframe.multiplier <= 60 ? '440' : 
+             timeframe.isintraday and timeframe.multiplier <= 120 ? '780' : 
+             timeframe.isintraday and timeframe.multiplier <= 240 ? '2D' : 
+             timeframe.isintraday and timeframe.multiplier <= 480 ? '3D' : 
+             timeframe.isintraday and timeframe.multiplier <= 720 ? '4D' : 
+             timeframe.isdaily ? '2W' : 
+             timeframe.isweekly ? '2M' : 
+             timeframe.ismonthly and timeframe.multiplier == 1 ? '3M' : 
+             timeframe.ismonthly and timeframe.multiplier == 3 ? '6M' : 
              sr_tf  // default to user selection
 
 // Use auto-adapted values if enabled
@@ -221,162 +237,154 @@ fr_up               = request.security(syminfo.tickerid, fractal_tf, ta.valuewhe
 fr_dn               = request.security(syminfo.tickerid, fractal_tf, ta.valuewhen(dn_fr_sr, low[fractal_size], 0))
 
 
-up_fr_line          = plot_sr_lines ? line.new(x1=bar_index[2], x2=bar_index[1], y1=fr_up, y2=fr_up, extend= not extend ? extend.right : extend.both, color=color.new(color.blue, transp_sr),
-                     style=line.style_solid, width=width_sr) : na
-
-dn_fr_line          = plot_sr_lines ? line.new(x1=bar_index[2], x2=bar_index[1], y1=fr_dn, y2=fr_dn, extend= not extend ? extend.right : extend.both, color=color.new(color.blue, transp_sr),
-                     style=line.style_solid, width=width_sr) : na
+up_fr_line          = plot_sr_lines ? line.new(x1=bar_index[2], x2=bar_index[1], y1=fr_up, y2=fr_up, extend= not extend ? extend.right : extend.both, color=color.new(color.blue, transp_sr), style=line.style_solid, width=width_sr) : na
+dn_fr_line          = plot_sr_lines ? line.new(x1=bar_index[2], x2=bar_index[1], y1=fr_dn, y2=fr_dn, extend= not extend ? extend.right : extend.both, color=color.new(color.blue, transp_sr), style=line.style_solid, width=width_sr) : na
 
 
-// Calculation All Time High
-// Rolling All-Time High/Low
+// Calculation All Time High / Low
 var float all_time_high = na
 var float all_time_low  = na
 
 all_time_high := na(all_time_high[1]) ? high : math.max(all_time_high[1], high)
 all_time_low  := na(all_time_low[1])  ? low  : math.min(all_time_low[1],  low)
 
-// --- ATH/ATL Lines (alte Linien sicher löschen, dann neu zeichnen) ---
+// --- ATH/ATL Lines ---
 var line ath_line = na
 
 if plot_sr_lines and bar_index > 0
     if not na(ath_line)
         line.delete(ath_line)
-
-    ath_line := line.new(x1=bar_index[1], y1=all_time_high, x2=bar_index,   y2=all_time_high, extend = not extend ? extend.right : extend.both,
-         color  = color.new(color.blue, transp_sr), style  = line.style_solid, width=width_sr)
+    ath_line := line.new(x1=bar_index[1], y1=all_time_high, x2=bar_index,   y2=all_time_high, extend = not extend ? extend.right : extend.both, color  = color.new(color.blue, transp_sr), style  = line.style_solid, width=width_sr)
 
 
-//----------------------------------------------------------------- ema cloud / hma slope / dmi adx -------------------------------------------------------------------
+//----------------------------------------------------------------- ema cloud / hma slope / dmi adx (Visuals for Chart) -------------------------------------------------------------------
 
-//dmi adx indicator current tf
-[diplus, diminus, adx]  = ta.dmi(di_len, len_smo)
-//adx_slope_up            = ta.rising(adx, 1)
-
-//dmi adx signal current tf
-adx_up_c            = diplus > diminus //and adx_slope_up
-adx_dn_c            = diplus < diminus //and not adx_slope_up
-
-//ema x up current tf
 ema1                = ta.ema(close, ema_inp1)
 ema2                = ta.ema(close, ema_inp2)
-
-// sma1
 sma1                = ta.sma(close, sma1_inp)
 sma1_slope          = sma1 - sma1[1]
 sma1_color          = sma1_slope >= 0 ? color.lime : color.rgb(255, 20, 20)
-
-
-ema_x_up            = ema1 > ema2
-
-//hma slope current tf
-hma                 = ta.hma(close, hma_inp)
-hma_slo_up          = ta.rising(hma, 1)
-
-// plots
-ema1_pl             = plot(en_cloud ? ema1 : na, color=color.new(color.blue, 100), title='EMA 1')
-ema2_pl             = plot(en_cloud ? ema2 : na, color=color.new(color.blue, 100), title='EMA 2')
-
-sma1_pl             = plot(sma1_plot ? sma1 : na, color=sma1_color, linewidth= 1, title='SMA')
-
 ema_buy             = en_cloud ? ema1 > ema2 : na
 ema_sell            = en_cloud ? ema1 < ema2 : na
 
-
+ema1_pl             = plot(en_cloud ? ema1 : na, color=color.new(color.blue, 100), title='EMA 1')
+ema2_pl             = plot(en_cloud ? ema2 : na, color=color.new(color.blue, 100), title='EMA 2')
+sma1_pl             = plot(sma1_plot ? sma1 : na, color=sma1_color, linewidth= 1, title='SMA')          
 
 fill(ema1_pl, ema2_pl, color=color.new(sig_plot and not ema_buy[1] ? color_ema_sig_dn : sig_plot and not ema_sell[1] ? color_ema_sig_up : color_ema_c, transp_ema_c))
 
-//------------------------------------------------------------ trend lines ----------------------------------------------------------------
 
-// --- Fractal Logic for Trendlines (Uses 'fractalBarsPerSide' input) ---
-n_tl = fractalBarsPerSide // Number of bars on each side for trendline fractals
+//------------------------------------------------------------ trend lines (Visuals for Chart) ----------------------------------------------------------------
 
-// Condition for an Up-Fractal for Trendline (highest high in 2*n_tl+1 bars, with the high in the middle [n_tl])
-up_fr_tl = high[n_tl] == ta.highest(high, 2 * n_tl + 1)
+// Determine logic based on input
+use_special_trend = fractalBarsPerSide == 0
+// Force 2 (5-bar fractal) for special mode to ensure stability
+n_tl = use_special_trend ? 2 : fractalBarsPerSide 
 
-// Condition for a Down-Fractal for Trendline (lowest low in 2*n_tl+1 bars, with the low in the middle [n_tl])
-dn_fr_tl = low[n_tl] == ta.lowest(low, 2 * n_tl + 1)
+// --- Detection using Pivot Functions ---
+ph_val = ta.pivothigh(high, n_tl, n_tl)
+pl_val = ta.pivotlow(low, n_tl, n_tl)
 
-// Up-Fractals
-y1_frup_1 = ta.valuewhen(up_fr_tl, high[n_tl], 1)      // Y-value (high of pivot bar)
-y0_frup_0 = ta.valuewhen(up_fr_tl, high[n_tl], 0)      // Y-value (high of pivot bar)
-x1_up_idx_pivot = ta.valuewhen(up_fr_tl, bar_index[n_tl], 1) // X-value (bar_index of pivot bar)
-x0_up_idx_pivot = ta.valuewhen(up_fr_tl, bar_index[n_tl], 0) // X-value (bar_index of pivot bar)
+// --- State Variables (Pivot 0 = Newest, Pivot 1 = Old) ---
+var float y0_up = na
+var int x0_up = na
+var float y1_up = na
+var int x1_up = na
 
-// Down-Fractals
-y1_frdn_1 = ta.valuewhen(dn_fr_tl, low[n_tl], 1)       // Y-value (low of pivot bar)
-y0_frdn_0 = ta.valuewhen(dn_fr_tl, low[n_tl], 0)       // Y-value (low of pivot bar)
-x1_dn_idx_pivot = ta.valuewhen(dn_fr_tl, bar_index[n_tl], 1) // X-value (bar_index of pivot bar)
-x0_dn_idx_pivot = ta.valuewhen(dn_fr_tl, bar_index[n_tl], 0) // X-value (bar_index of pivot bar)
+if not na(ph_val)
+    y1_up := y0_up
+    x1_up := x0_up
+    y0_up := ph_val
+    x0_up := bar_index - n_tl
+
+var float y0_dn = na
+var int x0_dn = na
+var float y1_dn = na
+var int x1_dn = na
+
+if not na(pl_val)
+    y1_dn := y0_dn
+    x1_dn := x0_dn
+    y0_dn := pl_val
+    x0_dn := bar_index - n_tl
+
+// --- Helper Function: Anchored Linear Regression Slope (Closed Candles) ---
+// Instead of average price, we calculate the 'Best Fit Slope' starting from the pivot.
+// Formula: Slope = Sum(dx * dy) / Sum(dx * dx)
+f_calc_anchored_slope(pivot_idx, pivot_val, _src) =>
+    float sum_xy = 0.0
+    float sum_x2 = 0.0
+    
+    if not na(pivot_idx) and not na(pivot_val)
+        int start_idx = pivot_idx + 1
+        int end_idx   = bar_index - 1
+        
+        if end_idx >= start_idx
+            // Loop from last closed bar (offset 1) back to start
+            int dist_to_start = bar_index - start_idx
+            for i = 1 to dist_to_start
+                // Calculate relative X and Y from the Pivot Point
+                // dx = distance from pivot to current bar i
+                // dy = difference in price from pivot to current bar i
+                int bar_idx_i = bar_index - i
+                int dx = bar_idx_i - pivot_idx
+                float dy = _src[i] - pivot_val
+                
+                sum_xy := sum_xy + (dx * dy)
+                sum_x2 := sum_x2 + (float(dx) * float(dx))
+                
+    // Return slope m
+    sum_x2 != 0 ? sum_xy / sum_x2 : na
+
+// Calculate Best Fit Slope based on Pivot 0
+slope_up = use_special_trend ? f_calc_anchored_slope(x0_up, y0_up, high) : na
+slope_dn = use_special_trend ? f_calc_anchored_slope(x0_dn, y0_dn, low)  : na
 
 // --- Draw Trendlines ---
 var line upper_line = na
 var line lower_line = na
 
 if (plot_trendline)
-    // Upper Trendline (connects the pivot points of the last two Up-Fractals)
-    if not na(x1_up_idx_pivot) and not na(x0_up_idx_pivot) and x1_up_idx_pivot != x0_up_idx_pivot
-        line.delete(upper_line[1]) // Delete the previous line
-        upper_line := line.new(x1 = x1_up_idx_pivot, y1 = y1_frup_1,
-                               x2 = x0_up_idx_pivot, y2 = y0_frup_0,
-                               extend = extend.right, color = color.new(color_tr, transp_tr),
-                               style = line.style_solid, width = width_tr)
+    // --- UPPER LINE ---
+    // Mode 0: Start=Newest(x0), Slope based calculation
+    // Mode >0: Start=Old(x1), End=Newest(x0)
+    
+    x1_u = use_special_trend ? x0_up : x1_up
+    y1_u = use_special_trend ? y0_up : y1_up
+    
+    x2_u = use_special_trend ? bar_index - 1 : x0_up
+    // Calculate Y2 based on Slope for Mode 0, or plain value for Mode >0
+    float y2_u = na
+    if use_special_trend
+        if not na(slope_up) and not na(x0_up)
+            // y = mx + b -> y2 = slope * distance + start_y
+            y2_u := y0_up + slope_up * (x2_u - x0_up)
+    else
+        y2_u := y0_up
 
-    // Lower Trendline (connects the pivot points of the last two Dn-Fractals)
-    if not na(x1_dn_idx_pivot) and not na(x0_dn_idx_pivot) and x1_dn_idx_pivot != x0_dn_idx_pivot
-        line.delete(lower_line[1]) // Delete the previous line
-        lower_line := line.new(x1 = x1_dn_idx_pivot, y1 = y1_frdn_1,
-                               x2 = x0_dn_idx_pivot, y2 = y0_frdn_0,
-                               extend = extend.right, color = color.new(color_tr, transp_tr),
-                               style = line.style_solid, width = width_tr)
+    // Draw
+    if not na(x1_u) and not na(x2_u) and x1_u != x2_u and not na(y2_u)
+        line.delete(upper_line) 
+        upper_line := line.new(x1 = x1_u, y1 = y1_u, x2 = x2_u, y2 = y2_u, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
 
-// --- Calculate Y-values of Trendlines at the Current Bar (Extrapolation) ---
-var float y_up_lvl = na
-var float y_dn_lvl = na
+    // --- LOWER LINE ---
+    x1_d = use_special_trend ? x0_dn : x1_dn
+    y1_d = use_special_trend ? y0_dn : y1_dn
+    
+    x2_d = use_special_trend ? bar_index - 1 : x0_dn
+    float y2_d = na
+    if use_special_trend
+        if not na(slope_dn) and not na(x0_dn)
+            y2_d := y0_dn + slope_dn * (x2_d - x0_dn)
+    else
+        y2_d := y0_dn
 
-// Calculation for upper line using pivot indices
-if not na(x1_up_idx_pivot) and not na(x0_up_idx_pivot) and x1_up_idx_pivot != x0_up_idx_pivot
-    delta_idx_up = x0_up_idx_pivot - x1_up_idx_pivot
-    // Prevent division by zero if indices are somehow the same
-    slope_up = delta_idx_up == 0 ? na : (y0_frup_0 - y1_frup_1) / delta_idx_up
-    y_up_lvl := na(slope_up) ? na : slope_up * (bar_index - x0_up_idx_pivot) + y0_frup_0
-
-// Calculation for lower line using pivot indices
-if not na(x1_dn_idx_pivot) and not na(x0_dn_idx_pivot) and x1_dn_idx_pivot != x0_dn_idx_pivot
-    delta_idx_dn = x0_dn_idx_pivot - x1_dn_idx_pivot
-    // Prevent division by zero
-    slope_dn = delta_idx_dn == 0 ? na : (y0_frdn_0 - y1_frdn_1) / delta_idx_dn
-    y_dn_lvl := na(slope_dn) ? na : slope_dn * (bar_index - x0_dn_idx_pivot) + y0_frdn_0
-
-
-// --- Breakout Signals based on Trendline Fractals ---
-
-// Fractal Break Signal (break of the last fractal level used for the trendline)
-frup_buy     = ta.crossover(high, y0_frup_0)
-frdn_sell    = ta.crossunder(low, y0_frdn_0)
-
-// Fractals Trendline Break Signal (break of the extrapolated trendline value)
-buy_up_line  = ta.crossover(high, y_up_lvl)
-sell_dn_line = ta.crossunder(low, y_dn_lvl)
-
-// Combined Signal (Fractal break OR Trendline break)
-fr_tl_buy    = buy_up_line or frup_buy
-fr_tl_sell   = sell_dn_line or frdn_sell
-
-// --- Conflict handling for "MACD Slope/Fractal Break (OR)" ---
-// If one bar breaks BOTH fractals, prefer the *other* component (MACD slope direction).
-fr_conflict      = frup_buy and frdn_sell
-frup_buy_eff     = frup_buy and not frdn_sell            // only up-break without down-break
-frdn_sell_eff    = frdn_sell and not frup_buy            // only down-break without up-break
-tie_buy_pref     = fr_conflict and macd_slow_up          // conflict resolved by MACD slope up
-tie_sell_pref    = fr_conflict and macd_slow_dn          // conflict resolved by MACD slope down
-
-// Filter conditions for trend line signals ('auto' entry direction)
-auto_long    = (adx_up_c and hma_slo_up) or (adx_up_c and ema_x_up) or (hma_slo_up and ema_x_up)
-auto_short   = (adx_dn_c and not hma_slo_up) or (adx_dn_c and not ema_x_up) or (not hma_slo_up and not ema_x_up)
+    if not na(x1_d) and not na(x2_d) and x1_d != x2_d and not na(y2_d)
+        line.delete(lower_line) 
+        lower_line := line.new(x1 = x1_d, y1 = y1_d, x2 = x2_d, y2 = y2_d, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
 
 
-//----------------------------------------------------------- last 12 bar ----------------------------------------------------------
+//----------------------------------------------------------- last 12 bar (Visuals for Chart) ----------------------------------------------------------
 
 l12_long = ta.highest(low, L12_input)
 l12_short = ta.lowest(high, L12_input)
@@ -384,14 +392,9 @@ l12_short = ta.lowest(high, L12_input)
 var bool long_plotted = na
 var bool short_plotted = na
 
-//plot_l12_long = not long_plotted and (low == l12_long)
-//plot_l12_short = not short_plotted and (high == l12_short)
-
-
-// Determine the actual signal trigger point (the bar where the condition is met *for the first time* since the opposite signal)
-plot_l12_long = low == l12_long and (na(short_plotted) or short_plotted) // Trigger long if condition met AND not already in long state (short_plotted is true or na)
-plot_l12_short = high == l12_short and (na(long_plotted) or long_plotted) // Trigger short if condition met AND not already in short state (long_plotted is true or na)
-
+// Determine the actual signal trigger point 
+plot_l12_long = low == l12_long and (na(short_plotted) or short_plotted) 
+plot_l12_short = high == l12_short and (na(long_plotted) or long_plotted) 
 
 if plot_l12_long
     long_plotted := true
@@ -405,7 +408,7 @@ plotchar(plot_l12_bar and plot_l12_long ? l12_long : na, char='L', location=loca
 plotchar(plot_l12_bar and plot_l12_short ? l12_short : na, char='L', location=location.abovebar, color=color.new(color.red, 0), title='L12 short bar')
 
 
-//----------------------------------------------------------- narrow range bar / anticipated fractal----------------------------------------------------------
+//----------------------------------------------------------- narrow range bar / anticipated fractal (Visuals for Chart)----------------------------------------------------------
 
 // --- Narrow Range Bar (NR7) ---
 p_nr_bar = high - low
@@ -417,9 +420,8 @@ bar_5 = high[5] - low[5]
 bar_6 = high[6] - low[6]
 bar_7 = high[7] - low[7]
 
-nr_bar = p_nr_bar < bar_1 and p_nr_bar < bar_2 and p_nr_bar < bar_3 and p_nr_bar < bar_4 and p_nr_bar < bar_5 and p_nr_bar < bar_6 //and p_nr_bar < bar_7
+nr_bar = p_nr_bar < bar_1 and p_nr_bar < bar_2 and p_nr_bar < bar_3 and p_nr_bar < bar_4 and p_nr_bar < bar_5 and p_nr_bar < bar_6 
 
-// Plot NR7 ('n') if toggled on (plot_nr_bar) and condition is met (GRAY)
 plotchar(plot_nr_bar and nr_bar, char='n', location=location.belowbar, color=color.new(color.gray, 0), title='NR bar')
 
 
@@ -429,23 +431,17 @@ af_dn = low < low[1] and low < low[2]
 
 var int last_af_state = 0
 
-// --- Plotting Logic ---
 bool plot_blue_a_now = false
 bool plot_red_a_now = false
 
-if plot_af_bar
-    if af_up and (last_af_state == 0 or last_af_state == -1)
-        plot_blue_a_now := true
-        last_af_state := 1
 
-    else if af_dn and (last_af_state == 0 or last_af_state == 1)
-        plot_red_a_now := true
-        last_af_state := -1
-
-// --- Plotting ---
-plotchar(plot_blue_a_now, char='a', location=location.belowbar, size=size.auto, color=color.new(color.blue, 0), title="Anticipated Fractal Up")
-
-plotchar(plot_red_a_now, char='a', location=location.abovebar, size=size.auto, color=color.new(color.red, 0), title="Anticipated Fractal Down")
+if af_up and (last_af_state == 0 or last_af_state == -1)
+    plot_blue_a_now := true
+    last_af_state := 1
+        
+else if af_dn and (last_af_state == 0 or last_af_state == 1) 
+    plot_red_a_now := true
+    last_af_state := -1
 
 
 //----------------------------------------------- inside bar / outside bar / sandwich bar / pin bar / fakey ---------------------------------------------
@@ -454,31 +450,12 @@ i_bar       = high < high[1] and low > low[1]
 
 o_bar       = high > high[1] and low < low[1]
 
-o_bar_color = close > high[1] ? color.new(color.red, 0) : close < low[1] ? color.new(color.green, 0) :color.new(color.gray, 0)
+o_bar_color = close > high[1] ? color.new(color.red, 0) : close < low[1] ? color.new(color.green, 0) :color.new(color.gray, 0)                  
 
 s_bar       = high[1] < high[2] and low[1] > low[2] and high > high[1] and low < low[1]
 
-
-// major fakey (old logic)
-//f_up_b      = i_bar[2] and low[1] < low[3] and close > high[3] or i_bar[3] and low[2] < low[4] and close > high[4] or i_bar[4] and low[3] < low[5] and close > high[5] or i_bar[2] and close[1] < low[3] and
-//             close > high[3] or i_bar[3] and close[2] < low[4] and close > high[4] or i_bar[4] and close[3] < low[5] and close > high[5]
-
-//f_up        = f_up_b and not f_up_b[1] and not f_up_b[2] and not f_up_b[3] and not f_up_b[4]
-
-//f_dn_b      = i_bar[2] and high[1] > high[3] and close < low[3] or i_bar[3] and high[2] > high[4] and close < low[4] or i_bar[4] and high[3] > high[5] and close < low[5] or i_bar[2] and close[1] > high[3] and
-//             close < low[3] or i_bar[3] and close[2] > high[4] and close < low[4] or i_bar[4] and close[3] > high[5] and close < low[5]
-
-//f_dn        = f_dn_b and not f_dn_b[1] and not f_dn_b[2] and not f_dn_b[3] and not f_dn_b[4]
-
-
-// early fakey
-f_up_e      = i_bar[1] and low < low[1] and close > open[1] and close > open or i_bar[2] and close[1] < low[2] and close > close[1] and high > high[1] or i_bar[1] and
-     low < low[2] and close > close[1] and
-             close > open or i_bar[2] and close[1] < low[3] and close > open and close > open[1]
-
-f_dn_e      = i_bar[1] and high > high[1] and close < open[1] and close < open or i_bar[2] and close[1] > high[2] and close < close[1] and low < low[1] or i_bar[1] and
-     high > high[2] and close < open and
-             close < close[1] or i_bar[2] and close[1] > high[3] and close < open and close < close[1]
+f_up_e      = i_bar[1] and low < low[1] and close > open[1] and close > open or i_bar[2] and close[1] < low[2] and close > close[1] and high > high[1] or i_bar[1] and low < low[2] and close > close[1] and close > open or i_bar[2] and close[1] < low[3] and close > open and close > open[1]
+f_dn_e      = i_bar[1] and high > high[1] and close < open[1] and close < open or i_bar[2] and close[1] > high[2] and close < close[1] and low < low[1] or i_bar[1] and high > high[2] and close < open and close < close[1] or i_bar[2] and close[1] > high[3] and close < open and close < close[1]
 
 
 i_bar_1 = high[1] < high[2] and low[1] > low[2]
@@ -486,74 +463,28 @@ i_bar_2 = high[2] < high[3] and low[2] > low[3]
 i_bar_3 = high[3] < high[4] and low[3] > low[4]
 i_bar_4 = high[4] < high[5] and low[4] > low[5]
 
-f_up_b = ((i_bar_1 and low < low[1] and close > high[1]) or (i_bar_2 and low < low[2] and close > high[2]) or (i_bar_3 and low < low[3] and close > high[3]) or
-     (i_bar_4 and low < low[4] and close > high[4]))
-
+f_up_b = ((i_bar_1 and low < low[1] and close > high[1]) or (i_bar_2 and low < low[2] and close > high[2]) or (i_bar_3 and low < low[3] and close > high[3]) or (i_bar_4 and low < low[4] and close > high[4]))
 f_up = f_up_b and not f_up_b[1]
 
-f_dn_b = ((i_bar_1 and high > high[1] and close < low[1]) or (i_bar_2 and high > high[2] and close < low[2]) or (i_bar_3 and high > high[3] and close < low[3]) or
-     (i_bar_4 and high > high[4] and close < low[4]))
-
+f_dn_b = ((i_bar_1 and high > high[1] and close < low[1]) or (i_bar_2 and high > high[2] and close < low[2]) or (i_bar_3 and high > high[3] and close < low[3]) or (i_bar_4 and high > high[4] and close < low[4]))
 f_dn = f_dn_b and not f_dn_b[1]
-
-
-
-// pinbar
-//candle_body     = math.abs(open - close)
-
-//pivot_up        = ta.pivothigh(high, p_bar_sens_2, 0)
-//pivot_dn        = ta.pivotlow(low, p_bar_sens_2, 0)
-
-//up_wick         = close > open ? high - close : high - open
-//dn_wick         = close > open ? open - low : close - low
-
-//pin_up_def      = high - open > p_bar_sens_1 * candle_body and close < open or high - close > p_bar_sens_1 * candle_body and close > open
-
-//pin_dn_def      = open - low > p_bar_sens_1 * candle_body and close > open or close - low > p_bar_sens_1 * candle_body and close < open
-
-//pin_bar_up      = pin_up_def and pivot_up and up_wick > dn_wick
-//pin_bar_dn      = pin_dn_def and pivot_dn and up_wick < dn_wick
 
 
 plotchar(plot_i_bar ? i_bar : na, char='i', location=location.abovebar, color=color.new(color.gray, 0), title='I bar')
 plotchar(plot_o_bar ? o_bar : na, char='o', location=location.abovebar, color=o_bar_color, title='O bar')
 plotchar(plot_s_bar ? s_bar : na, char='s', location=location.abovebar, color=color.new(color.silver, 0), offset=-1, title='S bar')
-//plotchar(plot_p_bar ? pin_bar_up : na, char='p', location=location.abovebar, color=color.new(color.silver, 0), title='P bar up')
-//plotchar(plot_p_bar ? pin_bar_dn : na, char='p', location=location.belowbar, color=color.new(color.silver, 0), title='P bar down')
 
 plotchar(plot_f_bar ? f_up and (not f_up[1] or not f_up[2] or not f_up[3]) or f_up_e and not f_up : na, char='F', location=location.belowbar, color=color.new(color.blue, 0), title='F bar up')
 plotchar(plot_f_bar ? f_dn and (not f_dn[1] or not f_dn[2] or not f_dn[3]) or f_dn_e and not f_dn : na, char='F', location=location.abovebar, color=color.new(color.red, 0), title='F bar down')
 
-//plotchar(plot_ef_bar ? f_up_e and not f_up : na, char='f', location=location.belowbar, color=color.new(color.blue, 0), title='EF bar up')
-//plotchar(plot_ef_bar ? f_dn_e and not f_dn : na, char='f', location=location.abovebar, color=color.new(color.red, 0), title='EF bar down')
 
-
-//---------------------------------------------------------------- smash days (larry williams) Placeholder for the "holy grail" ------------------------------------------------------
-
-// Smash Days Logic (Larry Williams)
-//smash_day_buy  = close[2] < low[3] and high[1] > high[2]
-//smash_day_sell = close[2] > high[3] and low[1] < low[2]
-
-
-//------------------------------------------------------------- reverse fractal --------------------------------------------------------------------
-
-//rev_up_fr       = ta.pivothigh(2, 1) and close < open
-
-//rev_dn_fr       = ta.pivotlow(2, 1) and close > open
-
-//plotchar(plot_r_fractal ? rev_up_fr : na, char='r', location=location.abovebar, color=color.new(color.red, 0), title='R bar up')
-//plotchar(plot_r_fractal ? rev_dn_fr : na, char='r', location=location.belowbar, color=color.new(color.blue, 0), title='R bar down')
-
-
-//----------------------------------------------------------------- segments --------------------------------------------------------------
+//----------------------------------------------------------------- segments (Visuals for Chart) --------------------------------------------------------------
 
 count1_l                    = 0
 count2_l                    = 0
 segment_1_stat_l            = false
 segment_2_stat_l            = false
 segment_3_stat_l            = false
-
-higher_low                  = low[0] > low[1]
 
 var line segment_low_1_l    = na
 var line segment_low_2_l    = na
@@ -562,7 +493,7 @@ var line segment_low_3_l    = na
 // long segments
 for i = 0 to sb by 1
     count1_l := count1_l + 1
-    if low[1] > low[i + 2]  //and higher_low
+    if low[1] > low[i + 2] 
         segment_low_1_l := line.new(x1=bar_index[2 + i], y1=low[2 + i], x2=bar_index[1], y2=low[1], color=color.new(color_seg, transp_seg), width=3)
         segment_1_stat_l := true
         break
@@ -592,15 +523,13 @@ segment_1_stat_s        = false
 segment_2_stat_s        = false
 segment_3_stat_s        = false
 
-lower_high              = high[0] < high[1]
-
 var line segment_high_1 = na
 var line segment_high_2 = na
 var line segment_high_3 = na
 
 for i = 0 to sb by 1
     count1_s := count1_s + 1
-    if high[1] < high[i + 2]  //and lower_high
+    if high[1] < high[i + 2]  
         segment_high_1 := line.new(x1=bar_index[2 + i], y1=high[2 + i], x2=bar_index[1], y2=high[1], color=color.new(color_seg, transp_seg), width=3)
         segment_1_stat_s := true
         break
@@ -623,165 +552,311 @@ line.delete(plot_segments ? segment_high_2[1] : segment_high_2[0])
 line.delete(plot_segments ? segment_high_3[1] : segment_high_3[0])
 
 
-// OR signals
-segments_buy                        = high > high[1] and segment_1_stat_l and segment_2_stat_l and segment_3_stat_l
-segments_sell                       = low < low[1] and segment_1_stat_s and segment_2_stat_s and segment_3_stat_s
+//------------------------------------------------------------------------ BACKGROUND COLOR LOGIC (MTF Wrapper) ------------------------------------------------------------------
 
-segments_fractals_buy               = segments_buy or high >= y0_frup_0
-segments_fractals_sell              = segments_sell or low <= y0_frdn_0
+// This function encapsulates the logic needed to determine the background signal
+// It is called via request.security to allow MTF plotting
+f_calc_bg_signal() =>
+    // 1. Re-calculate Component Indicators for this Context
+    // Bill Williams Fractals
+    up_fr_c = ta.pivothigh(2, 2)
+    dn_fr_c = ta.pivotlow(2, 2)
+    last_up_fr_level_c = ta.valuewhen(up_fr_c, high[2], 0)
+    last_dn_fr_level_c = ta.valuewhen(dn_fr_c, low[2], 0)
+    bw_fr_buy_break_c  = ta.crossover(high, last_up_fr_level_c)
+    bw_fr_sell_break_c = ta.crossunder(low, last_dn_fr_level_c)
 
-segments_fr_trend_buy               = segments_buy or buy_up_line
-segments_fr_trend_sell              = segments_sell or sell_dn_line
+    // Parabolic SAR (Standard Settings 0.02, 0.02, 0.2)
+    sar_c = ta.sar(0.02, 0.02, 0.2)
+    sar_is_long_c = close > sar_c
 
-segments_fractals_fr_trend_buy      = segments_fractals_buy or buy_up_line
-segments_fractals_fr_trend_sell     = segments_fractals_sell or sell_dn_line
+    // ADX / HMA / EMA
+    [diplus_c, diminus_c, adx_c] = ta.dmi(di_len, len_smo)
+    adx_up_c_val = diplus_c > diminus_c
+    adx_dn_c_val = diplus_c < diminus_c
+    hma_c = ta.hma(close, hma_inp)
+    hma_slo_up_c = ta.rising(hma_c, 1)
+    
+    // MACD
+    [_, macdSignal_c, _] = ta.macd(close, 12, 26, 9)
+    macd_slow_slope_c = ta.change(macdSignal_c)
+    macd_slow_up_c = macd_slow_slope_c > 0
+    macd_slow_dn_c = macd_slow_slope_c < 0
+    macd_slow_up_evt_c = ta.crossover(macd_slow_slope_c, 0)
+    macd_slow_dn_evt_c = ta.crossunder(macd_slow_slope_c, 0)
 
+    // Anticipated Fractal
+    af_up_c = high > high[1] and high > high[2]
+    af_dn_c = low < low[1] and low < low[2]
+    
+    // Last 12 Bar
+    l12_long_c = ta.highest(low, L12_input)
+    l12_short_c = ta.lowest(high, L12_input)
+    var bool long_plotted_c = na
+    var bool short_plotted_c = na
+    plot_l12_long_c = low == l12_long_c and (na(short_plotted_c) or short_plotted_c) 
+    plot_l12_short_c = high == l12_short_c and (na(long_plotted_c) or long_plotted_c)
+    if plot_l12_long_c
+        long_plotted_c := true
+        short_plotted_c := false
+    if plot_l12_short_c
+        short_plotted_c := true
+        long_plotted_c := false
+    
+    // Trendlines Math
+    use_special_trend_c = fractalBarsPerSide == 0
+    n_tl_c = use_special_trend_c ? 2 : fractalBarsPerSide
+    
+    ph_val_c = ta.pivothigh(high, n_tl_c, n_tl_c)
+    pl_val_c = ta.pivotlow(low, n_tl_c, n_tl_c)
 
-// --- Define component signal conditions ---
-// Explicit definition of fractal break signals used for trendlines
-fractal_break_buy = high >= y0_frup_0 and not na(y0_frup_0)
-fractal_break_sell = low <= y0_frdn_0 and not na(y0_frdn_0)
-// Segment signals (segments_buy, segments_sell) and Trendline break signals (buy_up_line, sell_dn_line)
-bool trendline_buy_signal = buy_up_line and not na(y_up_lvl)
-bool trendline_sell_signal = sell_dn_line and not na(y_dn_lvl)
+    // Using VAR to maintain stable state
+    var float y0_up_c = na, var int x0_up_c = na
+    var float y1_up_c = na, var int x1_up_c = na
 
+    if not na(ph_val_c)
+        y1_up_c := y0_up_c
+        x1_up_c := x0_up_c
+        y0_up_c := ph_val_c
+        x0_up_c := bar_index - n_tl_c
 
-//------------------------------------------------------------------------ State Variables for Time-Delayed AND Signals ------------------------------------
-// These variables store whether a component's buy signal has occurred since the last sell flip (and vice-versa)
-// 'var' makes them persistent across bars. Initialize with 'false'.
-var bool seg_buy_occurred = false     // Has segment buy occurred since last sell flip?
-var bool seg_sell_occurred = false    // Has segment sell occurred since last buy flip?
-var bool frac_buy_occurred = false    // Has fractal break buy occurred since last sell flip?
-var bool frac_sell_occurred = false   // Has fractal break sell occurred since last buy flip?
-var bool tl_buy_occurred = false      // Has trendline break buy occurred since last sell flip?
-var bool tl_sell_occurred = false     // Has trendline break sell occurred since last buy flip?
-var bool macd_up_occurred = false     // Has MACD slope up-event occurred since last sell flip?
-var bool macd_dn_occurred = false     // Has MACD slope down-event occurred since last buy flip?
+    var float y0_dn_c = na, var int x0_dn_c = na
+    var float y1_dn_c = na, var int x1_dn_c = na
 
+    if not na(pl_val_c)
+        y1_dn_c := y0_dn_c
+        x1_dn_c := x0_dn_c
+        y0_dn_c := pl_val_c
+        x0_dn_c := bar_index - n_tl_c
 
-//------------------------------------------------------------------------ Update Component State Variables -----------------------------------------------------------
-// Update on each bar if a component signal occurs. They only get reset upon a background flip.
+    // --- Slope Calculation (Anchored Regression on Closed Candles) ---
+    float slope_up_c = na
+    float sum_xy_u = 0.0
+    float sum_x2_u = 0.0
+    
+    if use_special_trend_c and not na(x0_up_c) and not na(y0_up_c)
+        int start_idx_u = x0_up_c + 1
+        int end_idx_u   = bar_index - 1
+        if end_idx_u >= start_idx_u
+            for i = 1 to (end_idx_u - start_idx_u + 1)
+                int bar_idx_i = bar_index - i
+                int dx = bar_idx_i - x0_up_c
+                float dy = high[i] - y0_up_c
+                sum_xy_u := sum_xy_u + (dx * dy)
+                sum_x2_u := sum_x2_u + (float(dx) * float(dx))
+            
+            slope_up_c := sum_x2_u != 0 ? sum_xy_u / sum_x2_u : na
 
-// Segment state update
-if segments_buy
-    seg_buy_occurred := true
-if segments_sell
-    seg_sell_occurred := true
+    float slope_dn_c = na
+    float sum_xy_d = 0.0
+    float sum_x2_d = 0.0
+    
+    if use_special_trend_c and not na(x0_dn_c) and not na(y0_dn_c)
+        int start_idx_d = x0_dn_c + 1
+        int end_idx_d   = bar_index - 1
+        if end_idx_d >= start_idx_d
+            for i = 1 to (end_idx_d - start_idx_d + 1)
+                int bar_idx_i = bar_index - i
+                int dx = bar_idx_i - x0_dn_c
+                float dy = low[i] - y0_dn_c
+                sum_xy_d := sum_xy_d + (dx * dy)
+                sum_x2_d := sum_x2_d + (float(dx) * float(dx))
+            
+            slope_dn_c := sum_x2_d != 0 ? sum_xy_d / sum_x2_d : na
 
-// Fractal break state update (using trendline fractals)
-if fractal_break_buy
-    frac_buy_occurred := true
-if fractal_break_sell
-    frac_sell_occurred := true
+    var float y_up_lvl_c = na
+    var float y_dn_lvl_c = na
+    
+    // --- Projection Logic ---
+    if use_special_trend_c
+        if not na(slope_up_c) and not na(x0_up_c)
+            y_up_lvl_c := y0_up_c + slope_up_c * (bar_index - x0_up_c)
+        if not na(slope_dn_c) and not na(x0_dn_c)
+            y_dn_lvl_c := y0_dn_c + slope_dn_c * (bar_index - x0_dn_c)
+    else
+        if not na(x1_up_c) and not na(x0_up_c) and x1_up_c != x0_up_c 
+            delta_idx = x0_up_c - x1_up_c
+            m_std = (y0_up_c - y1_up_c) / delta_idx
+            y_up_lvl_c := y1_up_c + m_std * (bar_index - x1_up_c)
+        if not na(x1_dn_c) and not na(x0_dn_c) and x1_dn_c != x0_dn_c 
+            delta_idx = x0_dn_c - x1_dn_c
+            m_std = (y0_dn_c - y1_dn_c) / delta_idx
+            y_dn_lvl_c := y1_dn_c + m_std * (bar_index - x1_dn_c)
 
-// Trendline break state update
-if trendline_buy_signal
-    tl_buy_occurred := true
-if trendline_sell_signal
-    tl_sell_occurred := true
+    // --- LOGIC FIX: State Based Check instead of Crossover ---
+    // If Close is above upper line -> TRUE (Green State)
+    // If Close is below lower line -> TRUE (Red State)
+    buy_up_line_c  = not na(y_up_lvl_c) and close > y_up_lvl_c
+    sell_dn_line_c = not na(y_dn_lvl_c) and close < y_dn_lvl_c
+    
+    // Standard Fractal Levels
+    frup_buy_std_c = ta.crossover(high, y0_up_c)
+    frdn_sell_std_c = ta.crossunder(low, y0_dn_c)
+    
+    fr_tl_buy_c    = buy_up_line_c or frup_buy_std_c
+    fr_tl_sell_c   = sell_dn_line_c or frdn_sell_std_c
+    fr_conflict_c  = frup_buy_std_c and frdn_sell_std_c
+    frup_buy_eff_c = frup_buy_std_c and not frdn_sell_std_c
+    frdn_sell_eff_c = frdn_sell_std_c and not frup_buy_std_c
+    tie_buy_pref_c = fr_conflict_c and macd_slow_up_c
+    tie_sell_pref_c = fr_conflict_c and macd_slow_dn_c
 
-// MACD slope event state update
-if macd_slow_up_evt
-    macd_up_occurred := true
-if macd_slow_dn_evt
-    macd_dn_occurred := true
+    // Segments Logic (Declared properly)
+    int count1_l_c = 0 
+    int count2_l_c = 0 
+    int count1_s_c = 0 
+    int count2_s_c = 0
+    bool segment_1_stat_l_c = false 
+    bool segment_2_stat_l_c = false 
+    bool segment_3_stat_l_c = false
+    bool segment_1_stat_s_c = false 
+    bool segment_2_stat_s_c = false 
+    bool segment_3_stat_s_c = false
+    
+    for i = 0 to sb
+        count1_l_c := count1_l_c + 1
+        if low[1] > low[i + 2] 
+            segment_1_stat_l_c := true
+            break
+    for i = count1_l_c to sb + count1_l_c
+        count2_l_c := count2_l_c + 1
+        if low[1 + count1_l_c] > low[i + 2] and segment_1_stat_l_c
+            segment_2_stat_l_c := true
+            break
+    for i = count2_l_c to sb + count2_l_c
+        if low[1 + count1_l_c + count2_l_c] > low[i + 2 + count1_l_c] and segment_2_stat_l_c
+            segment_3_stat_l_c := true
+            break
+            
+    for i = 0 to sb
+        count1_s_c := count1_s_c + 1
+        if high[1] < high[i + 2]  
+            segment_1_stat_s_c := true
+            break
+    for i = count1_s_c to sb + count1_s_c
+        count2_s_c := count2_s_c + 1
+        if high[1 + count1_s_c] < high[i + 2] and segment_1_stat_s_c
+            segment_2_stat_s_c := true
+            break
+    for i = count2_s_c to sb + count2_s_c
+        if high[1 + count1_s_c + count2_s_c] < high[i + 2 + count1_s_c] and segment_2_stat_s_c
+            segment_3_stat_s_c := true
+            break
+            
+    segments_buy_c = high > high[1] and segment_1_stat_l_c and segment_2_stat_l_c and segment_3_stat_l_c
+    segments_sell_c = low < low[1] and segment_1_stat_s_c and segment_2_stat_s_c and segment_3_stat_s_c
+    
+    // Combining
+    segments_fractals_buy_c = segments_buy_c or high >= y0_up_c
+    segments_fractals_sell_c = segments_sell_c or low <= y0_dn_c
+    segments_fr_trend_buy_c = segments_buy_c or buy_up_line_c
+    segments_fr_trend_sell_c = segments_sell_c or sell_dn_line_c
+    segments_fractals_fr_trend_buy_c = segments_fractals_buy_c or buy_up_line_c
+    segments_fractals_fr_trend_sell_c = segments_fractals_sell_c or sell_dn_line_c
+    
+    fractal_break_buy_c = high >= y0_up_c and not na(y0_up_c) 
+    fractal_break_sell_c = low <= y0_dn_c and not na(y0_dn_c) 
+    trendline_buy_signal_c = buy_up_line_c 
+    trendline_sell_signal_c = sell_dn_line_c 
+    
+    // State Variables
+    var bool seg_buy_occurred_c = false
+    var bool seg_sell_occurred_c = false
+    var bool frac_buy_occurred_c = false
+    var bool frac_sell_occurred_c = false
+    var bool tl_buy_occurred_c = false
+    var bool tl_sell_occurred_c = false
+    var bool macd_up_occurred_c = false
+    var bool macd_dn_occurred_c = false
+    
+    if segments_buy_c
+        seg_buy_occurred_c := true
+    if segments_sell_c
+        seg_sell_occurred_c := true
+    if fractal_break_buy_c
+        frac_buy_occurred_c := true
+    if fractal_break_sell_c
+        frac_sell_occurred_c := true
+    if trendline_buy_signal_c 
+        tl_buy_occurred_c := true
+    if trendline_sell_signal_c 
+        tl_sell_occurred_c := true
+    if macd_slow_up_evt_c
+        macd_up_occurred_c := true
+    if macd_slow_dn_evt_c
+        macd_dn_occurred_c := true
+        
+    // 2. Determine Conditions for this Context
+    buy_flip_condition_met = (selected_bg_signal == "Bill Williams Fractals BG" and bw_fr_buy_break_c) or
+                             (selected_bg_signal == "Anticipated Fractal BG" and af_up_c) or
+                             (selected_bg_signal == "Last 12 Bar BG" and plot_l12_long_c) or
+                             (selected_bg_signal == "MACD Slope/Fractal Break BG (OR)" and (macd_slow_up_evt_c or frup_buy_eff_c or tie_buy_pref_c)) or
+                             (selected_bg_signal == "Trend Line/Fractal Break BG (OR)" and fr_tl_buy_c) or 
+                             (selected_bg_signal == "Fractals Trend Lines" and buy_up_line_c) or
+                             (selected_bg_signal == "Segments BG" and segments_buy_c) or
+                             (selected_bg_signal == "Segments/Fractals BG (OR)" and segments_fractals_buy_c) or 
+                             (selected_bg_signal == "Segments/Trend Line BG (OR)" and segments_fr_trend_buy_c) or 
+                             (selected_bg_signal == "Segments/Fractals/Trend Line BG (OR)" and segments_fractals_fr_trend_buy_c) or 
+                             (selected_bg_signal == "Segments/Fractals BG (AND)" and seg_buy_occurred_c and frac_buy_occurred_c) or
+                             (selected_bg_signal == "Segments/Trend Line BG (AND)" and seg_buy_occurred_c and tl_buy_occurred_c) or
+                             (selected_bg_signal == "Segments/Fractals/Trend Line BG (AND)" and seg_buy_occurred_c and frac_buy_occurred_c and tl_buy_occurred_c) or
+                             (selected_bg_signal == "Segments/MACD Slope BG (AND)" and seg_buy_occurred_c and macd_up_occurred_c) or
+                             (selected_bg_signal == "MACD Slope/Fractals Break BG (AND)" and macd_up_occurred_c and frac_buy_occurred_c)
 
-//------------------------------------------------------------------------ Background Color Logic ------------------------------------------------------------------
+    sell_flip_condition_met = (selected_bg_signal == "Bill Williams Fractals BG" and bw_fr_sell_break_c) or
+                              (selected_bg_signal == "Anticipated Fractal BG" and af_dn_c) or
+                              (selected_bg_signal == "Last 12 Bar BG" and plot_l12_short_c) or
+                              (selected_bg_signal == "MACD Slope/Fractal Break BG (OR)" and (macd_slow_dn_evt_c or frdn_sell_eff_c or tie_sell_pref_c)) or
+                              (selected_bg_signal == "Trend Line/Fractal Break BG (OR)" and fr_tl_sell_c) or 
+                              (selected_bg_signal == "Fractals Trend Lines" and sell_dn_line_c) or
+                              (selected_bg_signal == "Segments BG" and segments_sell_c) or
+                              (selected_bg_signal == "Segments/Fractals BG (OR)" and segments_fractals_sell_c) or 
+                              (selected_bg_signal == "Segments/Trend Line BG (OR)" and segments_fr_trend_sell_c) or 
+                              (selected_bg_signal == "Segments/Fractals/Trend Line BG (OR)" and segments_fractals_fr_trend_sell_c) or 
+                              (selected_bg_signal == "Segments/Fractals BG (AND)" and seg_sell_occurred_c and frac_sell_occurred_c) or
+                              (selected_bg_signal == "Segments/Trend Line BG (AND)" and seg_sell_occurred_c and tl_sell_occurred_c) or
+                              (selected_bg_signal == "Segments/Fractals/Trend Line BG (AND)" and seg_sell_occurred_c and frac_sell_occurred_c and tl_sell_occurred_c) or
+                              (selected_bg_signal == "Segments/MACD Slope BG (AND)" and seg_sell_occurred_c and macd_dn_occurred_c) or
+                              (selected_bg_signal == "MACD Slope/Fractals Break BG (AND)" and macd_dn_occurred_c and frac_sell_occurred_c)
 
-// These variables determine if the *conditions* for a flip are met on the current bar.
-// BUY Flip Condition: Met if a standard OR/single signal triggers, OR if an AND signal is selected and all its components have occurred.
-buy_flip_condition_met = (selected_bg_signal == "Bill Williams Fractals BG" and bw_fr_buy_break) or
-                         (selected_bg_signal == "Anticipated Fractal BG" and af_up) or
-                         (selected_bg_signal == "Last 12 Bar BG" and plot_l12_long) or
-                         (selected_bg_signal == "MACD Slope/Fractal Break BG (OR)" and (macd_slow_up_evt or frup_buy_eff or tie_buy_pref)) or
-                         (selected_bg_signal == "Trend Line/Fractal Break BG (OR)" and fr_tl_buy) or
-                         (selected_bg_signal == "Segments BG" and segments_buy) or
-                         (selected_bg_signal == "Segments/Fractals BG (OR)" and segments_fractals_buy) or
-                         (selected_bg_signal == "Segments/Trend Line BG (OR)" and segments_fr_trend_buy) or
-                         (selected_bg_signal == "Segments/Fractals/Trend Line BG (OR)" and segments_fractals_fr_trend_buy) or
-                         (selected_bg_signal == "Segments/Fractals BG (AND)" and seg_buy_occurred and frac_buy_occurred) or
-                         (selected_bg_signal == "Segments/Trend Line BG (AND)" and seg_buy_occurred and tl_buy_occurred) or
-                         (selected_bg_signal == "Segments/Fractals/Trend Line BG (AND)" and seg_buy_occurred and frac_buy_occurred and tl_buy_occurred) or
-                         (selected_bg_signal == "Segments/MACD Slope BG (AND)" and seg_buy_occurred and macd_up_occurred) or
-                         (selected_bg_signal == "MACD Slope/Fractals Break BG (AND)" and macd_up_occurred and frac_buy_occurred)
+    var bool bg_state_is_green = na 
 
-// SELL Flip Condition: Met if a standard OR/single signal triggers, OR if an AND signal is selected and all its components have occurred.
-sell_flip_condition_met = (selected_bg_signal == "Bill Williams Fractals BG" and bw_fr_sell_break) or
-                          (selected_bg_signal == "Anticipated Fractal BG" and af_dn) or
-                          (selected_bg_signal == "Last 12 Bar BG" and plot_l12_short) or
-                          (selected_bg_signal == "MACD Slope/Fractal Break BG (OR)" and (macd_slow_dn_evt or frdn_sell_eff or tie_sell_pref)) or
-                          (selected_bg_signal == "Trend Line/Fractal Break BG (OR)" and fr_tl_sell) or
-                          (selected_bg_signal == "Segments BG" and segments_sell) or
-                          (selected_bg_signal == "Segments/Fractals BG (OR)" and segments_fractals_sell) or
-                          (selected_bg_signal == "Segments/Trend Line BG (OR)" and segments_fr_trend_sell) or
-                          (selected_bg_signal == "Segments/Fractals/Trend Line BG (OR)" and segments_fractals_fr_trend_sell) or
-                          (selected_bg_signal == "Segments/Fractals BG (AND)" and seg_sell_occurred and frac_sell_occurred) or
-                          (selected_bg_signal == "Segments/Trend Line BG (AND)" and seg_sell_occurred and tl_sell_occurred) or
-                          (selected_bg_signal == "Segments/Fractals/Trend Line BG (AND)" and seg_sell_occurred and frac_sell_occurred and tl_sell_occurred) or
-                          (selected_bg_signal == "Segments/MACD Slope BG (AND)" and seg_sell_occurred and macd_dn_occurred) or
-                          (selected_bg_signal == "MACD Slope/Fractals Break BG (AND)" and macd_dn_occurred and frac_sell_occurred)
+    if buy_flip_condition_met and (na(bg_state_is_green) or not bg_state_is_green[1]) 
+        bg_state_is_green := true
+        seg_sell_occurred_c := false
+        frac_sell_occurred_c := false
+        tl_sell_occurred_c := false
+        macd_dn_occurred_c := false
 
+    else if sell_flip_condition_met and (na(bg_state_is_green) or bg_state_is_green[1]) 
+        bg_state_is_green := false
+        seg_buy_occurred_c := false
+        frac_buy_occurred_c := false
+        tl_buy_occurred_c := false
+        macd_up_occurred_c := false
+    else
+        bg_state_is_green := bg_state_is_green[1]
 
-// --- State Change and Component Reset Logic ---
-// This section determines if the background *actually* flips and resets the opposite component flags.
-
-var bool bg_state_is_green = na // Main background state (Green=Buy, Red=Sell, NA=Initial/Neutral)
-
-// Check if a BUY flip should happen
-if buy_flip_condition_met and (na(bg_state_is_green) or not bg_state_is_green[1]) // Check previous state to avoid rapid flipping on same bar
-    // Condition met AND state was previously Red or NA -> Flip to Green
-    bg_state_is_green := true
-    // Reset the SELL component flags because we are now entering a Buy state
-    seg_sell_occurred := false
-    frac_sell_occurred := false
-    tl_sell_occurred := false
-    macd_dn_occurred := false
-    // Optionally reset buy flags too, if a signal should only trigger once per sequence
-    // seg_buy_occurred := false
-    // frac_buy_occurred := false
-    // tl_buy_occurred := false
-
-// Check if a SELL flip should happen
-else if sell_flip_condition_met and (na(bg_state_is_green) or bg_state_is_green[1]) // Check previous state
-    // Condition met AND state was previously Green or NA -> Flip to Red
-    bg_state_is_green := false
-    // Reset the BUY component flags because we are now entering a Sell state
-    seg_buy_occurred := false
-    frac_buy_occurred := false
-    tl_buy_occurred := false
-    macd_up_occurred := false
-    // Optionally reset sell flags too
-    // seg_sell_occurred := false
-    // frac_sell_occurred := false
-    // tl_sell_occurred := false
-else
-    // If no flip condition is met, maintain the previous state
-    bg_state_is_green := bg_state_is_green[1]
-
-
-// --- Final Color Determination ---
-// Determine the final background color based on the selected signal type and the current state.
-
-bg_final_color = if selected_bg_signal == "None"
-    na // No background color
-else if selected_bg_signal == "DMI ADX BG" // Non-stateful signal (color determined directly by current condition)
-    adx_up_c ? color.new(color.green, transp_bg) : adx_dn_c ? color.new(color.red, transp_bg) : color.new(color.gray, transp_bg) // Added gray for neutral
-else if selected_bg_signal == "HMA Slope BG" // Non-stateful signal (color determined directly by current condition)
-    hma_slo_up ? color.new(color.green, transp_bg) : not hma_slo_up ? color.new(color.red, transp_bg) : na // HMA slope is usually either up or down
-else if selected_bg_signal == "MACD Slow Slope BG" // Non-stateful signal (color determined directly by current condition)
-    macd_slow_up ? color.new(color.green, transp_bg) : macd_slow_dn ? color.new(color.red, transp_bg) : color.new(color.gray, transp_bg)
-else // Stateful signals (OR and time-delayed AND) use the tracked bg_state_is_green
-    // Ensure bg_state_is_green is not na before coloring
-    is_green = na(bg_state_is_green) ? false : bg_state_is_green // Default to false (red) if na initially? Or handle na explicitly
-    is_red = na(bg_state_is_green) ? false : not bg_state_is_green
-
-    na(bg_state_is_green) ? na : bg_state_is_green ? color.new(color.green, transp_bg) : color.new(color.red, transp_bg)
-    // Alternative: Default to gray if state is na
-    // na(bg_state_is_green) ? color.new(color.gray, transp_bg) : bg_state_is_green ? color.new(color.green, transp_bg) : color.new(color.red, transp_bg)
-
+    // 3. Return Result Color
+    bg_color_res = if selected_bg_signal == "None"
+        na 
+    else if selected_bg_signal == "DMI ADX BG" 
+        adx_up_c_val ? color.new(color.green, transp_bg) : adx_dn_c_val ? color.new(color.red, transp_bg) : color.new(color.gray, transp_bg) 
+    else if selected_bg_signal == "HMA Slope BG" 
+        hma_slo_up_c ? color.new(color.green, transp_bg) : not hma_slo_up_c ? color.new(color.red, transp_bg) : na 
+    else if selected_bg_signal == "Parabolic SAR BG"
+        sar_is_long_c ? color.new(color.green, transp_bg) : color.new(color.red, transp_bg)
+    else if selected_bg_signal == "MACD Slow Slope BG" 
+        macd_slow_up_c ? color.new(color.green, transp_bg) : macd_slow_dn_c ? color.new(color.red, transp_bg) : color.new(color.gray, transp_bg)
+    else 
+        na(bg_state_is_green) ? na : bg_state_is_green ? color.new(color.green, transp_bg) : color.new(color.red, transp_bg)
+    
+    bg_color_res
+// --- Execute MTF Request ---
+final_bg_color = request.security(syminfo.tickerid, bg_tf_select, f_calc_bg_signal())
 
 // Apply the calculated background color
-bgcolor(bg_final_color, title="Selected Background Signal")
+bgcolor(final_bg_color, title="Selected Background Signal")
 
 
 //-------------------------------------------------------------------- info panel -------------------------------------------------------------------------
@@ -871,6 +946,21 @@ color_blue_1    = color.new(color.blue, 30)
 color_red_1     = color.new(color.red, 30)
 color_gray_1    = color.new(color.gray, 30)
 
+//current tf condition for adx, hama and ema
+// RECALC for info panel table to ensure it matches current chart regardless of bg signal
+[_diplus_inf, _diminus_inf, _adx_inf]  = ta.dmi(di_len, len_smo) 
+adx_up_inf            = _diplus_inf > _diminus_inf
+adx_dn_inf            = _diplus_inf < _diminus_inf
+ema1_inf              = ta.ema(close, ema_inp1)
+ema2_inf              = ta.ema(close, ema_inp2)
+ema_x_up_inf          = ema1_inf > ema2_inf   
+hma_inf               = ta.hma(close, hma_inp)                  
+hma_slo_up_inf        = ta.rising(hma_inf, 1)                
+
+a_color_c       = adx_up_inf ? color_blue_1 : adx_dn_inf ? color_red_1 : color_gray_1
+h_color_c       = hma_slo_up_inf ? color_blue_1 : not hma_slo_up_inf ? color_red_1 : color_gray_1
+e_color_c       = ema_x_up_inf ? color_blue_1 : not ema_x_up_inf ? color_red_1 : color_gray_1
+
 
 //adx long htf
 adx_4h_up       = request.security(syminfo.tickerid, '240', adx_up_4h)
@@ -917,12 +1007,6 @@ e_color_w       = e1xe2_w_up ? color_blue_1 : not e1xe2_w_up ? color_red_1 : col
 e_color_m       = e1xe2_m_up ? color_blue_1 : not e1xe2_m_up ? color_red_1 : color_gray_1
 
 
-//current tf condition for adx, hama and ema
-a_color_c       = adx_up_c ? color_blue_1 : adx_dn_c ? color_red_1 : color_gray_1
-h_color_c       = hma_slo_up ? color_blue_1 : not hma_slo_up ? color_red_1 : color_gray_1
-e_color_c       = ema_x_up ? color_blue_1 : not ema_x_up ? color_red_1 : color_gray_1
-
-
 //mtf time frames
 Intra           = timeframe.isintraday
 Intra_D         = timeframe.isintraday or timeframe.isdaily
@@ -931,8 +1015,7 @@ Intra_D_W_M     = timeframe.isintraday or timeframe.isdaily or timeframe.isweekl
 
 
 if adx_trend
-    var info_panel = table.new(position = position.bottom_left, columns = 4, rows = 7, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, 
-                     frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50))
+    var info_panel = table.new(position = position.bottom_left, columns = 4, rows = 7, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50))
 
     table.cell(table_id=info_panel, column=0, row=0, text="C", text_size= size.small, text_color=color.silver)
     table.cell(table_id=info_panel, column=1, row=0, bgcolor=(Intra_D_W_M) ? a_color_c : na, width=2)
@@ -965,7 +1048,7 @@ if adx_trend
     table.cell(table_id=info_panel, column=3, row=5, bgcolor=(Intra_D_W_M) ? e_color_m : na, width=2)
 
     table.cell(table_id=info_panel, column=0, row=6, text="ATR14", text_size= size.small, text_color=color.silver)
-    table.cell(table_id=info_panel, column=2, row=6, text=str.tostring(ta.atr(14), '#'), text_color=color.silver)             //'#.000' - format
+    table.cell(table_id=info_panel, column=2, row=6, text=str.tostring(ta.atr(14), '#'), text_color=color.silver)
 
 
 // ----------------------------------------------------------- pivot points -----------------------------------------------------------------
@@ -995,23 +1078,11 @@ m12_low         = request.security(syminfo.tickerid, '12M', low[1])
 m12_close       = request.security(syminfo.tickerid, '12M', close[1])
 
 // P pivot points
-//d_PP            = (d_high + d_low + d_close) / 3
 w_PP            = (w_high + w_low + w_close) / 3
 m_PP            = (m_high + m_low + m_close) / 3
 m3_PP           = (m3_high + m3_low + m3_close) / 3
 m6_PP           = (m6_high + m6_low + m6_close) / 3
 m12_PP          = (m12_high + m12_low + m12_close) / 3
-
-
-// daily R/S pivot points
-//d_R1 = d_PP + (d_PP - d_low)
-//d_R2 = d_PP + (d_high - d_low)
-//d_R3 = d_high + 2 * (d_PP - d_low) 
-
-//d_S1 = d_PP - (d_high - d_PP)
-//d_S2 = d_PP - (d_high - d_low)
-//d_S3 = d_low - 2 * (d_high - d_PP)
-
 
 // weekly R/S pivot points
 w_R1            = w_PP + w_PP - w_low
@@ -1022,7 +1093,6 @@ w_S1            = w_PP - (w_high - w_PP)
 w_S2            = w_PP - (w_high - w_low)
 w_S3            = w_low - 2 * (w_high - w_PP)
 
-
 // monthly R/S pivot points
 m_R1            = m_PP + m_PP - m_low
 m_R2            = m_PP + m_high - m_low
@@ -1031,7 +1101,6 @@ m_R3            = m_high + 2 * (m_PP - m_low)
 m_S1            = m_PP - (m_high - m_PP)
 m_S2            = m_PP - (m_high - m_low)
 m_S3            = m_low - 2 * (m_high - m_PP)
-
 
 // 3 month R/S pivot points
 m3_R1           = m3_PP + m3_PP - m3_low
@@ -1042,7 +1111,6 @@ m3_S1           = m3_PP - (m3_high - m3_PP)
 m3_S2           = m3_PP - (m3_high - m3_low)
 m3_S3           = m3_low - 2 * (m3_high - m3_PP)
 
-
 // 6 month R/S pivot points
 m6_R1           = m6_PP + m6_PP - m6_low
 m6_R2           = m6_PP + m6_high - m6_low
@@ -1051,7 +1119,6 @@ m6_R3           = m6_high + 2 * (m6_PP - m6_low)
 m6_S1           = m6_PP - (m6_high - m6_PP)
 m6_S2           = m6_PP - (m6_high - m6_low)
 m6_S3           = m6_low - 2 * (m6_high - m6_PP)
-
 
 // 12 month R/S pivot points
 m12_R1          = m12_PP + m12_PP - m12_low
@@ -1063,85 +1130,47 @@ m12_S2          = m12_PP - (m12_high - m12_low)
 m12_S3          = m12_low - 2 * (m12_high - m12_PP)
 
 
-
-//d_PP_line       = Intra and plot_pivots_d ? line.new(x1=time, x2=time + 10, xloc = xloc.bar_time, y1=d_PP, y2=d_PP, color=color.new(color.blue, 0), width=2) : na
-
-//line.delete(Intra and plot_pivots_d ? d_PP_line[1] : d_PP_line[0])
-
-
-//line.set_xloc(d_PP_line, time + (0), time + (100), xloc.bar_time)
-
-
-
-
-
-//plot P/R/S daily pivot points
-//plot(Intra and plot_pivots_d ? d_PP : na, color= color.yellow, title= "PP", style = plot.style_line, linewidth= 2, show_last= 1, offset= 2)
-
-//plot(Intra and plot_pivots_d ? d_R1 : na, color= color.red, title= "R1", style = plot.style_line, linewidth= 2, show_last= 1, offset= 2)
-//plot(Intra and plot_pivots_d ? d_R2 : na, color= color.red, title= "R2", style = plot.style_line, linewidth= 2, show_last= 1, offset= 2)
-//plot(Intra and plot_pivots_d ? d_R3 : na, color= color.red, title= "R3", style = plot.style_line, linewidth= 2, show_last= 1, offset= 2)
-
-//plot(Intra and plot_pivots_d ? d_S1 : na, color= color.green, title= "S1", style = plot.style_line, linewidth= 2, show_last= 1, offset= 2)
-//plot(Intra and plot_pivots_d ? d_S2 : na, color= color.green, title= "S2", style = plot.style_line, linewidth= 2, show_last= 1, offset= 2)
-//plot(Intra and plot_pivots_d ? d_S3 : na, color= color.green, title= "S3", style = plot.style_line, linewidth= 2, show_last= 1, offset= 2)
-
-
 //plot P/R/S weekly pivot points
 plot(Intra_D and plot_pivots_w ? w_PP : na, color= color.yellow, title= "W PP", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
-
 plot(Intra_D and plot_pivots_w ? w_R1 : na, color= color.red, title= "W R1", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
 plot(Intra_D and plot_pivots_w ? w_R2 : na, color= color.red, title= "W R2", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
 plot(Intra_D and plot_pivots_w ? w_R3 : na, color= color.red, title= "W R3", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
-
 plot(Intra_D and plot_pivots_w ? w_S1 : na, color= color.green, title= "w S1", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
 plot(Intra_D and plot_pivots_w ? w_S2 : na, color= color.green, title= "w S2", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
 plot(Intra_D and plot_pivots_w ? w_S3 : na, color= color.green, title= "W S3", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
 
-
 //plot P/R/S 1 month pivot points
 plot(Intra_D_W and plot_pivots_m ? m_PP : na, color=color.new(color.yellow, 0), title='M PP', style=plot.style_line, linewidth=4, show_last=1, offset=3)
-
 plot(Intra_D_W and plot_pivots_m ? m_R1 : na, color=color.new(color.red, 0), title='M R1', style=plot.style_line, linewidth=4, show_last=1, offset=3)
 plot(Intra_D_W and plot_pivots_m ? m_R2 : na, color=color.new(color.red, 0), title='M R2', style=plot.style_line, linewidth=4, show_last=1, offset=3)
 plot(Intra_D_W and plot_pivots_m ? m_R3 : na, color=color.new(color.red, 0), title='M R3', style=plot.style_line, linewidth=4, show_last=1, offset=3)
-
 plot(Intra_D_W and plot_pivots_m ? m_S1 : na, color=color.new(color.green, 0), title='M S1', style=plot.style_line, linewidth=4, show_last=1, offset=3)
 plot(Intra_D_W and plot_pivots_m ? m_S2 : na, color=color.new(color.green, 0), title='M S2', style=plot.style_line, linewidth=4, show_last=1, offset=3)
 plot(Intra_D_W and plot_pivots_m ? m_S3 : na, color=color.new(color.green, 0), title='M S3', style=plot.style_line, linewidth=4, show_last=1, offset=3)
 
-
 //plot P/R/S 3 month pivot points
 plot(Intra_D_W_M and plot_pivots_3m ? m3_PP : na, color=color.new(color.yellow, 0), title='3M PP', style=plot.style_line, linewidth=5, show_last=1, offset=3)
-
 plot(Intra_D_W_M and plot_pivots_3m ? m3_R1 : na, color=color.new(color.red, 0), title='3M R1', style=plot.style_line, linewidth=5, show_last=1, offset=3)
 plot(Intra_D_W_M and plot_pivots_3m ? m3_R2 : na, color=color.new(color.red, 0), title='3M R2', style=plot.style_line, linewidth=5, show_last=1, offset=3)
 plot(Intra_D_W_M and plot_pivots_3m ? m3_R3 : na, color=color.new(color.red, 0), title='3M R3', style=plot.style_line, linewidth=5, show_last=1, offset=3)
-
 plot(Intra_D_W_M and plot_pivots_3m ? m3_S1 : na, color=color.new(color.green, 0), title='3M S1', style=plot.style_line, linewidth=5, show_last=1, offset=3)
 plot(Intra_D_W_M and plot_pivots_3m ? m3_S2 : na, color=color.new(color.green, 0), title='3M S2', style=plot.style_line, linewidth=5, show_last=1, offset=3)
 plot(Intra_D_W_M and plot_pivots_3m ? m3_S3 : na, color=color.new(color.green, 0), title='3M S3', style=plot.style_line, linewidth=5, show_last=1, offset=3)
 
-
 //plot P/R/S 6 month pivot points
 plot(Intra_D_W_M and plot_pivots_6m ? m6_PP : na, color=color.new(color.yellow, 0), title='6M PP', style=plot.style_line, linewidth=6, show_last=1, offset=5)
-
 plot(Intra_D_W_M and plot_pivots_6m ? m6_R1 : na, color=color.new(color.red, 0), title='6M R1', style=plot.style_line, linewidth=6, show_last=1, offset=5)
 plot(Intra_D_W_M and plot_pivots_6m ? m6_R2 : na, color=color.new(color.red, 0), title='6M R2', style=plot.style_line, linewidth=6, show_last=1, offset=5)
 plot(Intra_D_W_M and plot_pivots_6m ? m6_R3 : na, color=color.new(color.red, 0), title='6M R3', style=plot.style_line, linewidth=6, show_last=1, offset=5)
-
 plot(Intra_D_W_M and plot_pivots_6m ? m6_S1 : na, color=color.new(color.green, 0), title='6M S1', style=plot.style_line, linewidth=6, show_last=1, offset=5)
 plot(Intra_D_W_M and plot_pivots_6m ? m6_S2 : na, color=color.new(color.green, 0), title='6M S2', style=plot.style_line, linewidth=6, show_last=1, offset=5)
 plot(Intra_D_W_M and plot_pivots_6m ? m6_S3 : na, color=color.new(color.green, 0), title='6M S3', style=plot.style_line, linewidth=6, show_last=1, offset=5)
 
-
 //plot P/R/S 12 month pivot points
 plot(Intra_D_W_M and plot_pivots_12m ? m12_PP : na, color=color.new(color.yellow, 0), title='12M PP', style=plot.style_line, linewidth=7, show_last=1, offset=5)
-
 plot(Intra_D_W_M and plot_pivots_12m ? m12_R1 : na, color=color.new(color.red, 0), title='12M R1', style=plot.style_line, linewidth=7, show_last=1, offset=5)
 plot(Intra_D_W_M and plot_pivots_12m ? m12_R2 : na, color=color.new(color.red, 0), title='12M R2', style=plot.style_line, linewidth=7, show_last=1, offset=5)
 plot(Intra_D_W_M and plot_pivots_12m ? m12_R3 : na, color=color.new(color.red, 0), title='12M R3', style=plot.style_line, linewidth=7, show_last=1, offset=5)
-
 plot(Intra_D_W_M and plot_pivots_12m ? m12_S1 : na, color=color.new(color.green, 0), title='12M S1', style=plot.style_line, linewidth=7, show_last=1, offset=5)
 plot(Intra_D_W_M and plot_pivots_12m ? m12_S2 : na, color=color.new(color.green, 0), title='12M S2', style=plot.style_line, linewidth=7, show_last=1, offset=5)
 plot(Intra_D_W_M and plot_pivots_12m ? m12_S3 : na, color=color.new(color.green, 0), title='12M S3', style=plot.style_line, linewidth=7, show_last=1, offset=5)
@@ -1164,20 +1193,10 @@ dev_1 = BB_sdev_1 * f_bb_dev(BB_length_1)
 upper_1 = basis + dev_1
 lower_1 = basis - dev_1
 
-//bb2
-dev_2 = BB_sdev_2 * f_bb_dev(BB_length_1)
-upper_2 = basis + dev_2
-lower_2 = basis - dev_2
-
 //bb3
 dev_3 = BB_sdev_3 * f_bb_dev(BB_length_1)
 upper_3 = basis + dev_3
 lower_3 = basis - dev_3
-
-//bb4
-dev_4 = BB_sdev_4 * f_bb_dev(BB_length_1)
-upper_4 = basis + dev_4
-lower_4 = basis - dev_4
 
 approach_up = near_bb ? high > upper_1 : true
 approach_dn = near_bb ? low < lower_1 : true
@@ -1191,3 +1210,301 @@ bdn_3 = plot(BB_plot and approach_dn ? lower_3 : na, title='Lower BB3', color=co
 fill(bup_1, bup_3, color=color.new(color.red, 80))
 fill(bdn_1, bdn_3, color=color.new(color.green, 80))
 
+
+//----------------- Trading Sessions Logic -----------------
+
+// Function to calculate state and draw Session Boxes or Lines
+f_draw_session(_show, _sess, _tz, _col, _style) =>
+    is_weekend = dayofweek == dayofweek.saturday or dayofweek == dayofweek.sunday
+    
+    // Calculate if session is active
+    bool is_sess = _show and not is_weekend and not na(time(timeframe.period, _sess, _tz))
+    bool is_start = is_sess and not is_sess[1]
+    
+    // Vertical Line Logic (Only executed if style is Vertical Line and session starts)
+    if _style == "Vertical Line" and is_start
+        // Note: For a vertical line, x1 must equal x2, but y1 must differ from y2 so direction is established.
+        // extend.both then stretches it infinitely up and down.
+        line.new(x1=bar_index, y1=low, x2=bar_index, y2=high, extend=extend.both, color=color.new(_col, 50), style=line.style_solid, width=1)
+
+    // Box Logic (Only executed if style is Box and session is active)
+    var box sess_box = na
+    var float sess_high = na
+    var float sess_low = na
+    
+    if _style == "Box" and is_sess
+        if is_start // Session Start
+            sess_high := high
+            sess_low := low
+            // Create box
+            sess_box := box.new(left=bar_index, top=sess_high, right=bar_index, bottom=sess_low, border_color=_col, bgcolor=_col)
+        else // Session Ongoing
+            sess_high := math.max(sess_high, high)
+            sess_low := math.min(sess_low, low)
+            box.set_top(sess_box, sess_high)
+            box.set_bottom(sess_box, sess_low)
+            box.set_right(sess_box, bar_index + 1)
+    
+    // Return the status
+    is_sess
+
+// Execute Function and capture return value
+lon_active = f_draw_session(london_show, london_sess, sess_timezone, london_col, sess_style)
+ny_active  = f_draw_session(ny_show, ny_sess, sess_timezone, ny_col, sess_style)
+tok_active = f_draw_session(tokyo_show, tokyo_sess, sess_timezone, tokyo_col, sess_style)
+syd_active = f_draw_session(sydney_show, sydney_sess, sess_timezone, sydney_col, sess_style)
+
+// Draw Backgrounds - COMBINED
+// Priority: NY > London > Tokyo > Sydney (in case of overlapping times)
+bg_sess_color = sess_style == "Background" ? 
+                 (ny_active ? ny_col : 
+                  lon_active ? london_col : 
+                  tok_active ? tokyo_col : 
+                  syd_active ? sydney_col : na) : na
+
+bgcolor(bg_sess_color, title="Session Background Combined")
+
+
+//----------------- MTF Candle Overlay Logic -----------------
+
+// Map string selection
+mtf_tf = switch mtf_tf_sel
+    "5m" => "5"
+    "15m" => "15"
+    "30m" => "30"
+    "1h" => "60"
+    "2h" => "120"
+    "4h" => "240"
+    "6h" => "360"
+    "12h" => "720"
+    "1d" => "D"
+    "1w" => "W"
+    "1M" => "M"
+    "3M" => "3M"
+    => "240"
+
+// Fetch HTF Data with lookahead
+[mtf_o, mtf_h, mtf_l, mtf_c] = request.security(syminfo.tickerid, mtf_tf, [open, high, low, close], lookahead=barmerge.lookahead_on)
+
+// Check logic
+is_higher_tf = timeframe.in_seconds(mtf_tf) > timeframe.in_seconds(timeframe.period)
+new_mtf_bar = timeframe.change(mtf_tf)
+
+// Colors
+t_val = 100 - mtf_opacity
+col_bull = color.new(color.green, t_val)
+col_bear = color.new(color.red, t_val)
+col_border_bull = color.new(color.green, 80) 
+col_border_bear = color.new(color.red, 80) 
+
+// Persistent Variable
+var box mtf_body = na
+
+if show_mtf_candles and is_higher_tf
+    
+    // Determine Bull/Bear state
+    is_up = mtf_c >= mtf_o
+    cur_fill = is_up ? col_bull : col_bear
+    cur_border = is_up ? col_border_bull : col_border_bear
+
+    // Geometry: Always High to Low
+    float body_top = mtf_h
+    float body_bot = mtf_l
+
+    // --- Logic ---
+    if new_mtf_bar
+        // Create NEW object to avoid overlap
+        // Box starts at current bar_index
+        mtf_body := box.new(bar_index, body_top, bar_index, body_bot, border_color=cur_border, border_width=1, bgcolor=cur_fill)
+
+    else
+        // Update Existing Object (extend to right)
+        if not na(mtf_body)
+            box.set_right(mtf_body, bar_index)
+            box.set_top(mtf_body, body_top)
+            box.set_bottom(mtf_body, body_bot)
+            box.set_bgcolor(mtf_body, cur_fill)
+            box.set_border_color(mtf_body, cur_border)
+
+
+//--------------------------------------------------------- Fair Value Gaps (FVG) ---------------------------------------------------------
+
+col_fvg_bull  = input.color(color.new(color.green, 80), title="Bullish FVG Color", group=grp_fvg)
+col_fvg_bear  = input.color(color.new(color.red, 80), title="Bearish FVG Color", group=grp_fvg)
+
+// --- Helper: Timeframe Duration ---
+// Calculate duration of the FVG timeframe in milliseconds
+tf_ms = (fvg_tf_sel == "" ? timeframe.in_seconds(timeframe.period) : timeframe.in_seconds(fvg_tf_sel)) * 1000
+
+// --- Data Fetching (MTF) ---
+// Pattern: [Bar 3 (Left)] [Bar 2 (Gap/Middle)] [Bar 1 (Signal/Right)] ... [Bar 0 (Developing)]
+// We utilize a persistent variable to check if we have already drawn the FVG for a specific time.
+[h1_mtf, l1_mtf, h3_mtf, l3_mtf, t2_mtf] = request.security(syminfo.tickerid, fvg_tf_sel == "" ? timeframe.period : fvg_tf_sel, [high[1], low[1], high[3], low[3], time[2]], lookahead=barmerge.lookahead_off)
+
+// Variable to track the last drawn FVG time to avoid duplicates but ensure drawing
+var int last_fvg_time = 0
+
+// --- Logic & Plotting ---
+if plot_fvg
+    // CASE A: Current Timeframe (Standard Behavior)
+    if fvg_tf_sel == ""
+        // Bullish FVG
+        if low > high[2]
+            _border_bull = color.new(color.green, 90)
+            box.new(left=bar_index[2], top=low, right=bar_index + (fvg_len - 1), bottom=high[2], 
+                 border_color=_border_bull, bgcolor=col_fvg_bull)
+
+        // Bearish FVG
+        if high < low[2]
+            _border_bear = color.new(color.red, 90)
+            box.new(left=bar_index[2], top=low[2], right=bar_index + (fvg_len - 1), bottom=high, 
+                 border_color=_border_bear, bgcolor=col_fvg_bear)
+
+    // CASE B: Higher Timeframe (Reliable MTF Logic)
+    else 
+        // We check if the time of the potential FVG (Bar 2) is new compared to what we last drawn.
+        // This ensures that even if data lags by 1-2 bars on LTF, it will be drawn as soon as available.
+        if t2_mtf != last_fvg_time and not na(t2_mtf)
+            
+            bool drawn = false
+            
+            // Coordinates Calculation:
+            // LEFT: Shift back 1 full duration to hit the Start of the Left Candle (Bar 3)
+            t_left = t2_mtf - tf_ms
+            // RIGHT: Start of Gap Candle + (Duration * Length)
+            t_right = t2_mtf + (tf_ms * fvg_len)
+
+            // Bullish FVG (MTF)
+            if l1_mtf > h3_mtf
+                _border_bull = color.new(color.green, 90)
+                box.new(left=t_left, top=l1_mtf, right=t_right, bottom=h3_mtf, 
+                     xloc=xloc.bar_time, border_color=_border_bull, bgcolor=col_fvg_bull)
+                drawn := true
+
+            // Bearish FVG (MTF)
+            if h1_mtf < l3_mtf
+                _border_bear = color.new(color.red, 90)
+                box.new(left=t_left, top=l3_mtf, right=t_right, bottom=h1_mtf, 
+                     xloc=xloc.bar_time, border_color=_border_bear, bgcolor=col_fvg_bear)
+                drawn := true
+            
+            // Only update the tracker if we actually checked this specific timestamp
+            // We update it regardless of whether an FVG was found or not, 
+            // so we don't keep checking the same completed candle again and again.
+            last_fvg_time := t2_mtf
+
+
+//--------------------------------------------------------- Real-time Fractal Alert ---------------------------------------------------------
+
+// --- Logic Calculation ---
+// We cannot use ta.pivothigh/low for the realtime bar effectively, so we check the structure manually.
+// Structure: [Left2][Left1][Pivot][Right1][Current(Right2)]
+// Indices:    [4]    [3]    [2]     [1]       [0]
+
+// Check if bars 4, 3, 2, and 1 form a valid pre-fractal structure
+valid_up_structure = high[2] > high[3] and high[2] > high[4] and high[2] > high[1]
+valid_dn_structure = low[2] < low[3] and low[2] < low[4] and low[2] < low[1]
+
+// Check if the current running bar (0) respects the fractal rule
+// Up Fractal: Current High must be lower than Pivot High
+rt_up_frac = valid_up_structure and high < high[2]
+
+// Down Fractal: Current Low must be higher than Pivot Low
+rt_dn_frac = valid_dn_structure and low > low[2]
+
+// --- Trigger Alert ---
+// Trigger only if enabled, in realtime, and condition is met. 
+// freq_once_per_bar avoids spamming the sound on every tick.
+if use_rt_alert and barstate.isrealtime and (rt_up_frac or rt_dn_frac)
+    alert("Potential Fractal Forming (5th Candle Running)", alert.freq_once_per_bar)
+
+
+//--------------------------------------------------------- Additional Context (No Plot-Limit Usage) ---------------------------------------------------------
+
+/// --- 1. Previous Candle High/Low (Lines & Labels) ---
+// Fetch High/Low of the previous completed candle based on selected TF
+[pc_h_val, pc_l_val] = request.security(syminfo.tickerid, pch_pcl_tf, [high[1], low[1]], lookahead=barmerge.lookahead_on)
+
+// Variables for Lines and Labels
+var line l_pch = na
+var line l_pcl = na
+var label lb_pch = na
+var label lb_pcl = na
+
+if show_pch_pcl and barstate.islast
+    // Delete old objects so they update dynamically and don't clutter history
+    line.delete(l_pch)
+    line.delete(l_pcl)
+    label.delete(lb_pch)
+    label.delete(lb_pcl)
+    
+    // --- Logic to find the START point (x1) ---
+    // We look backwards to find the exact bar on the current chart that touched the HTF High/Low
+    int lookback_limit = 2000 // Limit search to max bars
+    int pch_index = bar_index // Default to current if not found
+    int pcl_index = bar_index // Default to current if not found
+    
+    // Find Prev Candle High Index
+    for i = 1 to lookback_limit
+        // Use a small tolerance or exact match depending on data
+        if high[i] >= pc_h_val 
+            pch_index := bar_index - i
+            break // Stop at the most recent occurrence
+    
+    // Find Prev Candle Low Index
+    for i = 1 to lookback_limit
+        if low[i] <= pc_l_val
+            pcl_index := bar_index - i
+            break 
+
+    // Draw PCH Line (Start at found index, Extend Right)
+    l_pch := line.new(x1=pch_index, y1=pc_h_val, x2=bar_index, y2=pc_h_val, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
+    lb_pch := label.new(x=bar_index + 3, y=pc_h_val, text="Prev High", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+    
+    // Draw PCL Line (Start at found index, Extend Right)
+    l_pcl := line.new(x1=pcl_index, y1=pc_l_val, x2=bar_index, y2=pc_l_val, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
+    lb_pcl := label.new(x=bar_index + 3, y=pc_l_val, text="Prev Low", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+
+
+// --- 2. Last Fractal S/R (Lines & Labels) ---
+
+// Function to get last confirmed fractal price and time
+f_get_last_fractal_data() =>
+    ph = ta.pivothigh(high, 2, 2)
+    pl = ta.pivotlow(low, 2, 2)
+    // When ph is detected, the fractal apex is at [2]
+    p_h_val = ta.valuewhen(not na(ph), high[2], 0)
+    p_h_time = ta.valuewhen(not na(ph), time[2], 0)
+    p_l_val = ta.valuewhen(not na(pl), low[2], 0)
+    p_l_time = ta.valuewhen(not na(pl), time[2], 0)
+    [p_h_val, p_h_time, p_l_val, p_l_time]
+
+[frac_h_val, frac_h_time, frac_l_val, frac_l_time] = request.security(syminfo.tickerid, last_frac_tf, f_get_last_fractal_data())
+
+var line l_last_fh = na
+var line l_last_fl = na
+var label lb_last_fh = na
+var label lb_last_fl = na
+
+if show_last_frac and barstate.islast
+    line.delete(l_last_fh)
+    line.delete(l_last_fl)
+    label.delete(lb_last_fh)
+    label.delete(lb_last_fl)
+
+    if not na(frac_h_val)
+        l_last_fh := line.new(x1=frac_h_time, y1=frac_h_val, x2=time, y2=frac_h_val, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
+        lb_last_fh := label.new(x=bar_index + 3, y=frac_h_val, text="Frac High", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+
+    if not na(frac_l_val)
+        l_last_fl := line.new(x1=frac_l_time, y1=frac_l_val, x2=time, y2=frac_l_val, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
+        lb_last_fl := label.new(x=bar_index + 3, y=frac_l_val, text="Frac Low", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+
+
+// --- 3. Volume Spikes (Char) ---
+// Calculates if Volume is x-times larger than the SMA(20) of Volume
+avg_vol = ta.sma(volume, 20)
+is_vol_spike = volume > (avg_vol * vol_mult)
+
+// Uses plotchar (Symbol 'V' in bold RED)
+plotchar(show_vol ? is_vol_spike : na, char='v', location=location.bottom, color=color.new(color.red, 30), size=size.tiny, title="High Volume Spike")
