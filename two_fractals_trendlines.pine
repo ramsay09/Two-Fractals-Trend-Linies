@@ -264,11 +264,15 @@ fractal_tf = auto_adaption ? auto_sr_tf : sr_tf
 
 fr_src              = fr_source == 'high/low' ? high : close
 
-up_fr_sr            = request.security(syminfo.tickerid, fractal_tf, ta.pivothigh(fr_source == 'high/low' ? high : close, fractal_size, fractal_size))
-dn_fr_sr            = request.security(syminfo.tickerid, fractal_tf, ta.pivotlow(fr_source == 'high/low' ? low : close, fractal_size, fractal_size))
+// Optimization: Combine 4 security calls into 1
+f_fr_sr_levels(_src_h, _src_l, _size) =>
+    _up = ta.pivothigh(_src_h, _size, _size)
+    _dn = ta.pivotlow(_src_l, _size, _size)
+    _val_up = ta.valuewhen(_up, _src_h[_size], 0)
+    _val_dn = ta.valuewhen(_dn, _src_l[_size], 0)
+    [_up, _dn, _val_up, _val_dn]
 
-fr_up               = request.security(syminfo.tickerid, fractal_tf, ta.valuewhen(up_fr_sr, high[fractal_size], 0))
-fr_dn               = request.security(syminfo.tickerid, fractal_tf, ta.valuewhen(dn_fr_sr, low[fractal_size], 0))
+[up_fr_sr, dn_fr_sr, fr_up, fr_dn] = request.security(syminfo.tickerid, fractal_tf, f_fr_sr_levels(fr_source == 'high/low' ? high : close, fr_source == 'high/low' ? low : close, fractal_size))
 
 
 up_fr_line          = plot_sr_lines ? line.new(x1=bar_index[2], x2=bar_index[1], y1=fr_up, y2=fr_up, extend= not extend ? extend.right : extend.both, color=color.new(color.blue, transp_sr), style=line.style_solid, width=width_sr) : na
@@ -607,208 +611,283 @@ line.delete(plot_segments ? segment_high_3[1] : segment_high_3[0])
 // This function encapsulates the logic needed to determine the background signal
 // It is called via request.security to allow MTF plotting
 f_calc_bg_signal() =>
-    // 1. Re-calculate Component Indicators for this Context
-    // Bill Williams Fractals
-    up_fr_c = ta.pivothigh(2, 2)
-    dn_fr_c = ta.pivotlow(2, 2)
-    last_up_fr_level_c = ta.valuewhen(up_fr_c, high[2], 0)
-    last_dn_fr_level_c = ta.valuewhen(dn_fr_c, low[2], 0)
-    bw_fr_buy_break_c  = ta.crossover(high, last_up_fr_level_c)
-    bw_fr_sell_break_c = ta.crossunder(low, last_dn_fr_level_c)
+    // --- Optimization: Pre-calculate requirements ---
+    // Shortcuts for regex-like matching
+    has_fractal         = str.contains(selected_bg_signal, "Fractal")
+    has_segments        = str.contains(selected_bg_signal, "Segments")
+    has_trend           = str.contains(selected_bg_signal, "Trend Line") or str.contains(selected_bg_signal, "Trend Lines")
+    has_macd            = str.contains(selected_bg_signal, "MACD")
 
-    // Parabolic SAR (Standard Settings 0.02, 0.02, 0.2)
-    sar_c = ta.sar(0.02, 0.02, 0.2)
-    sar_is_long_c = close > sar_c
+    // Flags for specific modules
+    // Bill Williams Fractals: Explicitly named "Bill Williams Fractals BG"
+    need_bw             = selected_bg_signal == "Bill Williams Fractals BG"
+    need_ant            = selected_bg_signal == "Anticipated Fractal BG"
+    need_l12            = selected_bg_signal == "Last 12 Bar BG"
+    need_sar            = selected_bg_signal == "Parabolic SAR BG"
+    need_adx            = selected_bg_signal == "DMI ADX BG"
+    need_hma            = selected_bg_signal == "HMA Slope BG"
+    need_macd           = has_macd
+    need_ma_cross       = selected_bg_signal == "MA1/MA2 Cross BG"
+    need_seg            = has_segments
+
+    // Trendlines Math is needed if "Trend" is in name OR if "Fractal" is in name but NOT BW and NOT Anticipated
+    // Because "Fractal" in other context refers to the Trendline-based fractals (pivothigh/low used for trendlines)
+    need_trend_math     = has_trend or (has_fractal and not need_bw and not need_ant) or str.contains(selected_bg_signal, "Segments/Trend")
+
+    // 1. Re-calculate Component Indicators for this Context (CONDITIONAL)
+
+    // Bill Williams Fractals
+    bool bw_fr_buy_break_c = false
+    bool bw_fr_sell_break_c = false
+    if need_bw
+        up_fr_c = ta.pivothigh(2, 2)
+        dn_fr_c = ta.pivotlow(2, 2)
+        last_up_fr_level_c = ta.valuewhen(up_fr_c, high[2], 0)
+        last_dn_fr_level_c = ta.valuewhen(dn_fr_c, low[2], 0)
+        bw_fr_buy_break_c  := ta.crossover(high, last_up_fr_level_c)
+        bw_fr_sell_break_c := ta.crossunder(low, last_dn_fr_level_c)
+
+    // Parabolic SAR
+    bool sar_is_long_c = false
+    if need_sar
+        sar_c = ta.sar(0.02, 0.02, 0.2)
+        sar_is_long_c := close > sar_c
 
     // ADX / HMA / EMA
-    [diplus_c, diminus_c, adx_c] = ta.dmi(di_len, len_smo)
-    adx_up_c_val = diplus_c > diminus_c
-    adx_dn_c_val = diplus_c < diminus_c
-    hma_c = ta.hma(close, hma_inp)
-    hma_slo_up_c = ta.rising(hma_c, 1)
+    bool adx_up_c_val = false
+    bool adx_dn_c_val = false
+    bool hma_slo_up_c = false
+
+    if need_adx
+        [diplus_c, diminus_c, adx_c] = ta.dmi(di_len, len_smo)
+        adx_up_c_val := diplus_c > diminus_c
+        adx_dn_c_val := diplus_c < diminus_c
+
+    if need_hma
+        hma_c = ta.hma(close, hma_inp)
+        hma_slo_up_c := ta.rising(hma_c, 1)
     
     // MACD
-    [_, macdSignal_c, _] = ta.macd(close, 12, 26, 9)
-    macd_slow_slope_c = ta.change(macdSignal_c)
-    macd_slow_up_c = macd_slow_slope_c > 0
-    macd_slow_dn_c = macd_slow_slope_c < 0
-    macd_slow_up_evt_c = ta.crossover(macd_slow_slope_c, 0)
-    macd_slow_dn_evt_c = ta.crossunder(macd_slow_slope_c, 0)
+    bool macd_slow_up_c = false
+    bool macd_slow_dn_c = false
+    bool macd_slow_up_evt_c = false
+    bool macd_slow_dn_evt_c = false
+
+    if need_macd
+        [_, macdSignal_c, _] = ta.macd(close, 12, 26, 9)
+        macd_slow_slope_c = ta.change(macdSignal_c)
+        macd_slow_up_c := macd_slow_slope_c > 0
+        macd_slow_dn_c := macd_slow_slope_c < 0
+        macd_slow_up_evt_c := ta.crossover(macd_slow_slope_c, 0)
+        macd_slow_dn_evt_c := ta.crossunder(macd_slow_slope_c, 0)
 
     // MA1 / MA2 Cross Logic for Background
-    ma1_val_c = switch ma1_type
-        "SMA" => ta.sma(close, ma1_len)
-        "EMA" => ta.ema(close, ma1_len)
-        => na
+    bool ma_cross_buy_c = false
+    bool ma_cross_sell_c = false
     
-    ma2_val_c = switch ma2_type
-        "SMA" => ta.sma(close, ma2_len)
-        "EMA" => ta.ema(close, ma2_len)
-        => na
-
-    ma_cross_buy_c  = ta.crossover(ma1_val_c, ma2_val_c)
-    ma_cross_sell_c = ta.crossunder(ma1_val_c, ma2_val_c)
+    if need_ma_cross
+        ma1_val_c = switch ma1_type
+            "SMA" => ta.sma(close, ma1_len)
+            "EMA" => ta.ema(close, ma1_len)
+            => na
+        ma2_val_c = switch ma2_type
+            "SMA" => ta.sma(close, ma2_len)
+            "EMA" => ta.ema(close, ma2_len)
+            => na
+        ma_cross_buy_c  := ta.crossover(ma1_val_c, ma2_val_c)
+        ma_cross_sell_c := ta.crossunder(ma1_val_c, ma2_val_c)
 
     // Anticipated Fractal
-    af_up_c = high > high[1] and high > high[2]
-    af_dn_c = low < low[1] and low < low[2]
+    bool af_up_c = false
+    bool af_dn_c = false
+
+    if need_ant
+        af_up_c := high > high[1] and high > high[2]
+        af_dn_c := low < low[1] and low < low[2]
     
     // Last 12 Bar
-    l12_long_c = ta.highest(low, L12_input)
-    l12_short_c = ta.lowest(high, L12_input)
-    var bool long_plotted_c = na
-    var bool short_plotted_c = na
-    plot_l12_long_c = low == l12_long_c and (na(short_plotted_c) or short_plotted_c) 
-    plot_l12_short_c = high == l12_short_c and (na(long_plotted_c) or long_plotted_c)
-    if plot_l12_long_c
-        long_plotted_c := true
-        short_plotted_c := false
-    if plot_l12_short_c
-        short_plotted_c := true
-        long_plotted_c := false
+    bool plot_l12_long_c = false
+    bool plot_l12_short_c = false
+
+    if need_l12
+        l12_long_c = ta.highest(low, L12_input)
+        l12_short_c = ta.lowest(high, L12_input)
+        var bool long_plotted_c = na
+        var bool short_plotted_c = na
+        plot_l12_long_c := low == l12_long_c and (na(short_plotted_c) or short_plotted_c)
+        plot_l12_short_c := high == l12_short_c and (na(long_plotted_c) or long_plotted_c)
+        if plot_l12_long_c
+            long_plotted_c := true
+            short_plotted_c := false
+        if plot_l12_short_c
+            short_plotted_c := true
+            long_plotted_c := false
     
     // Trendlines Math
-    use_special_trend_c = fractalBarsPerSide == 0
-    n_tl_c = use_special_trend_c ? 2 : fractalBarsPerSide
+    // Initialize variables used later
+    float y0_up_c = na
+    float y0_dn_c = na
+    bool buy_up_line_c = false
+    bool sell_dn_line_c = false
+    bool frup_buy_eff_c = false
+    bool frdn_sell_eff_c = false
+    bool tie_buy_pref_c = false
+    bool tie_sell_pref_c = false
+    bool fr_tl_buy_c = false
+    bool fr_tl_sell_c = false
     
-    ph_val_c = ta.pivothigh(high, n_tl_c, n_tl_c)
-    pl_val_c = ta.pivotlow(low, n_tl_c, n_tl_c)
+    // Trendlines Logic Block
+    if need_trend_math
+        use_special_trend_c = fractalBarsPerSide == 0
+        n_tl_c = use_special_trend_c ? 2 : fractalBarsPerSide
 
-    // Using VAR to maintain stable state
-    var float y0_up_c = na, var int x0_up_c = na
-    var float y1_up_c = na, var int x1_up_c = na
+        ph_val_c = ta.pivothigh(high, n_tl_c, n_tl_c)
+        pl_val_c = ta.pivotlow(low, n_tl_c, n_tl_c)
 
-    if not na(ph_val_c)
-        y1_up_c := y0_up_c
-        x1_up_c := x0_up_c
-        y0_up_c := ph_val_c
-        x0_up_c := bar_index - n_tl_c
+        // Using VAR to maintain stable state
+        var float v_y0_up_c = na, var int v_x0_up_c = na
+        var float v_y1_up_c = na, var int v_x1_up_c = na
 
-    var float y0_dn_c = na, var int x0_dn_c = na
-    var float y1_dn_c = na, var int x1_dn_c = na
+        if not na(ph_val_c)
+            v_y1_up_c := v_y0_up_c
+            v_x1_up_c := v_x0_up_c
+            v_y0_up_c := ph_val_c
+            v_x0_up_c := bar_index - n_tl_c
 
-    if not na(pl_val_c)
-        y1_dn_c := y0_dn_c
-        x1_dn_c := x0_dn_c
-        y0_dn_c := pl_val_c
-        x0_dn_c := bar_index - n_tl_c
+        var float v_y0_dn_c = na, var int v_x0_dn_c = na
+        var float v_y1_dn_c = na, var int v_x1_dn_c = na
 
-    // --- Slope Calculation (Anchored Regression on Closed Candles) ---
-    float slope_up_c = na
-    float sum_xy_u = 0.0
-    float sum_x2_u = 0.0
-    
-    if use_special_trend_c and not na(x0_up_c) and not na(y0_up_c)
-        int start_idx_u = x0_up_c + 1
-        int end_idx_u   = bar_index - 1
-        if end_idx_u >= start_idx_u
-            for i = 1 to (end_idx_u - start_idx_u + 1)
-                int bar_idx_i = bar_index - i
-                int dx = bar_idx_i - x0_up_c
-                float dy = high[i] - y0_up_c
-                sum_xy_u := sum_xy_u + (dx * dy)
-                sum_x2_u := sum_x2_u + (float(dx) * float(dx))
-            
-            slope_up_c := sum_x2_u != 0 ? sum_xy_u / sum_x2_u : na
+        if not na(pl_val_c)
+            v_y1_dn_c := v_y0_dn_c
+            v_x1_dn_c := v_x0_dn_c
+            v_y0_dn_c := pl_val_c
+            v_x0_dn_c := bar_index - n_tl_c
 
-    float slope_dn_c = na
-    float sum_xy_d = 0.0
-    float sum_x2_d = 0.0
-    
-    if use_special_trend_c and not na(x0_dn_c) and not na(y0_dn_c)
-        int start_idx_d = x0_dn_c + 1
-        int end_idx_d   = bar_index - 1
-        if end_idx_d >= start_idx_d
-            for i = 1 to (end_idx_d - start_idx_d + 1)
-                int bar_idx_i = bar_index - i
-                int dx = bar_idx_i - x0_dn_c
-                float dy = low[i] - y0_dn_c
-                sum_xy_d := sum_xy_d + (dx * dy)
-                sum_x2_d := sum_x2_d + (float(dx) * float(dx))
-            
-            slope_dn_c := sum_x2_d != 0 ? sum_xy_d / sum_x2_d : na
+        // Export vars to scope
+        y0_up_c := v_y0_up_c
+        y0_dn_c := v_y0_dn_c
 
-    var float y_up_lvl_c = na
-    var float y_dn_lvl_c = na
-    
-    // --- Projection Logic ---
-    if use_special_trend_c
-        if not na(slope_up_c) and not na(x0_up_c)
-            y_up_lvl_c := y0_up_c + slope_up_c * (bar_index - x0_up_c)
-        if not na(slope_dn_c) and not na(x0_dn_c)
-            y_dn_lvl_c := y0_dn_c + slope_dn_c * (bar_index - x0_dn_c)
-    else
-        if not na(x1_up_c) and not na(x0_up_c) and x1_up_c != x0_up_c 
-            delta_idx = x0_up_c - x1_up_c
-            m_std = (y0_up_c - y1_up_c) / delta_idx
-            y_up_lvl_c := y1_up_c + m_std * (bar_index - x1_up_c)
-        if not na(x1_dn_c) and not na(x0_dn_c) and x1_dn_c != x0_dn_c 
-            delta_idx = x0_dn_c - x1_dn_c
-            m_std = (y0_dn_c - y1_dn_c) / delta_idx
-            y_dn_lvl_c := y1_dn_c + m_std * (bar_index - x1_dn_c)
+        // --- Slope Calculation (Anchored Regression on Closed Candles) ---
+        float slope_up_c = na
+        float sum_xy_u = 0.0
+        float sum_x2_u = 0.0
 
-    // --- LOGIC FIX: State Based Check instead of Crossover ---
-    // If Close is above upper line -> TRUE (Green State)
-    // If Close is below lower line -> TRUE (Red State)
-    buy_up_line_c  = not na(y_up_lvl_c) and close > y_up_lvl_c
-    sell_dn_line_c = not na(y_dn_lvl_c) and close < y_dn_lvl_c
-    
-    // Standard Fractal Levels
-    frup_buy_std_c = ta.crossover(high, y0_up_c)
-    frdn_sell_std_c = ta.crossunder(low, y0_dn_c)
-    
-    fr_tl_buy_c    = buy_up_line_c or frup_buy_std_c
-    fr_tl_sell_c   = sell_dn_line_c or frdn_sell_std_c
-    fr_conflict_c  = frup_buy_std_c and frdn_sell_std_c
-    frup_buy_eff_c = frup_buy_std_c and not frdn_sell_std_c
-    frdn_sell_eff_c = frdn_sell_std_c and not frup_buy_std_c
-    tie_buy_pref_c = fr_conflict_c and macd_slow_up_c
-    tie_sell_pref_c = fr_conflict_c and macd_slow_dn_c
+        if use_special_trend_c and not na(v_x0_up_c) and not na(v_y0_up_c)
+            int start_idx_u = v_x0_up_c + 1
+            int end_idx_u   = bar_index - 1
+            if end_idx_u >= start_idx_u
+                for i = 1 to (end_idx_u - start_idx_u + 1)
+                    int bar_idx_i = bar_index - i
+                    int dx = bar_idx_i - v_x0_up_c
+                    float dy = high[i] - v_y0_up_c
+                    sum_xy_u := sum_xy_u + (dx * dy)
+                    sum_x2_u := sum_x2_u + (float(dx) * float(dx))
+
+                slope_up_c := sum_x2_u != 0 ? sum_xy_u / sum_x2_u : na
+
+        float slope_dn_c = na
+        float sum_xy_d = 0.0
+        float sum_x2_d = 0.0
+
+        if use_special_trend_c and not na(v_x0_dn_c) and not na(v_y0_dn_c)
+            int start_idx_d = v_x0_dn_c + 1
+            int end_idx_d   = bar_index - 1
+            if end_idx_d >= start_idx_d
+                for i = 1 to (end_idx_d - start_idx_d + 1)
+                    int bar_idx_i = bar_index - i
+                    int dx = bar_idx_i - v_x0_dn_c
+                    float dy = low[i] - v_y0_dn_c
+                    sum_xy_d := sum_xy_d + (dx * dy)
+                    sum_x2_d := sum_x2_d + (float(dx) * float(dx))
+
+                slope_dn_c := sum_x2_d != 0 ? sum_xy_d / sum_x2_d : na
+
+        var float y_up_lvl_c = na
+        var float y_dn_lvl_c = na
+
+        // --- Projection Logic ---
+        if use_special_trend_c
+            if not na(slope_up_c) and not na(v_x0_up_c)
+                y_up_lvl_c := v_y0_up_c + slope_up_c * (bar_index - v_x0_up_c)
+            if not na(slope_dn_c) and not na(v_x0_dn_c)
+                y_dn_lvl_c := v_y0_dn_c + slope_dn_c * (bar_index - v_x0_dn_c)
+        else
+            if not na(v_x1_up_c) and not na(v_x0_up_c) and v_x1_up_c != v_x0_up_c
+                delta_idx = v_x0_up_c - v_x1_up_c
+                m_std = (v_y0_up_c - v_y1_up_c) / delta_idx
+                y_up_lvl_c := v_y1_up_c + m_std * (bar_index - v_x1_up_c)
+            if not na(v_x1_dn_c) and not na(v_x0_dn_c) and v_x1_dn_c != v_x0_dn_c
+                delta_idx = v_x0_dn_c - v_x1_dn_c
+                m_std = (v_y0_dn_c - v_y1_dn_c) / delta_idx
+                y_dn_lvl_c := v_y1_dn_c + m_std * (bar_index - v_x1_dn_c)
+
+        // --- LOGIC FIX: State Based Check instead of Crossover ---
+        // If Close is above upper line -> TRUE (Green State)
+        // If Close is below lower line -> TRUE (Red State)
+        buy_up_line_c  := not na(y_up_lvl_c) and close > y_up_lvl_c
+        sell_dn_line_c := not na(y_dn_lvl_c) and close < y_dn_lvl_c
+
+        // Standard Fractal Levels
+        frup_buy_std_c = ta.crossover(high, v_y0_up_c)
+        frdn_sell_std_c = ta.crossunder(low, v_y0_dn_c)
+
+        fr_tl_buy_c    := buy_up_line_c or frup_buy_std_c
+        fr_tl_sell_c   := sell_dn_line_c or frdn_sell_std_c
+        fr_conflict_c  = frup_buy_std_c and frdn_sell_std_c
+        frup_buy_eff_c := frup_buy_std_c and not frdn_sell_std_c
+        frdn_sell_eff_c := frdn_sell_std_c and not frup_buy_std_c
+        tie_buy_pref_c := fr_conflict_c and macd_slow_up_c
+        tie_sell_pref_c := fr_conflict_c and macd_slow_dn_c
 
     // Segments Logic (Declared properly)
-    int count1_l_c = 0 
-    int count2_l_c = 0 
-    int count1_s_c = 0 
-    int count2_s_c = 0
-    bool segment_1_stat_l_c = false 
-    bool segment_2_stat_l_c = false 
-    bool segment_3_stat_l_c = false
-    bool segment_1_stat_s_c = false 
-    bool segment_2_stat_s_c = false 
-    bool segment_3_stat_s_c = false
+    bool segments_buy_c = false
+    bool segments_sell_c = false
     
-    for i = 0 to sb
-        count1_l_c := count1_l_c + 1
-        if low[1] > low[i + 2] 
-            segment_1_stat_l_c := true
-            break
-    for i = count1_l_c to sb + count1_l_c
-        count2_l_c := count2_l_c + 1
-        if low[1 + count1_l_c] > low[i + 2] and segment_1_stat_l_c
-            segment_2_stat_l_c := true
-            break
-    for i = count2_l_c to sb + count2_l_c
-        if low[1 + count1_l_c + count2_l_c] > low[i + 2 + count1_l_c] and segment_2_stat_l_c
-            segment_3_stat_l_c := true
-            break
-            
-    for i = 0 to sb
-        count1_s_c := count1_s_c + 1
-        if high[1] < high[i + 2]  
-            segment_1_stat_s_c := true
-            break
-    for i = count1_s_c to sb + count1_s_c
-        count2_s_c := count2_s_c + 1
-        if high[1 + count1_s_c] < high[i + 2] and segment_1_stat_s_c
-            segment_2_stat_s_c := true
-            break
-    for i = count2_s_c to sb + count2_s_c
-        if high[1 + count1_s_c + count2_s_c] < high[i + 2 + count1_s_c] and segment_2_stat_s_c
-            segment_3_stat_s_c := true
-            break
-            
-    segments_buy_c = high > high[1] and segment_1_stat_l_c and segment_2_stat_l_c and segment_3_stat_l_c
-    segments_sell_c = low < low[1] and segment_1_stat_s_c and segment_2_stat_s_c and segment_3_stat_s_c
+    // We only run segments loops if we need segments
+    if need_seg
+        int count1_l_c = 0
+        int count2_l_c = 0
+        int count1_s_c = 0
+        int count2_s_c = 0
+        bool segment_1_stat_l_c = false
+        bool segment_2_stat_l_c = false
+        bool segment_3_stat_l_c = false
+        bool segment_1_stat_s_c = false
+        bool segment_2_stat_s_c = false
+        bool segment_3_stat_s_c = false
+
+        for i = 0 to sb
+            count1_l_c := count1_l_c + 1
+            if low[1] > low[i + 2]
+                segment_1_stat_l_c := true
+                break
+        for i = count1_l_c to sb + count1_l_c
+            count2_l_c := count2_l_c + 1
+            if low[1 + count1_l_c] > low[i + 2] and segment_1_stat_l_c
+                segment_2_stat_l_c := true
+                break
+        for i = count2_l_c to sb + count2_l_c
+            if low[1 + count1_l_c + count2_l_c] > low[i + 2 + count1_l_c] and segment_2_stat_l_c
+                segment_3_stat_l_c := true
+                break
+
+        for i = 0 to sb
+            count1_s_c := count1_s_c + 1
+            if high[1] < high[i + 2]
+                segment_1_stat_s_c := true
+                break
+        for i = count1_s_c to sb + count1_s_c
+            count2_s_c := count2_s_c + 1
+            if high[1 + count1_s_c] < high[i + 2] and segment_1_stat_s_c
+                segment_2_stat_s_c := true
+                break
+        for i = count2_s_c to sb + count2_s_c
+            if high[1 + count1_s_c + count2_s_c] < high[i + 2 + count1_s_c] and segment_2_stat_s_c
+                segment_3_stat_s_c := true
+                break
+
+        segments_buy_c := high > high[1] and segment_1_stat_l_c and segment_2_stat_l_c and segment_3_stat_l_c
+        segments_sell_c := low < low[1] and segment_1_stat_s_c and segment_2_stat_s_c and segment_3_stat_s_c
     
     // Combining
     segments_fractals_buy_c = segments_buy_c or high >= y0_up_c
@@ -919,7 +998,11 @@ f_calc_bg_signal() =>
     
     bg_color_res
 // --- Execute MTF Request ---
-final_bg_color = request.security(syminfo.tickerid, bg_tf_select, f_calc_bg_signal())
+color final_bg_color = na
+if bg_tf_select == ""
+    final_bg_color := f_calc_bg_signal()
+else
+    final_bg_color := request.security(syminfo.tickerid, bg_tf_select, f_calc_bg_signal())
 
 // Apply the calculated background color
 bgcolor(final_bg_color, title="Selected Background Signal")
@@ -1028,30 +1111,11 @@ h_color_c       = hma_slo_up_inf ? color_blue_1 : not hma_slo_up_inf ? color_red
 e_color_c       = ema_x_up_inf ? color_blue_1 : not ema_x_up_inf ? color_red_1 : color_gray_1
 
 
-//adx long htf
-adx_4h_up       = request.security(syminfo.tickerid, '240', adx_up_4h)
-adx_d_up        = request.security(syminfo.tickerid, 'D', adx_up_d)
-adx_w_up        = request.security(syminfo.tickerid, 'W', adx_up_w)
-adx_m_up        = request.security(syminfo.tickerid, 'M', adx_up_m)
-//adx short htf
-adx_4h_dn       = request.security(syminfo.tickerid, '240', adx_dn_4h)
-adx_d_dn        = request.security(syminfo.tickerid, 'D', adx_dn_d)
-adx_w_dn        = request.security(syminfo.tickerid, 'W', adx_dn_w)
-adx_m_dn        = request.security(syminfo.tickerid, 'M', adx_dn_m)
-
-
-//hma htf
-hma_4h_up       = request.security(syminfo.tickerid, '240', hma_slo_up_4h)
-hma_d_up        = request.security(syminfo.tickerid, 'D', hma_slo_up_d)
-hma_w_up        = request.security(syminfo.tickerid, 'W', hma_slo_up_w)
-hma_m_up        = request.security(syminfo.tickerid, 'M', hma_slo_up_m)
-
-
-//ema1 x ema2 htf upcross
-e1xe2_4h_up     = request.security(syminfo.tickerid, '240', ema_x_up_4h)
-e1xe2_d_up      = request.security(syminfo.tickerid, 'D', ema_x_up_d)
-e1xe2_w_up      = request.security(syminfo.tickerid, 'W', ema_x_up_w)
-e1xe2_m_up      = request.security(syminfo.tickerid, 'M', ema_x_up_m)
+// Optimization: Combine security calls for Info Panel (16 calls -> 4 calls)
+[adx_4h_up, adx_4h_dn, hma_4h_up, e1xe2_4h_up] = request.security(syminfo.tickerid, '240', [adx_up_4h, adx_dn_4h, hma_slo_up_4h, ema_x_up_4h])
+[adx_d_up, adx_d_dn, hma_d_up, e1xe2_d_up]     = request.security(syminfo.tickerid, 'D',   [adx_up_d, adx_dn_d, hma_slo_up_d, ema_x_up_d])
+[adx_w_up, adx_w_dn, hma_w_up, e1xe2_w_up]     = request.security(syminfo.tickerid, 'W',   [adx_up_w, adx_dn_w, hma_slo_up_w, ema_x_up_w])
+[adx_m_up, adx_m_dn, hma_m_up, e1xe2_m_up]     = request.security(syminfo.tickerid, 'M',   [adx_up_m, adx_dn_m, hma_slo_up_m, ema_x_up_m])
 
 
 //adx conditions
