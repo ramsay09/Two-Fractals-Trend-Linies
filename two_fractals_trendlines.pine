@@ -1,6 +1,6 @@
 //@version=5
 
-indicator('Two Fractals Trend Lines', overlay=true, shorttitle='fr lines', max_bars_back=2000, max_lines_count=500, max_boxes_count=500)
+indicator('Two Fractals Trend Lines', overlay=true, shorttitle='fr lines', max_bars_back=4000, max_lines_count=500, max_boxes_count=500)
 
 general_info        = input.bool(title='General Description', defval=false, tooltip='Use the signals in confluence and as an indication of market tension, which will discharged in higher volatility or trend continuation. ... context matters.
                      Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
@@ -12,40 +12,58 @@ adx_trend           = input.bool(title='MTF Info Panel', defval=false,
 // fractals input
 fracals_plot        = input.bool(title='Bill Williams Fractals', defval=true, tooltip='Symbol: white triangle. Works as support and resistance level.')
 
+// Alert Inputs 
+grp_alert      = "Real-time Alerts"
+use_rt_alert   = input.bool(false, title="Alert on 5th Fractal Candle (Real-time)", tooltip="Triggers an alert signal while the 5th candle of a fractal pattern is forming (Real-time). Select 'Any function call' when creating the alert.")
+
+// Gradient Volume Profile
+//grp_vp = "Gradient Volume Profile"
+vp_enable   = input.bool(false, "Volume Profile ⠀⠀", inline="line4")
+// Smart Contrast
+vp_smart    = input.bool(false, "Contrast Factor", inline="line4", tooltip="If enabled, cuts off extreme peaks to make normal volume nodes visible.")
+vp_clip     = input.float(2.5, "", minval=1.0, step=0.1, inline="line4", tooltip="Clipping threshold. Lower = More saturated red. Higher = Only peaks are red.")
+
+
+// Basic Visuals
+vp_width    = 12 //input.int(12, "Width (px)", minval=1, group=grp_vp)
+vp_offset   = 15 //input.int(15, "Offset", group=grp_vp, tooltip="Horizontal offset in bars from the last candle.")
+
+// Precision & Smoothing
+vp_rows     = 300 //input.int(300, "Rows", minval=50, maxval=500, group=grp_vp, tooltip="Resolution of the profile. Higher = smoother gradient.")
+vp_smooth   = 3 //input.int(3, "Smooth", minval=1, maxval=10, group=grp_vp, tooltip="Vertical smoothing to blur edges.")
+
+// Data Scope (Performance)
+vp_maxScan  = 4000 //input.int(4000, "Scan Depth", minval=500, maxval=9000, group=grp_vp, tooltip="Max number of past bars to calculate. Lower this if you encounter performance issues.")
+
 // MTF CANDLE OVERLAY INPUTS
 grp_mtf_candle    = "MTF Candle Overlay"
-show_mtf_candles  = input.bool(false, "MTF Candle Overlay", group=grp_mtf_candle, tooltip="Two time frames at a glance. It's like looking into a candle with an X-ray.")
+show_mtf_candles  = input.bool(false, "MTF Candle Overlay", group=grp_mtf_candle, tooltip="Two timelines at a glance. It's like looking inside a candle with an X-ray.")
 mtf_tf_sel        = input.string("1h", "Overlay Timeframe", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], group=grp_mtf_candle)
 mtf_opacity       = input.int(15, "Overlay Opacity %", minval=0, maxval=100, group=grp_mtf_candle, tooltip="0% = Invisible, 100% = Solid")
 
 // Additional Context Inputs 
 grp_add         = "Additional Context"
-show_pch_pcl    = input.bool(false, "Previous Candle High/Low", group=grp_add, tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe.")
+show_pch_pcl    = input.bool(true, "Previous Candle High/Low", group=grp_add, tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe.")
 pch_pcl_tf      = input.timeframe("D", "Previous Candle Timeframe", group=grp_add, tooltip="Select the timeframe for the Previous Candle High/Low calculation.")
 
-show_last_frac  = input.bool(false, "Last Fractal S/R", group=grp_add, tooltip="Draws lines at the last confirmed Up/Down Fractals similar to PDH/PDL. Every new trend begins with the breaking of a fractal. (Time Frame dependent).")
-last_frac_tf    = input.timeframe("", "Last Fractal Timeframe", group=grp_add, tooltip="Select the timeframe for the Last Fractal calculation.")
+show_last_frac  = input.bool(true, "Last Fractal S/R", group=grp_add, tooltip="Draws lines at the last confirmed Up/Down Fractals similar to PDH/PDL. Every new trend begins with the breaking of a fractal. (Time Frame dependent).")
+last_frac_tf    = input.timeframe("240", "Last Fractal Timeframe", group=grp_add, tooltip="Select the timeframe for the Last Fractal calculation.")
 
 show_vol        = input.bool(true, "High Volume Spikes", group=grp_add, tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
 vol_mult        = input.float(2.0, "Volume Threshold (x Avg)", group=grp_add)
 
 // FVG Inputs 
-grp_fvg      = "Price Imbalance (Fair Value Gaps)"
+grp_fvg      = "Price Imbalance (Fair Value Gap)"
 plot_fvg     = input.bool(true, title="Price Imbalance", group=grp_fvg, tooltip="Indicates a potential pullback area after an strong price movement (Displacement).")
 fvg_tf_sel   = input.timeframe("", title="Imbalance Timeframe", group=grp_fvg, tooltip="Select the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
 fvg_len      = input.int(1, title="Box Length (Bars)", minval=1, group=grp_fvg, tooltip="Length of the box in units of the selected timeframe.")
-
-// Alert Inputs 
-grp_alert      = "Real-time Alerts"
-use_rt_alert   = input.bool(false, title="Alert on 5th Fractal Candle (Real-time)", group=grp_alert, tooltip="Triggers an alert signal while the 5th candle of a fractal pattern is forming (Real-time). Select 'Any function call' when creating the alert.")
 
 // Background Color Filter INPUT
 selected_bg_signal  = input.string("None", title="Background Color Filter", options=
                      ["None", "Bill Williams Fractals BG", "Anticipated Fractal BG", "Last 12 Bar BG", "Parabolic SAR BG", "DMI ADX BG", "HMA Slope BG", "MACD Slow Slope BG", "MACD Slope/Fractal Break BG (OR)", "Trend Line/Fractal Break BG (OR)", "Fractals Trend Lines", "Segments BG", 
                      "Segments/Fractals BG (OR)", "Segments/Trend Line BG (OR)", "Segments/Fractals/Trend Line BG (OR)",
-                     "Segments/Fractals BG (AND)", "Segments/Trend Line BG (AND)", "Segments/Fractals/Trend Line BG (AND)", "Segments/MACD Slope BG (AND)", "MACD Slope/Fractals Break BG (AND)"], 
+                     "Segments/Fractals BG (AND)", "Segments/Trend Line BG (AND)", "Segments/Fractals/Trend Line BG (AND)", "Segments/MACD Slope BG (AND)", "MACD Slope/Fractals Break BG (AND)", "MA1/MA2 Cross BG"], 
                      group="Background Color Filters:", tooltip="Signals that are alternatively displayed as a background color as a quick verification and a kind of 'backtest'.")
-
 
 bg_tf_select        = input.timeframe("", title="Background Filter Timeframe", group="Background Color Filters:", tooltip="Select the timeframe for the background signals calculations. Empty = Current Chart Timeframe.")
 
@@ -68,16 +86,26 @@ sr_tf               = input.timeframe('W', title='Time Frame Of Fractals', optio
 fr_source           = input.string('high/low', title='Fractal Source', options=['high/low', 'close'], tooltip='The source of fractals used to plot the SR-levels.', group='SR lines:')
 
 // ema cloud, hma, dmi adx inputs
-en_cloud            = input.bool(true, title='EMA Cloud', group='MA cloud, HMA slope, DMI ADX:', tooltip='This EMA cloud works as dynamic support and resistance and as trend indication. A wide cloud indicates high volatility, a narrow cloud indicates low volatility and breakout potential. Interesting pairs: 8/21, 40/97')
-sig_plot            = input.bool(true, title='EMA Cloud Color Signal', group='MA cloud, HMA slope, DMI ADX:', tooltip='EMA1 cross EMA2 color signal')
-sma1_plot           = input.bool(true, title='SMA', group='MA cloud, HMA slope, DMI ADX:', tooltip='SMA with slope color')
+grp_ma              = 'MA cloud, HMA slope, DMI ADX:'
+en_cloud            = input.bool(false, title='EMA Cloud', group=grp_ma, tooltip='This EMA cloud works as dynamic support and resistance and as trend indication. A wide cloud indicates high volatility, a narrow cloud indicates low volatility and breakout potential. Interesting pairs: 8/21, 40/97')
+sig_plot            = input.bool(true, title='EMA Cloud Color Signal', group=grp_ma, tooltip='EMA1 cross EMA2 color signal')
 
-ema_inp1            = input.int(8, title='EMA1 Length', minval=1, group='MA cloud, HMA slope, DMI ADX:', tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
-ema_inp2            = input.int(21, title='EMA2 Length', minval=1, group='MA cloud, HMA slope, DMI ADX:', tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
-sma1_inp            = input.int(50, title='SMA', minval=1, group='MA cloud, HMA slope, DMI ADX:', tooltip="SMA with slope color")
-di_len              = input.int(7, title='ADX DI Length', minval=1, group='MA cloud, HMA slope, DMI ADX:', tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
-len_smo             = input.int(7, title='ADX Smoothing', minval=1, group='MA cloud, HMA slope, DMI ADX:', tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
-hma_inp             = input.int(20, title='HMA Length', minval=1, group='MA cloud, HMA slope, DMI ADX:', tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
+ema_inp1            = input.int(8, title='Cloud EMA1 Length', minval=1, group=grp_ma, tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
+ema_inp2            = input.int(21, title='Cloud EMA2 Length', minval=1, group=grp_ma, tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
+
+// MA 1 Inputs
+ma1_type            = input.string("SMA", title="MA 1", options=["None", "SMA", "EMA"], inline="ma1", group=grp_ma)
+ma1_len             = input.int(200, title="", minval=1, inline="ma1", group=grp_ma)
+ma1_slope_c         = input.bool(false, title="Slope Color", inline="ma1", group=grp_ma)
+
+// MA 2 Inputs
+ma2_type            = input.string("EMA", title="MA 2", options=["None", "SMA", "EMA"], inline="ma2", group=grp_ma)
+ma2_len             = input.int(200, title="", minval=1, inline="ma2", group=grp_ma)
+ma2_slope_c         = input.bool(false, title="Slope Color", inline="ma2", group=grp_ma)
+
+di_len              = input.int(7, title='ADX DI Length', minval=1, group=grp_ma, tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
+len_smo             = input.int(7, title='ADX Smoothing', minval=1, group=grp_ma, tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
+hma_inp             = input.int(20, title='HMA Length', minval=1, group=grp_ma, tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
 
 // two fractals trendlines inputs
 plot_trendline      = input.bool(false, title='Fractal Trend Lines', group='Trend lines:', tooltip='The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal.')
@@ -96,7 +124,7 @@ plot_l12_bar        = input.bool(true, title='Last 12 Bar (L12)', tooltip='Lette
 L12_input           = input.int(12, minval=1, title='"Last 12"', group='Bar signals:', tooltip='"Last 12 Bar" Bar count.')
 plot_nr_bar         = input.bool(true, title='Narrow Range Bar (NR7)', tooltip='Letter: n, NR7 = narrowest range of a bar of the last seven bars. Indicates market tension.', group='Bar signals:')
 plot_i_bar          = input.bool(true, title='Inside Bar', tooltip='Letter: i. An inside bar is a triangle formation on smaller time frame.', group='Bar signals:')
-plot_o_bar          = input.bool(true, title='Outside Bar', tooltip='Letter: o. An outside bar is an opening funnel formation on smaller time frames. gray-> normal outside bar, valid for the next bar: red-> short, green-> long', group='Bar signals:')
+plot_o_bar          = input.bool(true, title='Outside Bar', tooltip='Letter: o. An outside bar is an opening funnel formation on smaller time frames. gray-> normal outside bar, valid at least for the next bar: red-> short, green-> long', group='Bar signals:')
 plot_s_bar          = input.bool(true, title='Sandwich Bar', tooltip='Letter: s. Indicates market tension.', group='Bar signals:')
 plot_f_bar          = input.bool(true, title='Fakey', tooltip='Letter: F. An inside bar false breakout.', group='Bar signals:')
 
@@ -105,38 +133,43 @@ plot_segments       = input.bool(false, title='Segments', tooltip='Gray lines th
 sb                  = input.int(10 ,title='Max Segment Bars', minval=0, step=1, tooltip='Max bars between two segment highs or segment lows.', group='Segment signal:')
 
 // pivot points inputs
-plot_pivots_w       = input.bool(true, title= "1 Week Classic Pivot Points", group= "Pivot points:", tooltip= "1 week classic Pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.")
-plot_pivots_m       = input.bool(true, title='1 Month Classic Pivot Points', group='Pivot points:', tooltip='1 month classic pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.')
-plot_pivots_3m      = input.bool(true, title='3 Month Classic Pivot Points', group='Pivot points:', tooltip='3 month classic pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.')
-plot_pivots_6m      = input.bool(true, title='6 Month Classic Pivot Points', group='Pivot points:', tooltip='6 month classic pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.')
-plot_pivots_12m     = input.bool(true, title='12 Month Classic Pivot Points', group='Pivot points:', tooltip='12 month classic pivot points are plotted (P, R1, R2, R3, S1, S2, S3). Pivot points are used as support and resistance levels. Watch out for clusters.')
+plot_pivots_h1      = input.bool(false, title= "1 Hour Classic Pivot Points", group= "Pivot points:", tooltip= "1 Hour Pivot points (P, R1-R4, S1-S4). Only visible on charts < 1H.")
+plot_pivots_h4      = input.bool(true, title= "4 Hour Classic Pivot Points", group= "Pivot points:", tooltip= "4 Hour Pivot points (P, R1-R4, S1-S4). Only visible on charts < 4H.")
+plot_pivots_d       = input.bool(true, title= "1 Day Classic Pivot Points", group= "Pivot points:", tooltip= "Daily Pivot points (P, R1-R4, S1-S4). Only visible on intraday charts.")
+plot_pivots_w       = input.bool(true, title= "1 Week Classic Pivot Points", group= "Pivot points:", tooltip= "1 week classic Pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.")
+plot_pivots_m       = input.bool(true, title='1 Month Classic Pivot Points', group='Pivot points:', tooltip='1 month classic pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.')
+plot_pivots_3m      = input.bool(true, title='3 Month Classic Pivot Points', group='Pivot points:', tooltip='3 month classic pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.')
+plot_pivots_12m     = input.bool(true, title='12 Month Classic Pivot Points', group='Pivot points:', tooltip='12 month classic pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.')
 
 // TRADING SESSIONS INPUTS ---
 grp_sess      = "Trading Sessions"
 sess_timezone = input.string("Europe/Berlin", title="Timezone", tooltip="Standard: Europe/Berlin. Change to 'UTC' or 'America/New_York' if needed.", group=grp_sess)
-sess_style    = input.string("Vertical Line", title="Session Style", options=["Vertical Line", "Box", "Background"], group=grp_sess, tooltip="Choose between a high/low box, a vertical background area or a vertical line.")
+sess_style    = input.string("Vertical Line", title="Session Style", options=["Vertical Line", "Box", "Background"], group=grp_sess, tooltip="Choose between a high/low box, a vertical background area or a vertical line. 
+                 1st blue line = NY a.m. session, 2nd blue line  = NY p.m. session")
 
 // London - ORANGE
-london_show   = input.bool(false, title="London Session ...", group=grp_sess, inline="lon")
+london_show   = input.bool(true, title="London Session ⠀⠀", group=grp_sess, inline="lon")
 london_sess   = input.session("0900-1730", title="", group=grp_sess, inline="lon")
-london_col    = input.color(color.new(color.orange, 95), title="", group=grp_sess, inline="lon")
+london_col    = input.color(color.new(color.orange, 90), title="", group=grp_sess, inline="lon")
 
 // New York - BLUE
-ny_show       = input.bool(false, title="New York Session .", group=grp_sess, inline="ny")
+ny_show       = input.bool(true, title="New York Session⠀", group=grp_sess, inline="ny")
 ny_sess       = input.session("1530-2200", title="", group=grp_sess, inline="ny")
-ny_col        = input.color(color.new(color.blue, 95), title="", group=grp_sess, inline="ny")
+ny_col        = input.color(color.new(color.blue, 90), title="", group=grp_sess, inline="ny")
 
 // Tokio - YELLOW
-tokyo_show    = input.bool(false, title="Tokio Session ......", group=grp_sess, inline="tok")
+tokyo_show    = input.bool(false, title="Tokio Session ⠀⠀⠀", group=grp_sess, inline="tok")
 tokyo_sess    = input.session("0100-0900", title="", group=grp_sess, inline="tok")
-tokyo_col     = input.color(color.new(color.yellow, 95), title="", group=grp_sess, inline="tok")
+tokyo_col     = input.color(color.new(color.yellow, 90), title="", group=grp_sess, inline="tok")
 
 // Sydney - RED
-sydney_show   = input.bool(false, title="Sydney Session ....", group=grp_sess, inline="syd")
+sydney_show   = input.bool(false, title="Sydney Session ⠀⠀", group=grp_sess, inline="syd")
 sydney_sess   = input.session("2200-0700", title="", group=grp_sess, inline="syd")
-sydney_col    = input.color(color.new(color.red, 95), title="", group=grp_sess, inline="syd")
+sydney_col    = input.color(color.new(color.red, 90), title="", group=grp_sess, inline="syd")
 
 // attributes inputs
+vp_color            = input.color(color.new(color.red, 0), "Volume Profile Color", group= "Attributes of drawn objects:")
+
 color_fr            = input.color(color.white, "Fractal Color", group= "Attributes of drawn objects:")
 transp_fr           = input.int(40, "Fractal Transparency", minval=1, maxval= 100, group= "Attributes of drawn objects:")
 
@@ -196,10 +229,11 @@ h_div_bear          = bar_scr_bear < ta.highest(bar_scr_bear, bar_div_p)[1] and 
 h_div_bull          = bar_scr_bull > ta.lowest(bar_scr_bull, bar_div_p)[1] and indi_scr < ta.lowest(indi_scr, bar_div_p)[1]
 
 
-plotshape(plot_div ? c_div_bear : na, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,  textcolor=color.new(color.red, 0),  color=color.new(color.red, 0), title='Classic bear divergence') 
-plotshape(plot_div ? c_div_bull : na, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,  textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Classic bull divergence') 
-plotshape(plot_div ? h_div_bear : na, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,  textcolor=color.new(color.red, 0), color=color.new(color.red, 0), title='Hidden bear divergence') 
-plotshape(plot_div ? h_div_bull : na, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,  textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Hidden bull divergence') 
+plot_bear_combined = plot_div and (c_div_bear or h_div_bear)
+plot_bull_combined = plot_div and (c_div_bull or h_div_bull)
+
+plotshape(plot_bear_combined, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,  textcolor=color.new(color.red, 0),  color=color.new(color.red, 0), title='Bear divergence') 
+plotshape(plot_bull_combined, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,  textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Bull divergence')
 
 
 //------------------------------------------------------- plot horizontal sr levels/lines (Visuals for Chart) -----------------------------------------------------
@@ -261,15 +295,31 @@ if plot_sr_lines and bar_index > 0
 
 ema1                = ta.ema(close, ema_inp1)
 ema2                = ta.ema(close, ema_inp2)
-sma1                = ta.sma(close, sma1_inp)
-sma1_slope          = sma1 - sma1[1]
-sma1_color          = sma1_slope >= 0 ? color.lime : color.rgb(255, 20, 20)
+
+// MA 1 Calculation & Logic
+ma1_val = switch ma1_type
+    "SMA" => ta.sma(close, ma1_len)
+    "EMA" => ta.ema(close, ma1_len)
+    => na
+// MA 1 Color Logic: Checked=Slope(Lime/Red), Unchecked=Red
+ma1_col = ma1_slope_c ? (ma1_val >= ma1_val[1] ? color.lime : color.rgb(255, 20, 20)) : color.green
+plot(ma1_type != "None" ? ma1_val : na, color=ma1_col, linewidth=1, title="MA 1")
+
+// MA 2 Calculation & Logic
+ma2_val = switch ma2_type
+    "SMA" => ta.sma(close, ma2_len)
+    "EMA" => ta.ema(close, ma2_len)
+    => na
+// MA 2 Color Logic: Checked=Slope(Lime/Red), Unchecked=Green
+ma2_col = ma2_slope_c ? (ma2_val >= ma2_val[1] ? color.lime : color.rgb(255, 20, 20)) : color.red
+plot(ma2_type != "None" ? ma2_val : na, color=ma2_col, linewidth=1, title="MA 2")
+
+
 ema_buy             = en_cloud ? ema1 > ema2 : na
 ema_sell            = en_cloud ? ema1 < ema2 : na
 
 ema1_pl             = plot(en_cloud ? ema1 : na, color=color.new(color.blue, 100), title='EMA 1')
 ema2_pl             = plot(en_cloud ? ema2 : na, color=color.new(color.blue, 100), title='EMA 2')
-sma1_pl             = plot(sma1_plot ? sma1 : na, color=sma1_color, linewidth= 1, title='SMA')          
 
 fill(ema1_pl, ema2_pl, color=color.new(sig_plot and not ema_buy[1] ? color_ema_sig_dn : sig_plot and not ema_sell[1] ? color_ema_sig_up : color_ema_c, transp_ema_c))
 
@@ -585,6 +635,20 @@ f_calc_bg_signal() =>
     macd_slow_up_evt_c = ta.crossover(macd_slow_slope_c, 0)
     macd_slow_dn_evt_c = ta.crossunder(macd_slow_slope_c, 0)
 
+    // MA1 / MA2 Cross Logic for Background
+    ma1_val_c = switch ma1_type
+        "SMA" => ta.sma(close, ma1_len)
+        "EMA" => ta.ema(close, ma1_len)
+        => na
+    
+    ma2_val_c = switch ma2_type
+        "SMA" => ta.sma(close, ma2_len)
+        "EMA" => ta.ema(close, ma2_len)
+        => na
+
+    ma_cross_buy_c  = ta.crossover(ma1_val_c, ma2_val_c)
+    ma_cross_sell_c = ta.crossunder(ma1_val_c, ma2_val_c)
+
     // Anticipated Fractal
     af_up_c = high > high[1] and high > high[2]
     af_dn_c = low < low[1] and low < low[2]
@@ -786,7 +850,7 @@ f_calc_bg_signal() =>
     if macd_slow_dn_evt_c
         macd_dn_occurred_c := true
         
-    // 2. Determine Conditions for this Context
+// 2. Determine Conditions for this Context
     buy_flip_condition_met = (selected_bg_signal == "Bill Williams Fractals BG" and bw_fr_buy_break_c) or
                              (selected_bg_signal == "Anticipated Fractal BG" and af_up_c) or
                              (selected_bg_signal == "Last 12 Bar BG" and plot_l12_long_c) or
@@ -801,7 +865,8 @@ f_calc_bg_signal() =>
                              (selected_bg_signal == "Segments/Trend Line BG (AND)" and seg_buy_occurred_c and tl_buy_occurred_c) or
                              (selected_bg_signal == "Segments/Fractals/Trend Line BG (AND)" and seg_buy_occurred_c and frac_buy_occurred_c and tl_buy_occurred_c) or
                              (selected_bg_signal == "Segments/MACD Slope BG (AND)" and seg_buy_occurred_c and macd_up_occurred_c) or
-                             (selected_bg_signal == "MACD Slope/Fractals Break BG (AND)" and macd_up_occurred_c and frac_buy_occurred_c)
+                             (selected_bg_signal == "MACD Slope/Fractals Break BG (AND)" and macd_up_occurred_c and frac_buy_occurred_c) or
+                             (selected_bg_signal == "MA1/MA2 Cross BG" and ma_cross_buy_c)
 
     sell_flip_condition_met = (selected_bg_signal == "Bill Williams Fractals BG" and bw_fr_sell_break_c) or
                               (selected_bg_signal == "Anticipated Fractal BG" and af_dn_c) or
@@ -817,7 +882,8 @@ f_calc_bg_signal() =>
                               (selected_bg_signal == "Segments/Trend Line BG (AND)" and seg_sell_occurred_c and tl_sell_occurred_c) or
                               (selected_bg_signal == "Segments/Fractals/Trend Line BG (AND)" and seg_sell_occurred_c and frac_sell_occurred_c and tl_sell_occurred_c) or
                               (selected_bg_signal == "Segments/MACD Slope BG (AND)" and seg_sell_occurred_c and macd_dn_occurred_c) or
-                              (selected_bg_signal == "MACD Slope/Fractals Break BG (AND)" and macd_dn_occurred_c and frac_sell_occurred_c)
+                              (selected_bg_signal == "MACD Slope/Fractals Break BG (AND)" and macd_dn_occurred_c and frac_sell_occurred_c) or
+                              (selected_bg_signal == "MA1/MA2 Cross BG" and ma_cross_sell_c)
 
     var bool bg_state_is_green = na 
 
@@ -1053,127 +1119,206 @@ if adx_trend
 
 // ----------------------------------------------------------- pivot points -----------------------------------------------------------------
 
-d_high          = request.security(syminfo.tickerid,"D", high[1])
-d_low           = request.security(syminfo.tickerid,"D", low[1])
-d_close         = request.security(syminfo.tickerid,"D", close[1])
+// Optimierte Datenabfrage (Tuples), um das "Security Limit" von 40 nicht zu sprengen
+// Wir holen High, Low und Close in EINEM Aufruf pro Timeframe statt in drei.
 
-w_high          = request.security(syminfo.tickerid,"W", high[1])
-w_low           = request.security(syminfo.tickerid,"W", low[1])
-w_close         = request.security(syminfo.tickerid,"W", close[1])
+[h1_high, h1_low, h1_close]    = request.security(syminfo.tickerid, "60", [high[1], low[1], close[1]])
+[h4_high, h4_low, h4_close]    = request.security(syminfo.tickerid, "240", [high[1], low[1], close[1]])
+[d_high, d_low, d_close]       = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]])
+[w_high, w_low, w_close]       = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]])
+[m_high, m_low, m_close]       = request.security(syminfo.tickerid, "M", [high[1], low[1], close[1]])
+[m3_high, m3_low, m3_close]    = request.security(syminfo.tickerid, "3M", [high[1], low[1], close[1]])
+[m12_high, m12_low, m12_close] = request.security(syminfo.tickerid, "12M", [high[1], low[1], close[1]])
 
-m_high          = request.security(syminfo.tickerid, 'M', high[1])
-m_low           = request.security(syminfo.tickerid, 'M', low[1])
-m_close         = request.security(syminfo.tickerid, 'M', close[1])
+// --- Calculations ---
 
-m3_high         = request.security(syminfo.tickerid, '3M', high[1])
-m3_low          = request.security(syminfo.tickerid, '3M', low[1])
-m3_close        = request.security(syminfo.tickerid, '3M', close[1])
+// H1 pivot points
+h1_PP           = (h1_high + h1_low + h1_close) / 3
+h1_R1           = h1_PP + h1_PP - h1_low
+h1_R2           = h1_PP + h1_high - h1_low
+h1_R3           = h1_high + 2 * (h1_PP - h1_low)
+h1_R4           = h1_PP + 3 * (h1_high - h1_low)
+h1_S1           = h1_PP - (h1_high - h1_PP)
+h1_S2           = h1_PP - (h1_high - h1_low)
+h1_S3           = h1_low - 2 * (h1_high - h1_PP)
+h1_S4           = h1_PP - 3 * (h1_high - h1_low)
 
-m6_high         = request.security(syminfo.tickerid, '6M', high[1])
-m6_low          = request.security(syminfo.tickerid, '6M', low[1])
-m6_close        = request.security(syminfo.tickerid, '6M', close[1])
+// H4 pivot points
+h4_PP           = (h4_high + h4_low + h4_close) / 3
+h4_R1           = h4_PP + h4_PP - h4_low
+h4_R2           = h4_PP + h4_high - h4_low
+h4_R3           = h4_high + 2 * (h4_PP - h4_low)
+h4_R4           = h4_PP + 3 * (h4_high - h4_low)
+h4_S1           = h4_PP - (h4_high - h4_PP)
+h4_S2           = h4_PP - (h4_high - h4_low)
+h4_S3           = h4_low - 2 * (h4_high - h4_PP)
+h4_S4           = h4_PP - 3 * (h4_high - h4_low)
 
-m12_high        = request.security(syminfo.tickerid, '12M', high[1])
-m12_low         = request.security(syminfo.tickerid, '12M', low[1])
-m12_close       = request.security(syminfo.tickerid, '12M', close[1])
+// Daily pivot points
+d_PP            = (d_high + d_low + d_close) / 3
 
-// P pivot points
 w_PP            = (w_high + w_low + w_close) / 3
 m_PP            = (m_high + m_low + m_close) / 3
 m3_PP           = (m3_high + m3_low + m3_close) / 3
-m6_PP           = (m6_high + m6_low + m6_close) / 3
 m12_PP          = (m12_high + m12_low + m12_close) / 3
 
-// weekly R/S pivot points
+// Daily R/S (extended to 4)
+d_R1            = d_PP + d_PP - d_low
+d_R2            = d_PP + d_high - d_low
+d_R3            = d_high + 2 * (d_PP - d_low)
+d_R4            = d_PP + 3 * (d_high - d_low)
+
+d_S1            = d_PP - (d_high - d_PP)
+d_S2            = d_PP - (d_high - d_low)
+d_S3            = d_low - 2 * (d_high - d_PP)
+d_S4            = d_PP - 3 * (d_high - d_low)
+
+// weekly R/S pivot points (extended to 4)
 w_R1            = w_PP + w_PP - w_low
 w_R2            = w_PP + w_high - w_low
-w_R3            = w_high + 2 * (w_PP - w_low) 
+w_R3            = w_high + 2 * (w_PP - w_low)
+w_R4            = w_PP + 3 * (w_high - w_low)
 
 w_S1            = w_PP - (w_high - w_PP)
 w_S2            = w_PP - (w_high - w_low)
 w_S3            = w_low - 2 * (w_high - w_PP)
+w_S4            = w_PP - 3 * (w_high - w_low)
 
-// monthly R/S pivot points
+// monthly R/S pivot points (extended to 4)
 m_R1            = m_PP + m_PP - m_low
 m_R2            = m_PP + m_high - m_low
 m_R3            = m_high + 2 * (m_PP - m_low)
+m_R4            = m_PP + 3 * (m_high - m_low)
 
 m_S1            = m_PP - (m_high - m_PP)
 m_S2            = m_PP - (m_high - m_low)
 m_S3            = m_low - 2 * (m_high - m_PP)
+m_S4            = m_PP - 3 * (m_high - m_low)
 
-// 3 month R/S pivot points
+// 3 month R/S pivot points (extended to 4)
 m3_R1           = m3_PP + m3_PP - m3_low
 m3_R2           = m3_PP + m3_high - m3_low
 m3_R3           = m3_high + 2 * (m3_PP - m3_low)
+m3_R4           = m3_PP + 3 * (m3_high - m3_low)
 
 m3_S1           = m3_PP - (m3_high - m3_PP)
 m3_S2           = m3_PP - (m3_high - m3_low)
 m3_S3           = m3_low - 2 * (m3_high - m3_PP)
+m3_S4           = m3_PP - 3 * (m3_high - m3_low)
 
-// 6 month R/S pivot points
-m6_R1           = m6_PP + m6_PP - m6_low
-m6_R2           = m6_PP + m6_high - m6_low
-m6_R3           = m6_high + 2 * (m6_PP - m6_low)
-
-m6_S1           = m6_PP - (m6_high - m6_PP)
-m6_S2           = m6_PP - (m6_high - m6_low)
-m6_S3           = m6_low - 2 * (m6_high - m6_PP)
-
-// 12 month R/S pivot points
+// 12 month R/S pivot points (extended to 4)
 m12_R1          = m12_PP + m12_PP - m12_low
 m12_R2          = m12_PP + m12_high - m12_low
 m12_R3          = m12_high + 2 * (m12_PP - m12_low)
+m12_R4          = m12_PP + 3 * (m12_high - m12_low)
 
 m12_S1          = m12_PP - (m12_high - m12_PP)
 m12_S2          = m12_PP - (m12_high - m12_low)
 m12_S3          = m12_low - 2 * (m12_high - m12_PP)
+m12_S4          = m12_PP - 3 * (m12_high - m12_low)
 
 
-//plot P/R/S weekly pivot points
-plot(Intra_D and plot_pivots_w ? w_PP : na, color= color.yellow, title= "W PP", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
-plot(Intra_D and plot_pivots_w ? w_R1 : na, color= color.red, title= "W R1", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
-plot(Intra_D and plot_pivots_w ? w_R2 : na, color= color.red, title= "W R2", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
-plot(Intra_D and plot_pivots_w ? w_R3 : na, color= color.red, title= "W R3", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
-plot(Intra_D and plot_pivots_w ? w_S1 : na, color= color.green, title= "w S1", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
-plot(Intra_D and plot_pivots_w ? w_S2 : na, color= color.green, title= "w S2", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
-plot(Intra_D and plot_pivots_w ? w_S3 : na, color= color.green, title= "W S3", style = plot.style_line, linewidth= 3, show_last= 1, offset= 2)
+// --- ALL PIVOTS AS LINES (Visual Update) ---
 
-//plot P/R/S 1 month pivot points
-plot(Intra_D_W and plot_pivots_m ? m_PP : na, color=color.new(color.yellow, 0), title='M PP', style=plot.style_line, linewidth=4, show_last=1, offset=3)
-plot(Intra_D_W and plot_pivots_m ? m_R1 : na, color=color.new(color.red, 0), title='M R1', style=plot.style_line, linewidth=4, show_last=1, offset=3)
-plot(Intra_D_W and plot_pivots_m ? m_R2 : na, color=color.new(color.red, 0), title='M R2', style=plot.style_line, linewidth=4, show_last=1, offset=3)
-plot(Intra_D_W and plot_pivots_m ? m_R3 : na, color=color.new(color.red, 0), title='M R3', style=plot.style_line, linewidth=4, show_last=1, offset=3)
-plot(Intra_D_W and plot_pivots_m ? m_S1 : na, color=color.new(color.green, 0), title='M S1', style=plot.style_line, linewidth=4, show_last=1, offset=3)
-plot(Intra_D_W and plot_pivots_m ? m_S2 : na, color=color.new(color.green, 0), title='M S2', style=plot.style_line, linewidth=4, show_last=1, offset=3)
-plot(Intra_D_W and plot_pivots_m ? m_S3 : na, color=color.new(color.green, 0), title='M S3', style=plot.style_line, linewidth=4, show_last=1, offset=3)
+// 1. Definition of line variables
+var line l_h1_pp = na, var line l_h1_r1 = na, var line l_h1_r2 = na, var line l_h1_r3 = na, var line l_h1_r4 = na, var line l_h1_s1 = na, var line l_h1_s2 = na, var line l_h1_s3 = na, var line l_h1_s4 = na
+var line l_h4_pp = na, var line l_h4_r1 = na, var line l_h4_r2 = na, var line l_h4_r3 = na, var line l_h4_r4 = na, var line l_h4_s1 = na, var line l_h4_s2 = na, var line l_h4_s3 = na, var line l_h4_s4 = na
+var line l_d_pp = na, var line l_d_r1 = na, var line l_d_r2 = na, var line l_d_r3 = na, var line l_d_r4 = na, var line l_d_s1 = na, var line l_d_s2 = na, var line l_d_s3 = na, var line l_d_s4 = na
+var line l_w_pp = na, var line l_w_r1 = na, var line l_w_r2 = na, var line l_w_r3 = na, var line l_w_r4 = na, var line l_w_s1 = na, var line l_w_s2 = na, var line l_w_s3 = na, var line l_w_s4 = na
+var line l_m_pp = na, var line l_m_r1 = na, var line l_m_r2 = na, var line l_m_r3 = na, var line l_m_r4 = na, var line l_m_s1 = na, var line l_m_s2 = na, var line l_m_s3 = na, var line l_m_s4 = na
+var line l_3m_pp = na, var line l_3m_r1 = na, var line l_3m_r2 = na, var line l_3m_r3 = na, var line l_3m_r4 = na, var line l_3m_s1 = na, var line l_3m_s2 = na, var line l_3m_s3 = na, var line l_3m_s4 = na
+var line l_12m_pp = na, var line l_12m_r1 = na, var line l_12m_r2 = na, var line l_12m_r3 = na, var line l_12m_r4 = na, var line l_12m_s1 = na, var line l_12m_s2 = na, var line l_12m_s3 = na, var line l_12m_s4 = na
 
-//plot P/R/S 3 month pivot points
-plot(Intra_D_W_M and plot_pivots_3m ? m3_PP : na, color=color.new(color.yellow, 0), title='3M PP', style=plot.style_line, linewidth=5, show_last=1, offset=3)
-plot(Intra_D_W_M and plot_pivots_3m ? m3_R1 : na, color=color.new(color.red, 0), title='3M R1', style=plot.style_line, linewidth=5, show_last=1, offset=3)
-plot(Intra_D_W_M and plot_pivots_3m ? m3_R2 : na, color=color.new(color.red, 0), title='3M R2', style=plot.style_line, linewidth=5, show_last=1, offset=3)
-plot(Intra_D_W_M and plot_pivots_3m ? m3_R3 : na, color=color.new(color.red, 0), title='3M R3', style=plot.style_line, linewidth=5, show_last=1, offset=3)
-plot(Intra_D_W_M and plot_pivots_3m ? m3_S1 : na, color=color.new(color.green, 0), title='3M S1', style=plot.style_line, linewidth=5, show_last=1, offset=3)
-plot(Intra_D_W_M and plot_pivots_3m ? m3_S2 : na, color=color.new(color.green, 0), title='3M S2', style=plot.style_line, linewidth=5, show_last=1, offset=3)
-plot(Intra_D_W_M and plot_pivots_3m ? m3_S3 : na, color=color.new(color.green, 0), title='3M S3', style=plot.style_line, linewidth=5, show_last=1, offset=3)
+// 2. Drawing function
+f_draw_pivot(_line, _val, _col, _width, _offset_start, _show_cond, _input_active) =>
+    line.delete(_line)
+    if barstate.islast and _input_active and _show_cond and not na(_val)
+        line.new(bar_index + _offset_start, _val, bar_index + _offset_start + 1, _val, color=_col, width=_width)
+    else
+        na
 
-//plot P/R/S 6 month pivot points
-plot(Intra_D_W_M and plot_pivots_6m ? m6_PP : na, color=color.new(color.yellow, 0), title='6M PP', style=plot.style_line, linewidth=6, show_last=1, offset=5)
-plot(Intra_D_W_M and plot_pivots_6m ? m6_R1 : na, color=color.new(color.red, 0), title='6M R1', style=plot.style_line, linewidth=6, show_last=1, offset=5)
-plot(Intra_D_W_M and plot_pivots_6m ? m6_R2 : na, color=color.new(color.red, 0), title='6M R2', style=plot.style_line, linewidth=6, show_last=1, offset=5)
-plot(Intra_D_W_M and plot_pivots_6m ? m6_R3 : na, color=color.new(color.red, 0), title='6M R3', style=plot.style_line, linewidth=6, show_last=1, offset=5)
-plot(Intra_D_W_M and plot_pivots_6m ? m6_S1 : na, color=color.new(color.green, 0), title='6M S1', style=plot.style_line, linewidth=6, show_last=1, offset=5)
-plot(Intra_D_W_M and plot_pivots_6m ? m6_S2 : na, color=color.new(color.green, 0), title='6M S2', style=plot.style_line, linewidth=6, show_last=1, offset=5)
-plot(Intra_D_W_M and plot_pivots_6m ? m6_S3 : na, color=color.new(color.green, 0), title='6M S3', style=plot.style_line, linewidth=6, show_last=1, offset=5)
+// 3. Execution (Drawing)
 
-//plot P/R/S 12 month pivot points
-plot(Intra_D_W_M and plot_pivots_12m ? m12_PP : na, color=color.new(color.yellow, 0), title='12M PP', style=plot.style_line, linewidth=7, show_last=1, offset=5)
-plot(Intra_D_W_M and plot_pivots_12m ? m12_R1 : na, color=color.new(color.red, 0), title='12M R1', style=plot.style_line, linewidth=7, show_last=1, offset=5)
-plot(Intra_D_W_M and plot_pivots_12m ? m12_R2 : na, color=color.new(color.red, 0), title='12M R2', style=plot.style_line, linewidth=7, show_last=1, offset=5)
-plot(Intra_D_W_M and plot_pivots_12m ? m12_R3 : na, color=color.new(color.red, 0), title='12M R3', style=plot.style_line, linewidth=7, show_last=1, offset=5)
-plot(Intra_D_W_M and plot_pivots_12m ? m12_S1 : na, color=color.new(color.green, 0), title='12M S1', style=plot.style_line, linewidth=7, show_last=1, offset=5)
-plot(Intra_D_W_M and plot_pivots_12m ? m12_S2 : na, color=color.new(color.green, 0), title='12M S2', style=plot.style_line, linewidth=7, show_last=1, offset=5)
-plot(Intra_D_W_M and plot_pivots_12m ? m12_S3 : na, color=color.new(color.green, 0), title='12M S3', style=plot.style_line, linewidth=7, show_last=1, offset=5)
+// Bedingungen für Sichtbarkeit
+cond_h1 = timeframe.isintraday and timeframe.multiplier < 60
+cond_h4 = timeframe.isintraday and timeframe.multiplier < 240
+
+// 1H: Offset 1, Width 1 (Analog zu Daily)
+l_h1_pp := f_draw_pivot(l_h1_pp, h1_PP, color.orange, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_r1 := f_draw_pivot(l_h1_r1, h1_R1, color.red, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_r2 := f_draw_pivot(l_h1_r2, h1_R2, color.red, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_r3 := f_draw_pivot(l_h1_r3, h1_R3, color.red, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_r4 := f_draw_pivot(l_h1_r4, h1_R4, color.red, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_s1 := f_draw_pivot(l_h1_s1, h1_S1, color.green, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_s2 := f_draw_pivot(l_h1_s2, h1_S2, color.green, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_s3 := f_draw_pivot(l_h1_s3, h1_S3, color.green, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_s4 := f_draw_pivot(l_h1_s4, h1_S4, color.green, 1, 1, cond_h1, plot_pivots_h1)
+
+// 4H: Offset 1, Width 1 (Analog zu Daily)
+l_h4_pp := f_draw_pivot(l_h4_pp, h4_PP, color.orange, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_r1 := f_draw_pivot(l_h4_r1, h4_R1, color.red, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_r2 := f_draw_pivot(l_h4_r2, h4_R2, color.red, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_r3 := f_draw_pivot(l_h4_r3, h4_R3, color.red, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_r4 := f_draw_pivot(l_h4_r4, h4_R4, color.red, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_s1 := f_draw_pivot(l_h4_s1, h4_S1, color.green, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_s2 := f_draw_pivot(l_h4_s2, h4_S2, color.green, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_s3 := f_draw_pivot(l_h4_s3, h4_S3, color.green, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_s4 := f_draw_pivot(l_h4_s4, h4_S4, color.green, 1, 1, cond_h4, plot_pivots_h4)
+
+// Daily: Offset 1, Width 1
+l_d_pp := f_draw_pivot(l_d_pp, d_PP, color.orange, 2, 1, Intra, plot_pivots_d)
+l_d_r1 := f_draw_pivot(l_d_r1, d_R1, color.red, 2, 1, Intra, plot_pivots_d)
+l_d_r2 := f_draw_pivot(l_d_r2, d_R2, color.red, 2, 1, Intra, plot_pivots_d)
+l_d_r3 := f_draw_pivot(l_d_r3, d_R3, color.red, 2, 1, Intra, plot_pivots_d)
+l_d_r4 := f_draw_pivot(l_d_r4, d_R4, color.red, 2, 1, Intra, plot_pivots_d)
+l_d_s1 := f_draw_pivot(l_d_s1, d_S1, color.green, 2, 1, Intra, plot_pivots_d)
+l_d_s2 := f_draw_pivot(l_d_s2, d_S2, color.green, 2, 1, Intra, plot_pivots_d)
+l_d_s3 := f_draw_pivot(l_d_s3, d_S3, color.green, 2, 1, Intra, plot_pivots_d)
+l_d_s4 := f_draw_pivot(l_d_s4, d_S4, color.green, 2, 1, Intra, plot_pivots_d)
+
+// Weekly: Offset 3, Width 3
+l_w_pp := f_draw_pivot(l_w_pp, w_PP, color.yellow, 3, 3, Intra_D, plot_pivots_w)
+l_w_r1 := f_draw_pivot(l_w_r1, w_R1, color.red, 3, 3, Intra_D, plot_pivots_w)
+l_w_r2 := f_draw_pivot(l_w_r2, w_R2, color.red, 3, 3, Intra_D, plot_pivots_w)
+l_w_r3 := f_draw_pivot(l_w_r3, w_R3, color.red, 3, 3, Intra_D, plot_pivots_w)
+l_w_r4 := f_draw_pivot(l_w_r4, w_R4, color.red, 3, 3, Intra_D, plot_pivots_w)
+l_w_s1 := f_draw_pivot(l_w_s1, w_S1, color.green, 3, 3, Intra_D, plot_pivots_w)
+l_w_s2 := f_draw_pivot(l_w_s2, w_S2, color.green, 3, 3, Intra_D, plot_pivots_w)
+l_w_s3 := f_draw_pivot(l_w_s3, w_S3, color.green, 3, 3, Intra_D, plot_pivots_w)
+l_w_s4 := f_draw_pivot(l_w_s4, w_S4, color.green, 3, 3, Intra_D, plot_pivots_w)
+
+// Monthly: Offset 5, Width 4
+l_m_pp := f_draw_pivot(l_m_pp, m_PP, color.yellow, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_r1 := f_draw_pivot(l_m_r1, m_R1, color.red, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_r2 := f_draw_pivot(l_m_r2, m_R2, color.red, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_r3 := f_draw_pivot(l_m_r3, m_R3, color.red, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_r4 := f_draw_pivot(l_m_r4, m_R4, color.red, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_s1 := f_draw_pivot(l_m_s1, m_S1, color.green, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_s2 := f_draw_pivot(l_m_s2, m_S2, color.green, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_s3 := f_draw_pivot(l_m_s3, m_S3, color.green, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_s4 := f_draw_pivot(l_m_s4, m_S4, color.green, 4, 5, Intra_D_W, plot_pivots_m)
+
+// 3 Month: Offset 7, Width 5
+l_3m_pp := f_draw_pivot(l_3m_pp, m3_PP, color.yellow, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_r1 := f_draw_pivot(l_3m_r1, m3_R1, color.red, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_r2 := f_draw_pivot(l_3m_r2, m3_R2, color.red, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_r3 := f_draw_pivot(l_3m_r3, m3_R3, color.red, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_r4 := f_draw_pivot(l_3m_r4, m3_R4, color.red, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_s1 := f_draw_pivot(l_3m_s1, m3_S1, color.green, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_s2 := f_draw_pivot(l_3m_s2, m3_S2, color.green, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_s3 := f_draw_pivot(l_3m_s3, m3_S3, color.green, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_s4 := f_draw_pivot(l_3m_s4, m3_S4, color.green, 5, 7, Intra_D_W_M, plot_pivots_3m)
+
+// 12 Month: Offset 9, Width 6
+l_12m_pp := f_draw_pivot(l_12m_pp, m12_PP, color.yellow, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_r1 := f_draw_pivot(l_12m_r1, m12_R1, color.red, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_r2 := f_draw_pivot(l_12m_r2, m12_R2, color.red, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_r3 := f_draw_pivot(l_12m_r3, m12_R3, color.red, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_r4 := f_draw_pivot(l_12m_r4, m12_R4, color.red, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_s1 := f_draw_pivot(l_12m_s1, m12_S1, color.green, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_s2 := f_draw_pivot(l_12m_s2, m12_S2, color.green, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_s3 := f_draw_pivot(l_12m_s3, m12_S3, color.green, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_s4 := f_draw_pivot(l_12m_s4, m12_S4, color.green, 6, 9, Intra_D_W_M, plot_pivots_12m)
 
 
 //----------------------------------- Bollinger Bands ------------------------------------
@@ -1225,7 +1370,7 @@ f_draw_session(_show, _sess, _tz, _col, _style) =>
     if _style == "Vertical Line" and is_start
         // Note: For a vertical line, x1 must equal x2, but y1 must differ from y2 so direction is established.
         // extend.both then stretches it infinitely up and down.
-        line.new(x1=bar_index, y1=low, x2=bar_index, y2=high, extend=extend.both, color=color.new(_col, 50), style=line.style_solid, width=1)
+        line.new(x1=bar_index, y1=low, x2=bar_index, y2=high, extend=extend.both, color=color.new(_col, 70), style=line.style_solid, width=1)
 
     // Box Logic (Only executed if style is Box and session is active)
     var box sess_box = na
@@ -1248,11 +1393,28 @@ f_draw_session(_show, _sess, _tz, _col, _style) =>
     // Return the status
     is_sess
 
+// Check TF Constraint (Visible only if TF <= 1 Hour)
+show_sess_on_tf = timeframe.isintraday and timeframe.multiplier <= 60
+
 // Execute Function and capture return value
-lon_active = f_draw_session(london_show, london_sess, sess_timezone, london_col, sess_style)
-ny_active  = f_draw_session(ny_show, ny_sess, sess_timezone, ny_col, sess_style)
-tok_active = f_draw_session(tokyo_show, tokyo_sess, sess_timezone, tokyo_col, sess_style)
-syd_active = f_draw_session(sydney_show, sydney_sess, sess_timezone, sydney_col, sess_style)
+lon_active = f_draw_session(london_show and show_sess_on_tf, london_sess, sess_timezone, london_col, sess_style)
+ny_active  = f_draw_session(ny_show and show_sess_on_tf, ny_sess, sess_timezone, ny_col, sess_style)
+
+// --- ZUSATZ: Zweite Linie um 19:30 Uhr für New York (nur bei Vertical Line) ---
+if ny_show and show_sess_on_tf and sess_style == "Vertical Line"
+    // Prüfen, ob wir Wochenende haben (um Linie zu verhindern)
+    is_weekend_ny = dayofweek == dayofweek.saturday or dayofweek == dayofweek.sunday
+    // Wir prüfen auf Startzeit 19:30 in der gewählten Zeitzone
+    // "1930-2359" stellt sicher, dass wir den Beginn auch auf höheren Timeframes (z.B. 1h) erwischen
+    is_1930_sess  = not is_weekend_ny and not na(time(timeframe.period, "1930-2359", sess_timezone))
+    is_1930_start = is_1930_sess and not is_1930_sess[1]
+
+    if is_1930_start
+        line.new(x1=bar_index, y1=low, x2=bar_index, y2=high, extend=extend.both, color=color.new(ny_col, 70), style=line.style_solid, width=1)
+// -------------------------------------------------------------------------------
+
+tok_active = f_draw_session(tokyo_show and show_sess_on_tf, tokyo_sess, sess_timezone, tokyo_col, sess_style)
+syd_active = f_draw_session(sydney_show and show_sess_on_tf, sydney_sess, sess_timezone, sydney_col, sess_style)
 
 // Draw Backgrounds - COMBINED
 // Priority: NY > London > Tokyo > Sydney (in case of overlapping times)
@@ -1422,12 +1584,12 @@ if use_rt_alert and barstate.isrealtime and (rt_up_frac or rt_dn_frac)
 //--------------------------------------------------------- Additional Context (No Plot-Limit Usage) ---------------------------------------------------------
 
 /// --- 1. Previous Candle High/Low (Lines & Labels) ---
-// Fetch High/Low of the previous completed candle based on selected TF
-[pc_h_val, pc_l_val] = request.security(syminfo.tickerid, pch_pcl_tf, [high[1], low[1]], lookahead=barmerge.lookahead_on)
+// Fetch High/Low of the previous completed candle + its exact time window (start/end)
+[pc_h_val, pc_l_val, pc_start_time, pc_end_time] = request.security(syminfo.tickerid, pch_pcl_tf, [high[1], low[1], time[1], time], lookahead=barmerge.lookahead_on)
 
 // Variables for Lines and Labels
-var line l_pch = na
-var line l_pcl = na
+var line  l_pch  = na
+var line  l_pcl  = na
 var label lb_pch = na
 var label lb_pcl = na
 
@@ -1437,33 +1599,42 @@ if show_pch_pcl and barstate.islast
     line.delete(l_pcl)
     label.delete(lb_pch)
     label.delete(lb_pcl)
-    
-    // --- Logic to find the START point (x1) ---
-    // We look backwards to find the exact bar on the current chart that touched the HTF High/Low
-    int lookback_limit = 2000 // Limit search to max bars
-    int pch_index = bar_index // Default to current if not found
-    int pcl_index = bar_index // Default to current if not found
-    
-    // Find Prev Candle High Index
-    for i = 1 to lookback_limit
-        // Use a small tolerance or exact match depending on data
-        if high[i] >= pc_h_val 
-            pch_index := bar_index - i
-            break // Stop at the most recent occurrence
-    
-    // Find Prev Candle Low Index
-    for i = 1 to lookback_limit
-        if low[i] <= pc_l_val
-            pcl_index := bar_index - i
-            break 
 
-    // Draw PCH Line (Start at found index, Extend Right)
-    l_pch := line.new(x1=pch_index, y1=pc_h_val, x2=bar_index, y2=pc_h_val, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
-    lb_pch := label.new(x=bar_index + 3, y=pc_h_val, text="Prev High", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
-    
-    // Draw PCL Line (Start at found index, Extend Right)
-    l_pcl := line.new(x1=pcl_index, y1=pc_l_val, x2=bar_index, y2=pc_l_val, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
-    lb_pcl := label.new(x=bar_index + 3, y=pc_l_val, text="Prev Low", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+    // Check visibility: Current TF must be <= Selected TF
+    is_valid_pch_tf = timeframe.in_seconds(timeframe.period) <= timeframe.in_seconds(pch_pcl_tf)
+
+    if is_valid_pch_tf
+        int lookback_limit = 2000
+
+        // Find the exact LTF bar INSIDE the previous HTF candle window that made the high/low
+        int   pch_index = na
+        int   pcl_index = na
+        float max_h     = na
+        float min_l     = na
+
+        for i = 0 to lookback_limit
+            if not na(pc_start_time) and not na(pc_end_time) and time[i] >= pc_start_time and time[i] < pc_end_time
+                if na(max_h) or high[i] > max_h
+                    max_h := high[i]
+                    pch_index := bar_index - i
+                if na(min_l) or low[i] < min_l
+                    min_l := low[i]
+                    pcl_index := bar_index - i
+
+        // Stable fallbacks
+        pch_index := na(pch_index) ? bar_index : pch_index
+        pcl_index := na(pcl_index) ? bar_index : pcl_index
+
+        float pch_y = not na(pc_h_val) ? pc_h_val : max_h
+        float pcl_y = not na(pc_l_val) ? pc_l_val : min_l
+
+        // Draw PCH Line (Start at found index, Extend Right)
+        l_pch := line.new(x1=pch_index, y1=pch_y, x2=bar_index, y2=pch_y, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
+        lb_pch := label.new(x=bar_index + 4, y=pch_y, text="Prev High", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+
+        // Draw PCL Line (Start at found index, Extend Right)
+        l_pcl := line.new(x1=pcl_index, y1=pcl_y, x2=bar_index, y2=pcl_y, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
+        lb_pcl := label.new(x=bar_index + 4, y=pcl_y, text="Prev Low", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
 
 
 // --- 2. Last Fractal S/R (Lines & Labels) ---
@@ -1492,13 +1663,17 @@ if show_last_frac and barstate.islast
     label.delete(lb_last_fh)
     label.delete(lb_last_fl)
 
-    if not na(frac_h_val)
-        l_last_fh := line.new(x1=frac_h_time, y1=frac_h_val, x2=time, y2=frac_h_val, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
-        lb_last_fh := label.new(x=bar_index + 3, y=frac_h_val, text="Frac High", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+    // Check visibility: Current TF must be <= Selected TF
+    is_valid_frac_tf = timeframe.in_seconds(timeframe.period) <= timeframe.in_seconds(last_frac_tf)
 
-    if not na(frac_l_val)
-        l_last_fl := line.new(x1=frac_l_time, y1=frac_l_val, x2=time, y2=frac_l_val, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
-        lb_last_fl := label.new(x=bar_index + 3, y=frac_l_val, text="Frac Low", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+    if is_valid_frac_tf
+        if not na(frac_h_val)
+            l_last_fh := line.new(x1=frac_h_time, y1=frac_h_val, x2=time, y2=frac_h_val, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
+            lb_last_fh := label.new(x=bar_index + 8, y=frac_h_val, text="Frac High", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+
+        if not na(frac_l_val)
+            l_last_fl := line.new(x1=frac_l_time, y1=frac_l_val, x2=time, y2=frac_l_val, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
+            lb_last_fl := label.new(x=bar_index + 8, y=frac_l_val, text="Frac Low", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
 
 
 // --- 3. Volume Spikes (Char) ---
@@ -1508,3 +1683,139 @@ is_vol_spike = volume > (avg_vol * vol_mult)
 
 // Uses plotchar (Symbol 'V' in bold RED)
 plotchar(show_vol ? is_vol_spike : na, char='v', location=location.bottom, color=color.new(color.red, 30), size=size.tiny, title="High Volume Spike")
+
+
+
+// ------------------------------------------- Gradient Volume Profile ----------------------------------------------
+
+var float[] vp_volArray = array.new_float(vp_rows, 0.0)
+var float[] vp_smtArray = array.new_float(vp_rows, 0.0)
+var line[]  vp_lines    = array.new_line()
+
+if barstate.islast
+    // 1. CLEANUP
+    if array.size(vp_lines) > 0
+        for i = 0 to array.size(vp_lines) - 1
+            line.delete(array.get(vp_lines, i))
+        array.clear(vp_lines)
+
+    // 2. CALCULATION
+    if vp_enable
+        int vStart = chart.left_visible_bar_time
+        int vEnd   = chart.right_visible_bar_time
+        
+        float hMax = -1.0
+        float lMin = 1000000000.0
+        bool found = false
+
+        // --- REPLAY FIX ---
+        // Wir dürfen nie weiter zurückgehen als 'bar_index' erlaubt.
+        // Im Replay ist bar_index oft kleiner als vp_maxScan.
+        int loopLimit = math.min(vp_maxScan, bar_index)
+
+        // SCAN 1: Price Range
+        for i = 0 to loopLimit
+            int t = time[i]
+            if t < vStart
+                break 
+            
+            if t <= vEnd
+                if not found
+                    hMax := high[i]
+                    lMin := low[i]
+                    found := true
+                else
+                    hMax := math.max(hMax, high[i])
+                    lMin := math.min(lMin, low[i])
+
+        if not found
+            hMax := high
+            lMin := low
+
+        float rng = hMax - lMin
+        if rng == 0
+            rng := syminfo.mintick * 100
+        float step = rng / vp_rows
+        
+        array.fill(vp_volArray, 0.0)
+        
+        // SCAN 2: Volume Distribution
+        for i = 0 to loopLimit
+            int t = time[i]
+            if t < vStart
+                break
+            
+            if t <= vEnd
+                float h = high[i]
+                float l = low[i]
+                float v = volume[i]
+                
+                int iH = math.floor((h - lMin) / step)
+                int iL = math.floor((l - lMin) / step)
+                
+                if iH >= vp_rows 
+                    iH := vp_rows - 1
+                if iL < 0 
+                    iL := 0
+                
+                int bins = (iH - iL) + 1
+                if bins > 0
+                    float vBin = v / bins
+                    for k = iL to iH
+                        float cVal = array.get(vp_volArray, k)
+                        array.set(vp_volArray, k, cVal + vBin)
+
+        // 3. Smoothing
+        array.fill(vp_smtArray, 0.0)
+        float maxV = 0.0
+        float sumV = 0.0
+        int actB   = 0
+        
+        for j = 0 to vp_rows - 1
+            float s = 0.0
+            int c = 0
+            for x = -vp_smooth to vp_smooth
+                int idx = j + x
+                if idx >= 0 and idx < vp_rows
+                    s += array.get(vp_volArray, idx)
+                    c += 1
+            
+            float val = (c > 0) ? s / c : 0.0
+            array.set(vp_smtArray, j, val)
+            
+            if val > 0
+                sumV += val
+                actB += 1
+                if val > maxV
+                    maxV := val
+
+        // 4. Threshold
+        float avgV = (actB > 0) ? sumV / actB : 0.0
+        float thres = maxV
+        
+        if vp_smart and avgV > 0
+            thres := avgV * vp_clip
+            if thres == 0
+                thres := maxV
+
+        // 5. Drawing
+        int xLoc = bar_index + vp_offset
+        
+        if maxV > 0
+            for j = 0 to vp_rows - 1
+                float val = array.get(vp_smtArray, j)
+                if val > 0
+                    float y1 = lMin + (j * step)
+                    float y2 = lMin + ((j + 1) * step)
+                    
+                    float intens = val / thres
+                    if intens > 1.0 
+                        intens := 1.0
+                    
+                    if intens > 0.01
+                        color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
+                        line l = line.new(x1=xLoc, y1=y1, x2=xLoc, y2=y2, xloc=xloc.bar_index, color=col, width=vp_width)
+                        array.push(vp_lines, l)
+
+
+
