@@ -998,11 +998,7 @@ f_calc_bg_signal() =>
     
     bg_color_res
 // --- Execute MTF Request ---
-color final_bg_color = na
-if bg_tf_select == ""
-    final_bg_color := f_calc_bg_signal()
-else
-    final_bg_color := request.security(syminfo.tickerid, bg_tf_select, f_calc_bg_signal())
+final_bg_color = request.security(syminfo.tickerid, bg_tf_select, f_calc_bg_signal())
 
 // Apply the calculated background color
 bgcolor(final_bg_color, title="Selected Background Signal")
