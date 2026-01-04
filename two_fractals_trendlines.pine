@@ -1876,6 +1876,3 @@ if barstate.islast
                         color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
                         line l = line.new(x1=xLoc, y1=y1, x2=xLoc, y2=y2, xloc=xloc.bar_index, color=col, width=vp_width)
                         array.push(vp_lines, l)
-
-
-
