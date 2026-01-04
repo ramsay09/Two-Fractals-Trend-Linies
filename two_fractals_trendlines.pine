@@ -62,7 +62,7 @@ fvg_len      = input.int(1, title="Box Length (Bars)", minval=1, group=grp_fvg, 
 selected_bg_signal  = input.string("None", title="Background Color Filter", options=
                      ["None", "Bill Williams Fractals BG", "Anticipated Fractal BG", "Last 12 Bar BG", "Parabolic SAR BG", "DMI ADX BG", "HMA Slope BG", "MACD Slow Slope BG", "MACD Slope/Fractal Break BG (OR)", "Trend Line/Fractal Break BG (OR)", "Fractals Trend Lines", "Segments BG", 
                      "Segments/Fractals BG (OR)", "Segments/Trend Line BG (OR)", "Segments/Fractals/Trend Line BG (OR)",
-                     "Segments/Fractals BG (AND)", "Segments/Trend Line BG (AND)", "Segments/Fractals/Trend Line BG (AND)", "Segments/MACD Slope BG (AND)", "MACD Slope/Fractals Break BG (AND)", "MA1/MA2 Cross BG"], 
+                     "Segments/Fractals BG (AND)", "Segments/Trend Line BG (AND)", "Segments/Fractals/Trend Line BG (AND)", "Segments/MACD Slope BG (AND)", "MACD Slope/Fractals Break BG (AND)", "MA1/MA2 Cross BG", "FVG Open", "FVG Close"],
                      group="Background Color Filters:", tooltip="Signals that are alternatively displayed as a background color as a quick verification and a kind of 'backtest'.")
 
 bg_tf_select        = input.timeframe("", title="Background Filter Timeframe", group="Background Color Filters:", tooltip="Select the timeframe for the background signals calculations. Empty = Current Chart Timeframe.")
@@ -628,6 +628,7 @@ f_calc_bg_signal() =>
     need_hma            = selected_bg_signal == "HMA Slope BG"
     need_macd           = has_macd
     need_ma_cross       = selected_bg_signal == "MA1/MA2 Cross BG"
+    need_fvg            = selected_bg_signal == "FVG Open" or selected_bg_signal == "FVG Close"
     need_seg            = has_segments
 
     // Trendlines Math is needed if "Trend" is in name OR if "Fractal" is in name but NOT BW and NOT Anticipated
@@ -696,6 +697,23 @@ f_calc_bg_signal() =>
             => na
         ma_cross_buy_c  := ta.crossover(ma1_val_c, ma2_val_c)
         ma_cross_sell_c := ta.crossunder(ma1_val_c, ma2_val_c)
+
+    // FVG Logic
+    bool fvg_bull_open_c = false
+    bool fvg_bear_open_c = false
+    bool fvg_bull_close_c = false
+    bool fvg_bear_close_c = false
+
+    if need_fvg
+        // Bullish FVG
+        // Gap between High[2] and Low[0] (Close check) or Open[0] (Open check)
+        fvg_bull_open_c  := open > high[2]
+        fvg_bull_close_c := low > high[2]
+
+        // Bearish FVG
+        // Gap between Low[2] and High[0] (Close check) or Open[0] (Open check)
+        fvg_bear_open_c  := open < low[2]
+        fvg_bear_close_c := high < low[2]
 
     // Anticipated Fractal
     bool af_up_c = false
@@ -945,7 +963,9 @@ f_calc_bg_signal() =>
                              (selected_bg_signal == "Segments/Fractals/Trend Line BG (AND)" and seg_buy_occurred_c and frac_buy_occurred_c and tl_buy_occurred_c) or
                              (selected_bg_signal == "Segments/MACD Slope BG (AND)" and seg_buy_occurred_c and macd_up_occurred_c) or
                              (selected_bg_signal == "MACD Slope/Fractals Break BG (AND)" and macd_up_occurred_c and frac_buy_occurred_c) or
-                             (selected_bg_signal == "MA1/MA2 Cross BG" and ma_cross_buy_c)
+                             (selected_bg_signal == "MA1/MA2 Cross BG" and ma_cross_buy_c) or
+                             (selected_bg_signal == "FVG Open" and fvg_bull_open_c) or
+                             (selected_bg_signal == "FVG Close" and fvg_bull_close_c)
 
     sell_flip_condition_met = (selected_bg_signal == "Bill Williams Fractals BG" and bw_fr_sell_break_c) or
                               (selected_bg_signal == "Anticipated Fractal BG" and af_dn_c) or
@@ -962,7 +982,9 @@ f_calc_bg_signal() =>
                               (selected_bg_signal == "Segments/Fractals/Trend Line BG (AND)" and seg_sell_occurred_c and frac_sell_occurred_c and tl_sell_occurred_c) or
                               (selected_bg_signal == "Segments/MACD Slope BG (AND)" and seg_sell_occurred_c and macd_dn_occurred_c) or
                               (selected_bg_signal == "MACD Slope/Fractals Break BG (AND)" and macd_dn_occurred_c and frac_sell_occurred_c) or
-                              (selected_bg_signal == "MA1/MA2 Cross BG" and ma_cross_sell_c)
+                              (selected_bg_signal == "MA1/MA2 Cross BG" and ma_cross_sell_c) or
+                              (selected_bg_signal == "FVG Open" and fvg_bear_open_c) or
+                              (selected_bg_signal == "FVG Close" and fvg_bear_close_c)
 
     var bool bg_state_is_green = na 
 
