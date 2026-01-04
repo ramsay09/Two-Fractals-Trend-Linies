@@ -53,10 +53,21 @@ show_vol        = input.bool(true, "High Volume Spikes", group=grp_add, tooltip=
 vol_mult        = input.float(2.0, "Volume Threshold (x Avg)", group=grp_add)
 
 // FVG Inputs 
-grp_fvg      = "Price Imbalance (Fair Value Gap)"
-plot_fvg     = input.bool(true, title="Price Imbalance", group=grp_fvg, tooltip="Indicates a potential pullback area after an strong price movement (Displacement).")
-fvg_tf_sel   = input.timeframe("", title="Imbalance Timeframe", group=grp_fvg, tooltip="Select the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
-fvg_len      = input.int(1, title="Box Length (Bars)", minval=1, group=grp_fvg, tooltip="Length of the box in units of the selected timeframe.")
+grp_fvg1     = "Price Imbalance (Fair Value Gap) 1"
+plot_fvg1    = input.bool(true, title="FVG 1 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg1, inline="f1_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement).")
+fvg1_tf_sel  = input.timeframe("", title="Timeframe", group=grp_fvg1, inline="f1_1", tooltip="Select the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
+fvg1_len     = input.int(1, title="Box Length", minval=1, group=grp_fvg1, inline="f1_2")
+fvg1_limit   = input.int(50, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg1, inline="f1_2")
+col_fvg1_bull = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg1, inline="f1_3")
+col_fvg1_bear = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg1, inline="f1_3")
+
+grp_fvg2     = "Price Imbalance (Fair Value Gap) 2"
+plot_fvg2    = input.bool(false, title="FVG 2 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg2, inline="f2_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement).")
+fvg2_tf_sel  = input.timeframe("", title="Timeframe", group=grp_fvg2, inline="f2_1")
+fvg2_len     = input.int(1, title="Box Length", minval=1, group=grp_fvg2, inline="f2_2")
+fvg2_limit   = input.int(5, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg2, inline="f2_2")
+col_fvg2_bull = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg2, inline="f2_3")
+col_fvg2_bear = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg2, inline="f2_3")
 
 // Background Color Filter INPUT
 selected_bg_signal  = input.string("None", title="Background Color Filter", options=
@@ -1573,69 +1584,100 @@ if show_mtf_candles and is_higher_tf
 
 //--------------------------------------------------------- Fair Value Gaps (FVG) ---------------------------------------------------------
 
-col_fvg_bull  = input.color(color.new(color.green, 80), title="Bullish FVG Color", group=grp_fvg)
-col_fvg_bear  = input.color(color.new(color.red, 80), title="Bearish FVG Color", group=grp_fvg)
+// --- Variables to track boxes for limit ---
+var box[] boxes_fvg1 = array.new_box()
+var box[] boxes_fvg2 = array.new_box()
 
-// --- Helper: Timeframe Duration ---
-// Calculate duration of the FVG timeframe in milliseconds
-tf_ms = (fvg_tf_sel == "" ? timeframe.in_seconds(timeframe.period) : timeframe.in_seconds(fvg_tf_sel)) * 1000
+// --- FVG 1 LOGIC ---
 
-// --- Data Fetching (MTF) ---
-// Pattern: [Bar 3 (Left)] [Bar 2 (Gap/Middle)] [Bar 1 (Signal/Right)] ... [Bar 0 (Developing)]
-// We utilize a persistent variable to check if we have already drawn the FVG for a specific time.
-[h1_mtf, l1_mtf, h3_mtf, l3_mtf, t2_mtf] = request.security(syminfo.tickerid, fvg_tf_sel == "" ? timeframe.period : fvg_tf_sel, [high[1], low[1], high[3], low[3], time[2]], lookahead=barmerge.lookahead_off)
+// Helper: Timeframe Duration
+tf_ms1 = (fvg1_tf_sel == "" ? timeframe.in_seconds(timeframe.period) : timeframe.in_seconds(fvg1_tf_sel)) * 1000
 
-// Variable to track the last drawn FVG time to avoid duplicates but ensure drawing
-var int last_fvg_time = 0
+// Data Fetching (MTF)
+[h1_mtf1, l1_mtf1, h3_mtf1, l3_mtf1, t2_mtf1] = request.security(syminfo.tickerid, fvg1_tf_sel == "" ? timeframe.period : fvg1_tf_sel, [high[1], low[1], high[3], low[3], time[2]], lookahead=barmerge.lookahead_off)
 
-// --- Logic & Plotting ---
-if plot_fvg
-    // CASE A: Current Timeframe (Standard Behavior)
-    if fvg_tf_sel == ""
-        // Bullish FVG
-        if low > high[2]
+// Variable to track the last drawn FVG time
+var int last_fvg_time1 = 0
+
+if plot_fvg1
+    box b_new = na
+    // CASE A: Current Timeframe
+    if fvg1_tf_sel == ""
+        if low > high[2] // Bullish
             _border_bull = color.new(color.green, 90)
-            box.new(left=bar_index[2], top=low, right=bar_index + (fvg_len - 1), bottom=high[2], 
-                 border_color=_border_bull, bgcolor=col_fvg_bull)
+            b_new := box.new(left=bar_index[2], top=low, right=bar_index + (fvg1_len - 1), bottom=high[2], border_color=_border_bull, bgcolor=col_fvg1_bull)
 
-        // Bearish FVG
-        if high < low[2]
+        if high < low[2] // Bearish
             _border_bear = color.new(color.red, 90)
-            box.new(left=bar_index[2], top=low[2], right=bar_index + (fvg_len - 1), bottom=high, 
-                 border_color=_border_bear, bgcolor=col_fvg_bear)
+            b_new := box.new(left=bar_index[2], top=low[2], right=bar_index + (fvg1_len - 1), bottom=high, border_color=_border_bear, bgcolor=col_fvg1_bear)
 
-    // CASE B: Higher Timeframe (Reliable MTF Logic)
+    // CASE B: Higher Timeframe
     else 
-        // We check if the time of the potential FVG (Bar 2) is new compared to what we last drawn.
-        // This ensures that even if data lags by 1-2 bars on LTF, it will be drawn as soon as available.
-        if t2_mtf != last_fvg_time and not na(t2_mtf)
-            
-            bool drawn = false
-            
-            // Coordinates Calculation:
-            // LEFT: Shift back 1 full duration to hit the Start of the Left Candle (Bar 3)
-            t_left = t2_mtf - tf_ms
-            // RIGHT: Start of Gap Candle + (Duration * Length)
-            t_right = t2_mtf + (tf_ms * fvg_len)
+        if t2_mtf1 != last_fvg_time1 and not na(t2_mtf1)
+            t_left = t2_mtf1 - tf_ms1
+            t_right = t2_mtf1 + (tf_ms1 * fvg1_len)
 
-            // Bullish FVG (MTF)
-            if l1_mtf > h3_mtf
+            if l1_mtf1 > h3_mtf1 // Bullish
                 _border_bull = color.new(color.green, 90)
-                box.new(left=t_left, top=l1_mtf, right=t_right, bottom=h3_mtf, 
-                     xloc=xloc.bar_time, border_color=_border_bull, bgcolor=col_fvg_bull)
-                drawn := true
+                b_new := box.new(left=t_left, top=l1_mtf1, right=t_right, bottom=h3_mtf1, xloc=xloc.bar_time, border_color=_border_bull, bgcolor=col_fvg1_bull)
 
-            // Bearish FVG (MTF)
-            if h1_mtf < l3_mtf
+            if h1_mtf1 < l3_mtf1 // Bearish
                 _border_bear = color.new(color.red, 90)
-                box.new(left=t_left, top=l3_mtf, right=t_right, bottom=h1_mtf, 
-                     xloc=xloc.bar_time, border_color=_border_bear, bgcolor=col_fvg_bear)
-                drawn := true
+                b_new := box.new(left=t_left, top=l3_mtf1, right=t_right, bottom=h1_mtf1, xloc=xloc.bar_time, border_color=_border_bear, bgcolor=col_fvg1_bear)
             
-            // Only update the tracker if we actually checked this specific timestamp
-            // We update it regardless of whether an FVG was found or not, 
-            // so we don't keep checking the same completed candle again and again.
-            last_fvg_time := t2_mtf
+            last_fvg_time1 := t2_mtf1
+
+    // Manage Box Limit
+    if not na(b_new)
+        array.push(boxes_fvg1, b_new)
+        if array.size(boxes_fvg1) > fvg1_limit
+            box.delete(array.shift(boxes_fvg1))
+
+
+// --- FVG 2 LOGIC ---
+
+// Helper: Timeframe Duration
+tf_ms2 = (fvg2_tf_sel == "" ? timeframe.in_seconds(timeframe.period) : timeframe.in_seconds(fvg2_tf_sel)) * 1000
+
+// Data Fetching (MTF)
+[h1_mtf2, l1_mtf2, h3_mtf2, l3_mtf2, t2_mtf2] = request.security(syminfo.tickerid, fvg2_tf_sel == "" ? timeframe.period : fvg2_tf_sel, [high[1], low[1], high[3], low[3], time[2]], lookahead=barmerge.lookahead_off)
+
+// Variable to track the last drawn FVG time
+var int last_fvg_time2 = 0
+
+if plot_fvg2
+    box b_new = na
+    // CASE A: Current Timeframe
+    if fvg2_tf_sel == ""
+        if low > high[2] // Bullish
+            _border_bull = color.new(color.green, 90)
+            b_new := box.new(left=bar_index[2], top=low, right=bar_index + (fvg2_len - 1), bottom=high[2], border_color=_border_bull, bgcolor=col_fvg2_bull)
+
+        if high < low[2] // Bearish
+            _border_bear = color.new(color.red, 90)
+            b_new := box.new(left=bar_index[2], top=low[2], right=bar_index + (fvg2_len - 1), bottom=high, border_color=_border_bear, bgcolor=col_fvg2_bear)
+
+    // CASE B: Higher Timeframe
+    else
+        if t2_mtf2 != last_fvg_time2 and not na(t2_mtf2)
+            t_left = t2_mtf2 - tf_ms2
+            t_right = t2_mtf2 + (tf_ms2 * fvg2_len)
+
+            if l1_mtf2 > h3_mtf2 // Bullish
+                _border_bull = color.new(color.green, 90)
+                b_new := box.new(left=t_left, top=l1_mtf2, right=t_right, bottom=h3_mtf2, xloc=xloc.bar_time, border_color=_border_bull, bgcolor=col_fvg2_bull)
+
+            if h1_mtf2 < l3_mtf2 // Bearish
+                _border_bear = color.new(color.red, 90)
+                b_new := box.new(left=t_left, top=l3_mtf2, right=t_right, bottom=h1_mtf2, xloc=xloc.bar_time, border_color=_border_bear, bgcolor=col_fvg2_bear)
+            
+            last_fvg_time2 := t2_mtf2
+
+    // Manage Box Limit
+    if not na(b_new)
+        array.push(boxes_fvg2, b_new)
+        if array.size(boxes_fvg2) > fvg2_limit
+            box.delete(array.shift(boxes_fvg2))
 
 
 //--------------------------------------------------------- Real-time Fractal Alert ---------------------------------------------------------
