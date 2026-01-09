@@ -43,7 +43,9 @@ mtf_opacity       = input.int(15, "Overlay Opacity %", minval=0, maxval=100, gro
 
 // Additional Context Inputs 
 grp_add         = "Additional Context"
-show_pch_pcl    = input.bool(true, "Previous Candle High/Low", group=grp_add, tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe.")
+show_pch_pcl    = input.bool(true, "Previous Candle High/Low ⠀", group=grp_add, inline="add_1", tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe.")
+use_sess_1st    = input.bool(false, "1st Session Candle", group=grp_add, inline="add_1", tooltip="Previous Candle High/Low: Draws lines at the High and Low of the previous completed candle of the selected timeframe. 
+                  1st Session Candle: If enabled, lines remain at the high and low of the first candle of the running trading session. Current/Chart TF only.")
 pch_pcl_tf      = input.timeframe("D", "Previous Candle Timeframe", group=grp_add, tooltip="Select the timeframe for the Previous Candle High/Low calculation.")
 
 show_last_frac  = input.bool(true, "Last Fractal S/R", group=grp_add, tooltip="Draws lines at the last confirmed Up/Down Fractals similar to PDH/PDL. Every new trend begins with the breaking of a fractal. (Time Frame dependent).")
@@ -1711,6 +1713,27 @@ if use_rt_alert and barstate.isrealtime and (rt_up_frac or rt_dn_frac)
 // Fetch High/Low of the previous completed candle + its exact time window (start/end)
 [pc_h_val, pc_l_val, pc_start_time, pc_end_time] = request.security(syminfo.tickerid, pch_pcl_tf, [high[1], low[1], time[1], time], lookahead=barmerge.lookahead_on)
 
+// --- Session Tracking for 1st Candle Feature ---
+var float sess_1st_h = na
+var float sess_1st_l = na
+var int   sess_1st_t = na
+
+// Helper to check session start
+f_is_sess_start(_show, _sess) =>
+    _show and not na(time(timeframe.period, _sess, sess_timezone)) and na(time(timeframe.period, _sess, sess_timezone)[1])
+
+// Check all sessions
+bool s_lon_start = f_is_sess_start(london_show, london_sess)
+bool s_ny_start  = f_is_sess_start(ny_show, ny_sess)
+bool s_tok_start = f_is_sess_start(tokyo_show, tokyo_sess)
+bool s_syd_start = f_is_sess_start(sydney_show, sydney_sess)
+bool s_nypm_start = f_is_sess_start(ny_show, "1930-2359")
+
+if s_lon_start or s_ny_start or s_tok_start or s_syd_start or s_nypm_start
+    sess_1st_h := high
+    sess_1st_l := low
+    sess_1st_t := time
+
 // Variables for Lines and Labels
 var line  l_pch  = na
 var line  l_pcl  = na
@@ -1736,29 +1759,52 @@ if show_pch_pcl and barstate.islast
         float max_h     = na
         float min_l     = na
 
-        for i = 0 to lookback_limit
-            if not na(pc_start_time) and not na(pc_end_time) and time[i] >= pc_start_time and time[i] < pc_end_time
-                if na(max_h) or high[i] > max_h
-                    max_h := high[i]
-                    pch_index := bar_index - i
-                if na(min_l) or low[i] < min_l
-                    min_l := low[i]
-                    pcl_index := bar_index - i
+        float pch_y     = na
+        float pcl_y     = na
+
+        if use_sess_1st
+            // --- 1st Session Candle Mode ---
+            // Use stored session values
+            pch_y := sess_1st_h
+            pcl_y := sess_1st_l
+
+            // Find the index of the start time (sess_1st_t)
+            if not na(sess_1st_t)
+                for i = 0 to lookback_limit
+                    if time[i] == sess_1st_t
+                        pch_index := bar_index - i
+                        pcl_index := bar_index - i
+                        break
+        else
+            // --- Standard Previous Candle Mode ---
+            for i = 0 to lookback_limit
+                if not na(pc_start_time) and not na(pc_end_time) and time[i] >= pc_start_time and time[i] < pc_end_time
+                    if na(max_h) or high[i] > max_h
+                        max_h := high[i]
+                        pch_index := bar_index - i
+                    if na(min_l) or low[i] < min_l
+                        min_l := low[i]
+                        pcl_index := bar_index - i
+
+            pch_y := not na(pc_h_val) ? pc_h_val : max_h
+            pcl_y := not na(pc_l_val) ? pc_l_val : min_l
 
         // Stable fallbacks
         pch_index := na(pch_index) ? bar_index : pch_index
         pcl_index := na(pcl_index) ? bar_index : pcl_index
 
-        float pch_y = not na(pc_h_val) ? pc_h_val : max_h
-        float pcl_y = not na(pc_l_val) ? pc_l_val : min_l
-
         // Draw PCH Line (Start at found index, Extend Right)
-        l_pch := line.new(x1=pch_index, y1=pch_y, x2=bar_index, y2=pch_y, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
-        lb_pch := label.new(x=bar_index + 4, y=pch_y, text="Prev High", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+        string txt_h = use_sess_1st ? "1st High" : "Prev High"
+        string txt_l = use_sess_1st ? "1st Low" : "Prev Low"
+
+        if not na(pch_y)
+            l_pch := line.new(x1=pch_index, y1=pch_y, x2=bar_index, y2=pch_y, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
+            lb_pch := label.new(x=bar_index + 4, y=pch_y, text=txt_h, xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
 
         // Draw PCL Line (Start at found index, Extend Right)
-        l_pcl := line.new(x1=pcl_index, y1=pcl_y, x2=bar_index, y2=pcl_y, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
-        lb_pcl := label.new(x=bar_index + 4, y=pcl_y, text="Prev Low", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+        if not na(pcl_y)
+            l_pcl := line.new(x1=pcl_index, y1=pcl_y, x2=bar_index, y2=pcl_y, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
+            lb_pcl := label.new(x=bar_index + 4, y=pcl_y, text=txt_l, xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
 
 
 // --- 2. Last Fractal S/R (Lines & Labels) ---
@@ -1938,7 +1984,3 @@ if barstate.islast
                         color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
                         line l = line.new(x1=xLoc, y1=y1, x2=xLoc, y2=y2, xloc=xloc.bar_index, color=col, width=vp_width)
                         array.push(vp_lines, l)
-
-
-
-
