@@ -37,7 +37,7 @@ vp_maxScan  = 4000 //input.int(4000, "Scan Depth", minval=500, maxval=9000, grou
 
 // MTF CANDLE OVERLAY INPUTS
 grp_mtf_candle    = "MTF Candle Overlay"
-show_mtf_candles  = input.bool(false, "MTF Candle Overlay", group=grp_mtf_candle, tooltip="Two timelines at a glance. It's like looking inside a candle with an X-ray.")
+show_mtf_candles  = input.bool(false, "MTF Candle Overlay", group=grp_mtf_candle, tooltip="Two timelines at a glance. It's like looking inside a candle with X-rays.")
 mtf_tf_sel        = input.string("1h", "Overlay Timeframe", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], group=grp_mtf_candle)
 mtf_opacity       = input.int(15, "Overlay Opacity %", minval=0, maxval=100, group=grp_mtf_candle, tooltip="0% = Invisible, 100% = Solid")
 
@@ -53,21 +53,21 @@ show_vol        = input.bool(true, "High Volume Spikes", group=grp_add, tooltip=
 vol_mult        = input.float(2.0, "Volume Threshold (x Avg)", group=grp_add)
 
 // FVG Inputs 
-grp_fvg1     = "Price Imbalance (Fair Value Gap) 1"
-plot_fvg1    = input.bool(true, title="FVG 1 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg1, inline="f1_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement).")
-fvg1_tf_sel  = input.timeframe("", title="Timeframe", group=grp_fvg1, inline="f1_1", tooltip="Select the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
-fvg1_len     = input.int(1, title="Box Length", minval=1, group=grp_fvg1, inline="f1_2")
-fvg1_limit   = input.int(50, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg1, inline="f1_2")
-col_fvg1_bull = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg1, inline="f1_3")
-col_fvg1_bear = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg1, inline="f1_3")
+grp_fvg1        = "Price Imbalance (Fair Value Gap) 1"
+plot_fvg1       = input.bool(true, title="FVG 1 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg1, inline="f1_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement). Also reveals institutional interest (new trend).")
+fvg1_tf_sel     = input.timeframe("", title="Timeframe", group=grp_fvg1, inline="f1_1", tooltip="Select the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
+fvg1_len        = input.int(1, title="Box Length", minval=1, group=grp_fvg1, inline="f1_2")
+fvg1_limit      = input.int(50, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg1, inline="f1_2")
+col_fvg1_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg1, inline="f1_3")
+col_fvg1_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg1, inline="f1_3")
 
-grp_fvg2     = "Price Imbalance (Fair Value Gap) 2"
-plot_fvg2    = input.bool(false, title="FVG 2 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg2, inline="f2_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement).")
-fvg2_tf_sel  = input.timeframe("", title="Timeframe", group=grp_fvg2, inline="f2_1")
-fvg2_len     = input.int(1, title="Box Length", minval=1, group=grp_fvg2, inline="f2_2")
-fvg2_limit   = input.int(5, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg2, inline="f2_2")
-col_fvg2_bull = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg2, inline="f2_3")
-col_fvg2_bear = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg2, inline="f2_3")
+grp_fvg2        = "Price Imbalance (Fair Value Gap) 2"
+plot_fvg2       = input.bool(false, title="FVG 2 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg2, inline="f2_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement). Also reveals institutional interest (new trend).")
+fvg2_tf_sel     = input.timeframe("", title="Timeframe", group=grp_fvg2, inline="f2_1")
+fvg2_len        = input.int(1, title="Box Length", minval=1, group=grp_fvg2, inline="f2_2")
+fvg2_limit      = input.int(5, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg2, inline="f2_2")
+col_fvg2_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg2, inline="f2_3")
+col_fvg2_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg2, inline="f2_3")
 
 // Background Color Filter INPUT
 selected_bg_signal  = input.string("None", title="Background Color Filter", options=
@@ -1833,8 +1833,6 @@ if barstate.islast
         bool found = false
 
         // --- REPLAY FIX ---
-        // Wir dürfen nie weiter zurückgehen als 'bar_index' erlaubt.
-        // Im Replay ist bar_index oft kleiner als vp_maxScan.
         int loopLimit = math.min(vp_maxScan, bar_index)
 
         // SCAN 1: Price Range
@@ -1940,3 +1938,7 @@ if barstate.islast
                         color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
                         line l = line.new(x1=xLoc, y1=y1, x2=xLoc, y2=y2, xloc=xloc.bar_index, color=col, width=vp_width)
                         array.push(vp_lines, l)
+
+
+
+
