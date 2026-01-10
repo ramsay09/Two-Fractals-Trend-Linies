@@ -1998,6 +1998,111 @@ if barstate.islast
                         array.push(vp_lines, l)
 
 
+// --- SUPPLY & DEMAND TYPE ---
+type ActiveSD
+    box id
+    float top
+    float bottom
+    bool mitigated
+    bool is_bull
+    bool use_time
+
+// -- SCAN LOGIC FOR S&D --
+f_scan_sd(_type, _lookahead) =>
+    float _top = na
+    float _bot = na
+    bool _found = false
+    int _t_anchor = na
+    bool _is_bull = false
+
+    // Standard (Fractal) Logic
+    if _type == "Standard (Fractal)"
+        // Loop backwards to find the most recent confirmed S&D
+        for i = (2 + _lookahead) to 30
+            // Check Fractal (2-2) at index i
+            is_frac_up = high[i] > high[i-1] and high[i] > high[i-2] and high[i] > high[i+1] and high[i] > high[i+2]
+            is_frac_dn = low[i] < low[i-1] and low[i] < low[i-2] and low[i] < low[i+1] and low[i] < low[i+2]
+
+            if is_frac_up
+                bool fvg_found = false
+                for offset = 1 to _lookahead
+                    int k = i - 1 - offset
+                    if k >= 0
+                        if high[k] < low[k+2]
+                            fvg_found := true
+                            break
+                if fvg_found
+                    _is_bull := false
+                    _t_anchor := time[i]
+                    _top := high[i]
+                    _bot := low[i]
+                    _found := true
+                    break
+
+            else if is_frac_dn
+                bool fvg_found = false
+                for offset = 1 to _lookahead
+                    int k = i - 1 - offset
+                    if k >= 0
+                        if low[k] > high[k+2]
+                            fvg_found := true
+                            break
+                if fvg_found
+                    _is_bull := true
+                    _t_anchor := time[i]
+                    _top := high[i]
+                    _bot := low[i]
+                    _found := true
+                    break
+
+    // Doji (Base) Logic
+    else if _type == "Doji (Base)"
+        for i = (2 + _lookahead) to 30
+            // Doji Check: Body < 50% Range
+            rng = high[i] - low[i]
+            body = math.abs(close[i] - open[i])
+            is_doji = rng > 0 and (body / rng) < 0.5
+
+            if is_doji
+                // Check for BOTH directions, as Doji is neutral base
+
+                // 1. Demand? (Bullish FVG follows)
+                bool fvg_bull_found = false
+                for offset = 1 to _lookahead
+                    int k = i - 1 - offset
+                    if k >= 0
+                        if low[k] > high[k+2]
+                            fvg_bull_found := true
+                            break
+
+                if fvg_bull_found
+                    _is_bull := true
+                    _t_anchor := time[i]
+                    _top := high[i]
+                    _bot := low[i]
+                    _found := true
+                    break
+
+                // 2. Supply? (Bearish FVG follows)
+                bool fvg_bear_found = false
+                for offset = 1 to _lookahead
+                    int k = i - 1 - offset
+                    if k >= 0
+                        if high[k] < low[k+2]
+                            fvg_bear_found := true
+                            break
+
+                if fvg_bear_found
+                    _is_bull := false
+                    _t_anchor := time[i]
+                    _top := high[i]
+                    _bot := low[i]
+                    _found := true
+                    break
+
+    [_top, _bot, _found, _t_anchor, _is_bull]
+
+
 //--------------------------------------------------------- Supply & Demand (S&D) ---------------------------------------------------------
 
 var active_sds = array.new<ActiveSD>()
