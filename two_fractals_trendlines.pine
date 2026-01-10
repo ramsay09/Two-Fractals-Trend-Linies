@@ -37,7 +37,7 @@ vp_maxScan  = 4000 //input.int(4000, "Scan Depth", minval=500, maxval=9000, grou
 
 // MTF CANDLE OVERLAY INPUTS
 grp_mtf_candle    = "MTF Candle Overlay"
-show_mtf_candles  = input.bool(false, "MTF Candle Overlay", group=grp_mtf_candle, tooltip="Two timelines at a glance. It's like looking inside a candle with X-rays.")
+show_mtf_candles  = input.bool(false, "MTF Candle Overlay", group=grp_mtf_candle, tooltip="Two timelines at one glance. It's like looking inside a candle with X-rays.")
 mtf_tf_sel        = input.string("1h", "Overlay Timeframe", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], group=grp_mtf_candle)
 mtf_opacity       = input.int(15, "Overlay Opacity %", minval=0, maxval=100, group=grp_mtf_candle, tooltip="0% = Invisible, 100% = Solid")
 
@@ -48,7 +48,7 @@ use_sess_1st    = input.bool(false, "1st Session Candle", group=grp_add, inline=
                   1st Session Candle: If enabled, lines remain at the high and low of the first candle of the running trading session. Current/Chart TF only.")
 pch_pcl_tf      = input.timeframe("D", "Previous Candle Timeframe", group=grp_add, tooltip="Select the timeframe for the Previous Candle High/Low calculation.")
 
-show_last_frac  = input.bool(true, "Last Fractal S/R", group=grp_add, tooltip="Draws lines at the last confirmed Up/Down Fractals similar to PDH/PDL. Every new trend begins with the breaking of a fractal. (Time Frame dependent).")
+show_last_frac  = input.bool(false, "Last Fractal S/R", group=grp_add, tooltip="Draws lines at the last confirmed Up/Down Fractals similar to PDH/PDL. Every new trend begins with the breaking of a fractal. (Time Frame dependent).")
 last_frac_tf    = input.timeframe("240", "Last Fractal Timeframe", group=grp_add, tooltip="Select the timeframe for the Last Fractal calculation.")
 
 show_vol        = input.bool(true, "High Volume Spikes", group=grp_add, tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
@@ -70,18 +70,6 @@ fvg2_len        = input.int(1, title="Box Length", minval=1, group=grp_fvg2, inl
 fvg2_limit      = input.int(5, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg2, inline="f2_2")
 col_fvg2_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg2, inline="f2_3")
 col_fvg2_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg2, inline="f2_3")
-
-// --- SUPPLY & DEMAND ---
-grp_sd          = "Supply & Demand"
-sd_tooltip      = "Supply & Demand (S&D) Modi:\n- Standard (Fractal): Bill Williams Fraktal + FVG Bestätigung.\n- Doji (Base): Doji-ähnliche Kerze (Körper < 50% Range) + FVG Bestätigung.\n\nEine Zone wird bestätigt, wenn innerhalb der 'FVG Lookahead Candles' (1-3) danach ein FVG auftritt."
-sd_type         = input.string("None", title="Supply & Demand", options=["None", "Standard (Fractal)", "Doji (Base)"], group=grp_sd, inline="sd_1", tooltip=sd_tooltip)
-sd_tf_select    = input.timeframe("", title="⠀Timeframe ⠀⠀", group=grp_sd, inline="sd_1", tooltip="Timeframe für die S&D-Erkennung.")
-sd_len          = input.int(15, title="Box Length ⠀⠀⠀⠀", minval=1, inline="sd_2", group=grp_sd)
-sd_limit        = input.int(50, title=" ⠀Visible Boxes ⠀", minval=1, maxval=500, inline="sd_2", group=grp_sd)
-sd_fvg_lookahead = input.int(1, title="FVG Confirmation Candles ", options=[1, 2, 3], group=grp_sd, inline="sd_2", tooltip="Anzahl der Kerzen nach dem Setup (Fraktal/Doji), in denen ein FVG auftreten muss.")
-sd_mitigation_type = input.string("None", title="Mitigation ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", options=["None", "Opacity", "Grey", "Broken Zones"], group=grp_sd, inline="sd_4", tooltip="Mitigation Verhalten.")
-col_sd_bull     = input.color(color.new(color.green, 70), title="Demand Color", inline="sd_3", group=grp_sd)
-col_sd_bear     = input.color(color.new(color.red, 70), title="⠀⠀⠀⠀⠀⠀⠀ Supply Color", inline="sd_3", group=grp_sd)
 
 // Background Color Filter INPUT
 selected_bg_signal  = input.string("None", title="Background Color Filter", options=
@@ -1998,138 +1986,3 @@ if barstate.islast
                         array.push(vp_lines, l)
 
 
-//--------------------------------------------------------- Supply & Demand (S&D) ---------------------------------------------------------
-
-var active_sds = array.new<ActiveSD>()
-var box[] boxes_sd = array.new_box()
-
-// Helper: Timeframe Duration
-tf_ms_sd = (sd_tf_select == "" ? timeframe.in_seconds(timeframe.period) : timeframe.in_seconds(sd_tf_select)) * 1000
-
-// Data Fetching
-[sd_top, sd_bot, sd_valid, sd_anchor, sd_is_bull] = request.security(syminfo.tickerid, sd_tf_select == "" ? timeframe.period : sd_tf_select, f_scan_sd(sd_type, sd_fvg_lookahead), lookahead=barmerge.lookahead_off)
-
-var int last_sd_time = 0
-
-if sd_type != "None"
-    box b_new_sd = na
-    bool new_event_sd = false
-
-    // Check if new S&D detected
-    if sd_valid and sd_anchor != last_sd_time and not na(sd_anchor)
-        new_event_sd := true
-        last_sd_time := sd_anchor
-
-    if new_event_sd
-        // Deduplication
-        if array.size(boxes_sd) > 0
-            for i = 0 to array.size(boxes_sd) - 1
-                b_chk = array.get(boxes_sd, i)
-                if not na(b_chk)
-                    if math.abs(box.get_top(b_chk) - sd_top) < syminfo.mintick and math.abs(box.get_bottom(b_chk) - sd_bot) < syminfo.mintick
-                        new_event_sd := false
-                        break
-
-        if new_event_sd
-            c_bg_sd = sd_is_bull ? col_sd_bull : col_sd_bear
-            // Use time coordinates
-            t_end_sd = sd_mitigation_type != "None" ? time : (sd_anchor + (tf_ms_sd * sd_len))
-            b_new_sd := box.new(sd_anchor, sd_top, t_end_sd, sd_bot, xloc=xloc.bar_time, border_color=na, bgcolor=c_bg_sd)
-
-            // Mitigation
-            if sd_mitigation_type != "None" and not na(b_new_sd)
-                array.push(active_sds, ActiveSD.new(b_new_sd, sd_top, sd_bot, false, sd_is_bull, true))
-
-    // Manage Box Limit
-    if not na(b_new_sd)
-        array.push(boxes_sd, b_new_sd)
-        if sd_mitigation_type == "None" and array.size(boxes_sd) > sd_limit
-            box.delete(array.shift(boxes_sd))
-
-// -- MITIGATION LOOP FOR S&D --
-if sd_mitigation_type != "None" and array.size(active_sds) > 0
-    for i = array.size(active_sds) - 1 to 0
-        ActiveSD sd = array.get(active_sds, i)
-
-        if not na(box.get_top(sd.id))
-            if not sd.mitigated
-                // Check Collision
-                bool overlap_sd = false
-                if high >= sd.bottom and low <= sd.top
-                    overlap_sd := true
-
-                bool do_mitigate_sd = false
-                bool is_broken_sd = false
-
-                if overlap_sd
-                    if sd_mitigation_type == "Broken Zones"
-                        if sd.is_bull
-                            if close < sd.bottom
-                                is_broken_sd := true
-                        else
-                            if close > sd.top
-                                is_broken_sd := true
-
-                        if is_broken_sd
-                            do_mitigate_sd := true
-                    else
-                        do_mitigate_sd := true
-
-                if do_mitigate_sd
-                    sd.mitigated := true
-                    cur_col_sd = sd.is_bull ? col_sd_bull : col_sd_bear
-
-                    if sd_mitigation_type == "Grey"
-                        box.set_bgcolor(sd.id, color.new(color.gray, 65))
-                    else if sd_mitigation_type == "Broken Zones"
-                        box.set_bgcolor(sd.id, color.new(color.yellow, 65))
-                    else
-                        // Opacity
-                        new_transp_sd = math.min(95, color.t(cur_col_sd) + 15)
-                        new_col_sd = color.new(cur_col_sd, new_transp_sd)
-                        box.set_bgcolor(sd.id, new_col_sd)
-
-                    box.set_right(sd.id, time)
-                    array.set(active_sds, i, sd)
-                else
-                    box.set_right(sd.id, time)
-        else
-            array.remove(active_sds, i)
-
-// -- ADVANCED LIMIT MANAGEMENT (S&D) --
-if sd_mitigation_type != "None"
-    int cnt_mit_sd = 0
-    int idx_to_del_sd = -1
-
-    if array.size(active_sds) > 0
-        for i = 0 to array.size(active_sds) - 1
-            if array.get(active_sds, i).mitigated
-                cnt_mit_sd += 1
-                if idx_to_del_sd == -1
-                    idx_to_del_sd := i
-
-    // 1. Mitigated Limit
-    if cnt_mit_sd > sd_limit and idx_to_del_sd != -1
-        ActiveSD obj_del_sd = array.get(active_sds, idx_to_del_sd)
-        box.delete(obj_del_sd.id)
-        array.remove(active_sds, idx_to_del_sd)
-        // Sync boxes_sd
-        int b_idx_sd = array.indexof(boxes_sd, obj_del_sd.id)
-        if b_idx_sd != -1
-            array.remove(boxes_sd, b_idx_sd)
-
-    // 2. Safety Hard Limit (Pine Script Max 500)
-    if array.size(boxes_sd) > 490
-        box b_del_sd = array.shift(boxes_sd)
-        box.delete(b_del_sd)
-        // Remove from active_sds if present
-        if array.size(active_sds) > 0
-            int a_idx_sd = -1
-            for i = 0 to array.size(active_sds) - 1
-                box b_chk_id_sd = array.get(active_sds, i).id
-                // Use property comparison
-                if box.get_top(b_chk_id_sd) == box.get_top(b_del_sd) and box.get_left(b_chk_id_sd) == box.get_left(b_del_sd)
-                    a_idx_sd := i
-                    break
-            if a_idx_sd != -1
-                array.remove(active_sds, a_idx_sd)
