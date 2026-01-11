@@ -9,12 +9,13 @@ general_info        = input.bool(title='General Description', defval=false, tool
 adx_trend           = input.bool(title='MTF Info Panel', defval=false, 
                      tooltip='Provides an overview of multi time frame trends as DMI ADX, HMA slope and EMA1 cross EMA2 (down(red), consolidation(gray), up(blue)) for the current (C = current tf, these parameters are optimizable) and the supported higher time frames (4H, D, W, M, these indicator parameters are fixed and optimized for Bitcoin).')
 
-// fractals input
-fracals_plot        = input.bool(title='Bill Williams Fractals', defval=true, tooltip='Symbol: white triangle. Works as support and resistance level.')
-
 // Alert Inputs 
 grp_alert      = "Real-time Alerts"
 use_rt_alert   = input.bool(false, title="Alert on 5th Fractal Candle (Real-time)", tooltip="Triggers an alert signal while the 5th candle of a fractal pattern is forming (Real-time). Select 'Any function call' when creating the alert.")
+
+// fractals input
+fracals_plot        = input.bool(title='Bill Williams Fractals', defval=true, tooltip='Symbol: white triangle. Works as support and resistance level.')
+
 
 // Gradient Volume Profile
 //grp_vp = "Gradient Volume Profile"
@@ -37,22 +38,21 @@ vp_maxScan  = 4000 //input.int(4000, "Scan Depth", minval=500, maxval=9000, grou
 
 // MTF CANDLE OVERLAY INPUTS
 grp_mtf_candle    = "MTF Candle Overlay"
-show_mtf_candles  = input.bool(false, "MTF Candle Overlay", group=grp_mtf_candle, tooltip="Two timelines at one glance. It's like looking inside a candle with X-rays.")
-mtf_tf_sel        = input.string("1h", "Overlay Timeframe", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], group=grp_mtf_candle)
-mtf_opacity       = input.int(15, "Overlay Opacity %", minval=0, maxval=100, group=grp_mtf_candle, tooltip="0% = Invisible, 100% = Solid")
+show_mtf_candles  = input.bool(false, "MTF Candle Overlay ⠀⠀⠀⠀⠀", group=grp_mtf_candle, inline="mtf_ov", tooltip="Two timelines at one glance. It's like looking inside a candle with X-rays.")
+mtf_tf_sel        = input.string("1h", "", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], inline="mtf_ov", group=grp_mtf_candle)
+mtf_opacity       = input.int(15, "Opacity %", minval=0, maxval=100, group=grp_mtf_candle, tooltip="0% = Invisible, 100% = Solid")
 
 // Additional Context Inputs 
 grp_add         = "Additional Context"
-show_pch_pcl    = input.bool(true, "Previous Candle High/Low ⠀", group=grp_add, inline="add_1", tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe.")
-use_sess_1st    = input.bool(false, "1st Session Candle", group=grp_add, inline="add_1", tooltip="Previous Candle High/Low: Draws lines at the High and Low of the previous completed candle of the selected timeframe. 
-                  1st Session Candle: If enabled, lines remain at the high and low of the first candle of the running trading session. Current/Chart TF only.")
-pch_pcl_tf      = input.timeframe("D", "Previous Candle Timeframe", group=grp_add, tooltip="Select the timeframe for the Previous Candle High/Low calculation.")
+use_sess_1st    = input.bool(false, "1st Session Candle", group=grp_add, tooltip="Lines remain at the high and low of the first candle of the running trading session.")
+show_pch_pcl    = input.bool(true, "Previous Candle High/Low", group=grp_add, inline="add_1", tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe.")
+pch_pcl_tf      = input.timeframe("D", "", group=grp_add, inline="add_1", tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe. Select the timeframe for the Previous Candle High/Low calculation.")
 
-show_last_frac  = input.bool(false, "Last Fractal S/R", group=grp_add, tooltip="Draws lines at the last confirmed Up/Down Fractals similar to PDH/PDL. Every new trend begins with the breaking of a fractal. (Time Frame dependent).")
-last_frac_tf    = input.timeframe("240", "Last Fractal Timeframe", group=grp_add, tooltip="Select the timeframe for the Last Fractal calculation.")
+show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀", group=grp_add, inline="l_rf", tooltip="Draws lines at the last confirmed Up/Down Fractals similar to PDH/PDL. Every new trend begins with the breaking of a fractal. (Time Frame dependent).")
+last_frac_tf    = input.timeframe("240", "", group=grp_add, inline="l_rf", tooltip="Draws lines at the last confirmed Up/Down Fractals similar to PDH/PDL. Every new trend begins with the breaking of a fractal. (Time Frame dependent). Select the timeframe for the Last Fractal calculation.")
 
-show_vol        = input.bool(true, "High Volume Spikes", group=grp_add, tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
-vol_mult        = input.float(2.0, "Volume Threshold (x Avg)", group=grp_add)
+show_vol        = input.bool(true, "High Volume Spikes ⠀", group=grp_add, inline="vol_sp", tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
+vol_mult        = input.float(2.0, "Threshold (x Avg)", inline="vol_sp", group=grp_add)
 
 // FVG Inputs 
 grp_fvg1        = "Price Imbalance (Fair Value Gap) 1"
@@ -71,28 +71,19 @@ fvg2_limit      = input.int(5, title="⠀⠀ Visible Boxes", minval=1, maxval=50
 col_fvg2_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg2, inline="f2_3")
 col_fvg2_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg2, inline="f2_3")
 
-// Background Color Filter INPUT
-selected_bg_signal  = input.string("None", title="Background Color Filter", options=
-                     ["None", "Bill Williams Fractals BG", "Anticipated Fractal BG", "Last 12 Bar BG", "Parabolic SAR BG", "DMI ADX BG", "HMA Slope BG", "MACD Slow Slope BG", "MACD Slope/Fractal Break BG (OR)", "Trend Line/Fractal Break BG (OR)", "Fractals Trend Lines", "Segments BG", 
-                     "Segments/Fractals BG (OR)", "Segments/Trend Line BG (OR)", "Segments/Fractals/Trend Line BG (OR)",
-                     "Segments/Fractals BG (AND)", "Segments/Trend Line BG (AND)", "Segments/Fractals/Trend Line BG (AND)", "Segments/MACD Slope BG (AND)", "MACD Slope/Fractals Break BG (AND)", "MA1/MA2 Cross BG", "FVG Open", "FVG Close"],
-                     group="Background Color Filters:", tooltip="Signals that are alternatively displayed as a background color as a quick verification and a kind of 'backtest'.")
-
-bg_tf_select        = input.timeframe("", title="Background Filter Timeframe", group="Background Color Filters:", tooltip="Select the timeframe for the background signals calculations. Empty = Current Chart Timeframe.")
-
 // Bollinger Bands
 BB_plot             = input.bool(true, title='Bollinger Bands', group='Bollinger Bands:', tooltip='Works as support and resistence, as reversal zone and as squeeze indicator.')
 BB_calc_tog         = input.bool(true, title='Toggle BB Calculation (Standard/Exponential)', group='Bollinger Bands:', tooltip='Works as support and resistence, as reversal zone and as squeeze indicator. Standard -> checked')
 near_bb             = input.bool(true, title='Touched BBs only', group='Bollinger Bands:', tooltip='This maintains a better chart overview and works as reversal zone indicator.')
-BB_length_1         = input.int(20, minval=1, title='BB Length', group='Bollinger Bands:', tooltip='')
-BB_sdev_1           = input.float(2.0, minval=0.001, maxval=3.8, step= 0.2, title='BB 1 StdDev', group='Bollinger Bands:', tooltip='')
+BB_length_1         = input.int(20, minval=1, title='BB Length', inline="bb", group='Bollinger Bands:', tooltip='')
+BB_sdev_1           = input.float(2.0, minval=0.001, maxval=3.8, step= 0.2, title='⠀BB 1 StdDev', inline="bb", group='Bollinger Bands:', tooltip='')
 BB_sdev_2           = 3//input.float(3.0, minval=0.001, title='BB 2 StdDev', group='Bollinger Bands:', tooltip='')
 BB_sdev_3           = 4//input.float(4.0, minval=0.001, title='BB 3 StdDev', group='Bollinger Bands:', tooltip='')
 BB_sdev_4           = 5//input.float(5.0, minval=0.001, title='BB 4 StdDev', group='Bollinger Bands:', tooltip='')
 
 // sr lines inputs
-plot_sr_lines       = input.bool(false, title='SR Lines', tooltip='Plot horizontal support and resistance levels.', group='SR lines:')
-auto_adaption       = input.bool(true, title='Auto Adaption', tooltip='Automatically adapt the Fractal Size and Time Frame based on the current chart timeframe.', group='SR lines:')
+plot_sr_lines       = input.bool(false, title='SR Lines ⠀', tooltip='Plot horizontal support and resistance levels.', inline="sr_l", group='SR lines:')
+auto_adaption       = input.bool(true, title='Auto Adaption', inline="sr_l", tooltip='Plot horizontal support and resistance levels. Automatically adapt the Fractal Size and Time Frame based on the current chart timeframe.', group='SR lines:')
 extend              = input.bool(false, title='Toggle Line Extention', tooltip='Toggle line extention both/right. To the right = default = not selected', group='SR lines:')
 fr_size             = input.int(1, title='Fractal Size', minval=1, step=1, tooltip='The Size of fractals used to plot the SR-levels. The lower the value the more line are drawn.', group='SR lines:')
 sr_tf               = input.timeframe('W', title='Time Frame Of Fractals', options=['3','5', '15', '30', '60', '120', '240', '480', 'D', 'W', 'M', '3M', '6M'], tooltip='The time frame of fractals used to plot the SR-levels. Select always: \'Time Frame Of Fractals\' >= current time frame', group='SR lines:')
@@ -116,13 +107,9 @@ ma2_type            = input.string("EMA", title="MA 2", options=["None", "SMA", 
 ma2_len             = input.int(200, title="", minval=1, inline="ma2", group=grp_ma)
 ma2_slope_c         = input.bool(false, title="Slope Color", inline="ma2", group=grp_ma)
 
-di_len              = input.int(7, title='ADX DI Length', minval=1, group=grp_ma, tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
-len_smo             = input.int(7, title='ADX Smoothing', minval=1, group=grp_ma, tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
-hma_inp             = input.int(20, title='HMA Length', minval=1, group=grp_ma, tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
-
 // two fractals trendlines inputs
-plot_trendline      = input.bool(false, title='Fractal Trend Lines', group='Trend lines:', tooltip='The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal.')
-fractalBarsPerSide  = input.int(2, title="Fractal Size: Bars Per Side", minval=0, maxval=10, group='Trend lines:', tooltip="Number of bars to the left and right of the fractal bar for trendlines. Default is 2 (5-bar fractal). 
+plot_trendline      = input.bool(false, title='Fractal Trend Lines ⠀', inline="fr_tr", group='Trend lines:', tooltip='The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal.')
+fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group='Trend lines:', tooltip="The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal. Number of bars to the left and right of the fractal bar for trendlines. Default is 2 (5-bar fractal). 
                      Min=0 (Fractal(2) using anchored linear regression, follow the highs/lows of the subsequent candles to align with the current trend), Max=10 (21 bars).")
 
 // divergence signal inputs
@@ -133,8 +120,8 @@ bar_div_p           = input.int(25, title='Bar Period', minval=1, step=1, toolti
 src_div             = input.string('high/low', title='Bar Divergence Source', options=['high/low', 'close'], tooltip='The bar source for divergence calculation.', group='Divergences:')
 
 // bar signals inputs
-plot_l12_bar        = input.bool(true, title='Last 12 Bar (L12)', tooltip='Letter: L, L12 => highest low of last 12 bars -> long. Lowest high of last 12 bars -> short. Indicates a new trend.', group='Bar signals:')
-L12_input           = input.int(12, minval=1, title='"Last 12"', group='Bar signals:', tooltip='"Last 12 Bar" Bar count.')
+plot_l12_bar        = input.bool(true, title='Last 12 Bar (L12) ⠀', inline="l12", tooltip='Letter: L, L12 => highest low of last 12 bars -> long. Lowest high of last 12 bars -> short. Indicates a new trend.', group='Bar signals:')
+L12_input           = input.int(12, minval=1, title='Bar count', inline="l12", group='Bar signals:', tooltip='"Letter: L, L12 => highest low of last 12 bars -> long. Lowest high of last 12 bars -> short. Indicates a new trend. Last 12 Bar" Bar count.')
 plot_nr_bar         = input.bool(true, title='Narrow Range Bar (NR7)', tooltip='Letter: n, NR7 = narrowest range of a bar of the last seven bars. Indicates market tension.', group='Bar signals:')
 plot_i_bar          = input.bool(true, title='Inside Bar', tooltip='Letter: i. An inside bar is a triangle formation on smaller time frame.', group='Bar signals:')
 plot_o_bar          = input.bool(true, title='Outside Bar', tooltip='Letter: o. An outside bar is an opening funnel formation on smaller time frames. gray-> normal outside bar, valid at least for the next bar: red-> short, green-> long', group='Bar signals:')
@@ -142,8 +129,21 @@ plot_s_bar          = input.bool(true, title='Sandwich Bar', tooltip='Letter: s.
 plot_f_bar          = input.bool(true, title='Fakey', tooltip='Letter: F. An inside bar false breakout.', group='Bar signals:')
 
 // segments inputs
-plot_segments       = input.bool(false, title='Segments', tooltip='Gray lines that follow the highest highs and lowest lows. This is a subtle way to detect a new trend. The higher the timeframe the more reliable the signal.', group='Segment signal:')
-sb                  = input.int(10 ,title='Max Segment Bars', minval=0, step=1, tooltip='Max bars between two segment highs or segment lows.', group='Segment signal:')
+plot_segments       = input.bool(false, title='Segments ⠀', inline="seg", tooltip='Gray lines that follow the highest highs and lowest lows. This is a subtle way to detect a new trend. The higher the timeframe the more reliable the signal.', group='Segment signal:')
+sb                  = input.int(10 ,title='Max Bars', inline="seg", minval=0, step=1, tooltip='Gray lines that follow the highest highs and lowest lows. This is a subtle way to detect a new trend. The higher the timeframe the more reliable the signal. 
+                      Max bars between two segment highs or segment lows.', group='Segment signal:')
+
+// Background Color Filter INPUT
+selected_bg_signal  = input.string("None", title="Background Color Filter", options=
+                     ["None", "Bill Williams Fractals BG", "Anticipated Fractal BG", "Last 12 Bar BG", "Parabolic SAR BG", "DMI ADX BG", "HMA Slope BG", "MACD Slow Slope BG", "MACD Slope/Fractal Break BG (OR)", "Trend Line/Fractal Break BG (OR)", "Fractals Trend Lines", "Segments BG", 
+                     "Segments/Fractals BG (OR)", "Segments/Trend Line BG (OR)", "Segments/Fractals/Trend Line BG (OR)",
+                     "Segments/Fractals BG (AND)", "Segments/Trend Line BG (AND)", "Segments/Fractals/Trend Line BG (AND)", "Segments/MACD Slope BG (AND)", "MACD Slope/Fractals Break BG (AND)", "MA1/MA2 Cross BG", "FVG Open", "FVG Close"],
+                     group="Background Color Filters:", tooltip="Signals that are alternatively displayed as a background color as a quick verification and a kind of 'backtest'.")
+bg_tf_select        = input.timeframe("", title="Background Filter Timeframe", group="Background Color Filters:", tooltip="Select the timeframe for the background signals calculations. Empty = Current Chart Timeframe.")
+
+di_len              = input.int(7, title='ADX DI Length', minval=1, group="Background Color Filters:", tooltip="")
+len_smo             = input.int(7, title='ADX Smoothing', minval=1, group="Background Color Filters:", tooltip="")
+hma_inp             = input.int(20, title='HMA Length', minval=1, group="Background Color Filters:", tooltip="")
 
 // pivot points inputs
 plot_pivots_h1      = input.bool(false, title= "1 Hour Classic Pivot Points", group= "Pivot points:", tooltip= "1 Hour Pivot points (P, R1-R4, S1-S4). Only visible on charts < 1H.")
