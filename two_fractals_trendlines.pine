@@ -73,6 +73,35 @@ fvg2_limit      = input.int(5, title="⠀⠀ Visible Boxes", minval=1, maxval=50
 col_fvg2_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg2, inline="f2_3")
 col_fvg2_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg2, inline="f2_3")
 
+// Pro Smart MTF S&R
+grp_psr             = "Pro Smart S&R (Support & Resistance)"
+ps_enable           = input.bool(true, title="Enable Smart S&R ⠀", group=grp_psr, inline="en_tf", tooltip="")
+ps_tf               = input.timeframe("240", title="Pivot TF", inline="en_tf", group=grp_psr, tooltip="Activates the professional 'Smart Market Structure' system:
+                      \n• Multi-Timeframe Analysis: Identifies significant Swing Highs/Lows from a higher timeframe (e.g., 4H levels on a 15m chart).
+                      \n• Noise Filtering: Uses adjustable pivot strength to ignore minor price fluctuations.
+                      \n• Smart Zones: Automatically merges levels that are close together into a single 'Zone' (Box) to reduce clutter.
+                      \n• Dynamic State: Tracks confirmed breakouts and can automatically flip Support to Resistance (Role Reversal) or remove broken levels.
+                      \n• Clutter Control: Manages a fixed number of active levels, removing old or irrelevant ones automatically. \nSelect the Higher Timeframe to scan for significant Swing Highs/Lows.")
+ps_left             = input.int(2, title="Pivot Strength (Left)⠀⠀⠀⠀⠀⠀⠀⠀⠀", minval=1, group=grp_psr, inline="ps_str")
+ps_right            = input.int(2, title="Pivot Strength (Right)⠀⠀⠀⠀⠀⠀⠀⠀", minval=1, group=grp_psr, inline="ps_str", tooltip="Higher values filter out minor market noise. Standard=2 (Bill Williams Fractal).")
+ps_max              = input.int(10, title="Max Active Levels", minval=1, maxval=50, group=grp_psr, tooltip="Limits the number of visible lines to prevent chart clutter. FIFO (First In, First Out).")
+ps_break_act        = input.string("Role Reversal", title="On Break Action", options=["Keep", "Delete", "Role Reversal"], group=grp_psr, tooltip="How the script handles a level when price crosses it. \nKeep: Do nothing. \nDelete: Remove line. \nRole Reversal: Support becomes Resistance (Color change).")
+ps_merge_en         = input.bool(true, title="Merge Nearby Levels (Zones) ⠀", group=grp_psr, inline="ps_m")
+ps_merge_pct        = input.float(0.1, title="Merge Threshold %", minval=0.01, step=0.05, group=grp_psr, inline="ps_m", tooltip="If a new level appears within X% of an existing level, they are merged into a Zone.")
+ps_col_res          = input.color(color.new(color.red, 30), title="Res Color", group=grp_psr, inline="ps_c")
+ps_col_sup          = input.color(color.new(color.green, 30), title="⠀Sup Color", group=grp_psr, inline="ps_c")
+ps_col_zone         = input.color(color.new(color.blue, 85), title="⠀Zone Fill", group=grp_psr, inline="ps_c")
+
+// UDT for S&R Management
+type SRLevel
+    float price
+    bool  is_res      // True=Resistance, False=Support
+    bool  is_broken
+    int   start_time
+    line  id_line
+    box   id_box      // Used if merged into a zone
+    bool  is_zone
+
 // Bollinger Bands
 BB_plot             = input.bool(true, title='Bollinger Bands', group='Bollinger Bands:', tooltip='Works as support and resistence, as reversal zone and as squeeze indicator.')
 BB_calc_tog         = input.bool(true, title='Toggle BB Calculation (Standard/Exponential)', group='Bollinger Bands:', tooltip='Works as support and resistence, as reversal zone and as squeeze indicator. Standard -> checked')
@@ -83,13 +112,6 @@ BB_sdev_2           = 3//input.float(3.0, minval=0.001, title='BB 2 StdDev', gro
 BB_sdev_3           = 4//input.float(4.0, minval=0.001, title='BB 3 StdDev', group='Bollinger Bands:', tooltip='')
 BB_sdev_4           = 5//input.float(5.0, minval=0.001, title='BB 4 StdDev', group='Bollinger Bands:', tooltip='')
 
-// sr lines inputs
-plot_sr_lines       = input.bool(false, title='SR Lines ⠀', tooltip='', inline="sr_l", group='SR lines:')
-auto_adaption       = input.bool(true, title='Auto Adaption', inline="sr_l", tooltip='Horizontal support and resistance levels. \nAutomatically adapt the Fractal Size and Time Frame based on the current chart timeframe.', group='SR lines:')
-extend              = input.bool(false, title='Toggle Line Extention', tooltip='Toggle line extention both/right. To the right = default = not selected', group='SR lines:')
-fr_size             = input.int(1, title='Fractal Size', minval=1, step=1, tooltip='The Size of fractals used to plot the SR-levels. The lower the value the more line are drawn.', group='SR lines:')
-sr_tf               = input.timeframe('W', title='Time Frame Of Fractals', options=['3','5', '15', '30', '60', '120', '240', '480', 'D', 'W', 'M', '3M', '6M'], tooltip='The time frame of fractals used to plot the SR-levels. Select always: \'Time Frame Of Fractals\' >= current time frame', group='SR lines:')
-fr_source           = input.string('high/low', title='Fractal Source', options=['high/low', 'close'], tooltip='The source of fractals used to plot the SR-levels.', group='SR lines:')
 
 // ema cloud, hma, dmi adx inputs
 grp_ma              = 'MA cloud, HMA slope, DMI ADX:'
@@ -188,9 +210,6 @@ vp_color            = input.color(color.new(color.red, 0), "Volume Profile Color
 color_fr            = input.color(color.white, "Fractal Color", group= "Attributes of drawn objects:")
 transp_fr           = input.int(40, "Fractal Transparency", minval=1, maxval= 100, group= "Attributes of drawn objects:")
 
-width_sr            = input.int(1, 'SR Line Width', minval=1, group='Attributes of drawn objects:')
-transp_sr           = input.int(50, 'SR Line Transparency', minval=1, maxval= 100, group='Attributes of drawn objects:')
-
 color_ema_c         = input.color(color.blue, 'EMA Cloud Color', group='Attributes of drawn objects:')
 color_ema_sig_up    = input.color(color.green, 'EMA Signal Up Cloud Color', group='Attributes of drawn objects:')
 color_ema_sig_dn    = input.color(color.red, 'EMA Signal Down Cloud Color', group='Attributes of drawn objects:')
@@ -217,6 +236,159 @@ last_dn_fr_level    = ta.valuewhen(dn_fr, low[2], 0)
 // Plot fractals
 plotshape(fracals_plot ? up_fr : na, style=shape.triangleup, location=location.abovebar, offset=-2, color=color.new(color_fr, transp_fr), title='Fractal up')
 plotshape(fracals_plot ? dn_fr : na, style=shape.triangledown, location=location.belowbar, offset=-2, color=color.new(color_fr, transp_fr), title='Fractal down')
+
+
+//------------------------------------------------------- Pro Smart S&R Logic -----------------------------------------------------
+
+// --- 1. Data Fetching (MTF) ---
+// Function to get Raw Pivot Data from HTF
+// We need to return specific values when a pivot is confirmed
+f_get_mtf_pivots(_src_h, _src_l, _l, _r) =>
+    _ph = ta.pivothigh(_src_h, _l, _r)
+    _pl = ta.pivotlow(_src_l, _l, _r)
+
+    // Values are confirmed at the close of the bar _r bars after the peak
+    // We return the Price and the Time of the peak
+    // Note: Pivot High was at offset _r
+    _ph_val = not na(_ph) ? _ph : na
+    _ph_time = not na(_ph) ? time[_r] : na
+
+    _pl_val = not na(_pl) ? _pl : na
+    _pl_time = not na(_pl) ? time[_r] : na
+
+    [_ph_val, _ph_time, _pl_val, _pl_time]
+
+// Security call to get the data from the selected timeframe
+[s_ph_val, s_ph_time, s_pl_val, s_pl_time] = request.security(syminfo.tickerid, ps_tf, f_get_mtf_pivots(high, low, ps_left, ps_right))
+
+// --- 2. State Management (Arrays) ---
+var sr_levels = array.new<SRLevel>()
+var int last_ph_t = 0
+var int last_pl_t = 0
+
+// Helper to check proximity for Merging
+f_is_near(_p1, _p2, _pct) =>
+    math.abs(_p1 - _p2) <= (_p1 * (_pct / 100))
+
+// Main Logic Loop (Runs on every bar, but updates state only on new pivots or close)
+if ps_enable
+    // A. Ingest New High Pivot
+    if not na(s_ph_val) and s_ph_time != last_ph_t
+        last_ph_t := s_ph_time
+        // Check for merge candidate (Iterate backwards to find newest nearby)
+        bool merged = false
+        if ps_merge_en and array.size(sr_levels) > 0
+            for i = array.size(sr_levels) - 1 to 0
+                SRLevel lvl = array.get(sr_levels, i)
+                // Only merge with same type (Resistance) and active lines
+                if lvl.is_res and not lvl.is_broken and f_is_near(lvl.price, s_ph_val, ps_merge_pct)
+                    // CONVERT TO ZONE
+                    if not lvl.is_zone
+                        // Create Box
+                        float top = math.max(lvl.price, s_ph_val)
+                        float bot = math.min(lvl.price, s_ph_val)
+                        lvl.id_box := box.new(lvl.start_time, top, time, bot, xloc=xloc.bar_time, border_color=na, bgcolor=ps_col_zone)
+                        lvl.is_zone := true
+                        // Delete the old line
+                        line.delete(lvl.id_line)
+                    else
+                        // Extend Zone Price Range
+                        float cur_top = box.get_top(lvl.id_box)
+                        float cur_bot = box.get_bottom(lvl.id_box)
+                        box.set_top(lvl.id_box, math.max(cur_top, s_ph_val))
+                        box.set_bottom(lvl.id_box, math.min(cur_bot, s_ph_val))
+
+                    merged := true
+                    break
+
+        if not merged
+            // Add New Resistance Line
+            line new_l = line.new(s_ph_time, s_ph_val, time, s_ph_val, xloc=xloc.bar_time, color=ps_col_res, style=line.style_solid, width=1)
+            SRLevel new_lvl = SRLevel.new(s_ph_val, true, false, s_ph_time, new_l, na, false)
+            array.push(sr_levels, new_lvl)
+
+    // B. Ingest New Low Pivot
+    if not na(s_pl_val) and s_pl_time != last_pl_t
+        last_pl_t := s_pl_time
+        // Check for merge candidate
+        bool merged = false
+        if ps_merge_en and array.size(sr_levels) > 0
+            for i = array.size(sr_levels) - 1 to 0
+                SRLevel lvl = array.get(sr_levels, i)
+                if not lvl.is_res and not lvl.is_broken and f_is_near(lvl.price, s_pl_val, ps_merge_pct)
+                    // CONVERT TO ZONE
+                    if not lvl.is_zone
+                        float top = math.max(lvl.price, s_pl_val)
+                        float bot = math.min(lvl.price, s_pl_val)
+                        lvl.id_box := box.new(lvl.start_time, top, time, bot, xloc=xloc.bar_time, border_color=na, bgcolor=ps_col_zone)
+                        lvl.is_zone := true
+                        line.delete(lvl.id_line)
+                    else
+                        float cur_top = box.get_top(lvl.id_box)
+                        float cur_bot = box.get_bottom(lvl.id_box)
+                        box.set_top(lvl.id_box, math.max(cur_top, s_pl_val))
+                        box.set_bottom(lvl.id_box, math.min(cur_bot, s_pl_val))
+
+                    merged := true
+                    break
+
+        if not merged
+            line new_l = line.new(s_pl_time, s_pl_val, time, s_pl_val, xloc=xloc.bar_time, color=ps_col_sup, style=line.style_solid, width=1)
+            SRLevel new_lvl = SRLevel.new(s_pl_val, false, false, s_pl_time, new_l, na, false)
+            array.push(sr_levels, new_lvl)
+
+    // C. Pruning (FIFO)
+    while array.size(sr_levels) > ps_max
+        // Remove oldest (Index 0)
+        SRLevel old = array.shift(sr_levels)
+        line.delete(old.id_line)
+        box.delete(old.id_box)
+
+    // D. Update & Break Handling (Loop all active levels)
+    // We loop backwards to allow safe removal if "Delete" action is selected
+    if array.size(sr_levels) > 0
+        for i = array.size(sr_levels) - 1 to 0
+            SRLevel lvl = array.get(sr_levels, i)
+
+            // 1. Check Break
+            // Use current close to detect break.
+            // Resistance Broken: Close > Price
+            // Support Broken: Close < Price
+            // For Zones: Check against Top/Bottom
+            bool broken_now = false
+
+            if not lvl.is_broken
+                float check_price = lvl.is_zone ? (lvl.is_res ? box.get_top(lvl.id_box) : box.get_bottom(lvl.id_box)) : lvl.price
+
+                if lvl.is_res and close > check_price
+                    broken_now := true
+                else if not lvl.is_res and close < check_price
+                    broken_now := true
+
+            if broken_now
+                lvl.is_broken := true
+                if ps_break_act == "Delete"
+                    line.delete(lvl.id_line)
+                    box.delete(lvl.id_box)
+                    array.remove(sr_levels, i)
+                    continue // Skip to next iteration
+
+                if ps_break_act == "Role Reversal"
+                    // Reset broken status for the new role
+                    lvl.is_broken := false
+                    // Flip Type
+                    lvl.is_res := not lvl.is_res
+                    // Update Color
+                    color new_c = lvl.is_res ? ps_col_res : ps_col_sup
+                    if not lvl.is_zone
+                        line.set_color(lvl.id_line, new_c)
+                        line.set_style(lvl.id_line, line.style_dashed)
+
+            // 2. Extend visual to current time
+            if not lvl.is_zone
+                line.set_x2(lvl.id_line, time)
+            else
+                box.set_right(lvl.id_box, time)
 
 
 //---------------------------------------------------- macd and rsi divergences (Visuals for Chart) -------------------------------------------------------------
@@ -251,63 +423,6 @@ plotshape(plot_bear_combined, style=shape.arrowdown, location=location.abovebar,
 plotshape(plot_bull_combined, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,  textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Bull divergence')
 
 
-//------------------------------------------------------- plot horizontal sr levels/lines (Visuals for Chart) -----------------------------------------------------
-
-// Auto Adaption logic for SR lines
-auto_fr_size = 2  
-
-// Determine appropriate timeframe based on current chart timeframe
-auto_sr_tf = 
-             timeframe.isintraday and timeframe.multiplier <= 2 ? '15' : 
-             timeframe.isintraday and timeframe.multiplier <= 3 ? '25' : 
-             timeframe.isintraday and timeframe.multiplier <= 5 ? '30' : 
-             timeframe.isintraday and timeframe.multiplier <= 15 ? '120' : 
-             timeframe.isintraday and timeframe.multiplier <= 60 ? '440' : 
-             timeframe.isintraday and timeframe.multiplier <= 120 ? '780' : 
-             timeframe.isintraday and timeframe.multiplier <= 240 ? '2D' : 
-             timeframe.isintraday and timeframe.multiplier <= 480 ? '3D' : 
-             timeframe.isintraday and timeframe.multiplier <= 720 ? '4D' : 
-             timeframe.isdaily ? '2W' : 
-             timeframe.isweekly ? '2M' : 
-             timeframe.ismonthly and timeframe.multiplier == 1 ? '3M' : 
-             timeframe.ismonthly and timeframe.multiplier == 3 ? '6M' : 
-             sr_tf  // default to user selection
-
-// Use auto-adapted values if enabled
-fractal_size = auto_adaption ? auto_fr_size : fr_size
-fractal_tf = auto_adaption ? auto_sr_tf : sr_tf
-
-fr_src              = fr_source == 'high/low' ? high : close
-
-// Optimization: Combine 4 security calls into 1
-f_fr_sr_levels(_src_h, _src_l, _size) =>
-    _up = ta.pivothigh(_src_h, _size, _size)
-    _dn = ta.pivotlow(_src_l, _size, _size)
-    _val_up = ta.valuewhen(_up, _src_h[_size], 0)
-    _val_dn = ta.valuewhen(_dn, _src_l[_size], 0)
-    [_up, _dn, _val_up, _val_dn]
-
-[up_fr_sr, dn_fr_sr, fr_up, fr_dn] = request.security(syminfo.tickerid, fractal_tf, f_fr_sr_levels(fr_source == 'high/low' ? high : close, fr_source == 'high/low' ? low : close, fractal_size))
-
-
-up_fr_line          = plot_sr_lines ? line.new(x1=bar_index[2], x2=bar_index[1], y1=fr_up, y2=fr_up, extend= not extend ? extend.right : extend.both, color=color.new(color.blue, transp_sr), style=line.style_solid, width=width_sr) : na
-dn_fr_line          = plot_sr_lines ? line.new(x1=bar_index[2], x2=bar_index[1], y1=fr_dn, y2=fr_dn, extend= not extend ? extend.right : extend.both, color=color.new(color.blue, transp_sr), style=line.style_solid, width=width_sr) : na
-
-
-// Calculation All Time High / Low
-var float all_time_high = na
-var float all_time_low  = na
-
-all_time_high := na(all_time_high[1]) ? high : math.max(all_time_high[1], high)
-all_time_low  := na(all_time_low[1])  ? low  : math.min(all_time_low[1],  low)
-
-// --- ATH/ATL Lines ---
-var line ath_line = na
-
-if plot_sr_lines and bar_index > 0
-    if not na(ath_line)
-        line.delete(ath_line)
-    ath_line := line.new(x1=bar_index[1], y1=all_time_high, x2=bar_index,   y2=all_time_high, extend = not extend ? extend.right : extend.both, color  = color.new(color.blue, transp_sr), style  = line.style_solid, width=width_sr)
 
 
 //----------------------------------------------------------------- ema cloud / hma slope / dmi adx (Visuals for Chart) -------------------------------------------------------------------
