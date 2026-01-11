@@ -21,8 +21,9 @@ fracals_plot        = input.bool(title='Bill Williams Fractals', defval=true, to
 //grp_vp = "Gradient Volume Profile"
 vp_enable   = input.bool(false, "Volume Profile ⠀⠀", inline="line4")
 // Smart Contrast
-vp_smart    = input.bool(false, "Contrast Factor", inline="line4", tooltip="If enabled, cuts off extreme peaks to make normal volume nodes visible.")
-vp_clip     = input.float(2.5, "", minval=1.0, step=0.1, inline="line4", tooltip="Clipping threshold. Lower = More saturated red. Higher = Only peaks are red.")
+vp_smart    = input.bool(false, "Contrast Factor", inline="line4", tooltip="")
+vp_clip     = input.float(2.5, "", minval=1.0, step=0.1, inline="line4", tooltip="Visualizes trading volume distribution by price level over the visible chart range. Higher color intensity highlights High Volume Nodes (HVN), representing areas of significant market interest. 
+              Includes 'Smart Contrast' to automatically adjust saturation, ensuring key volume clusters remain visible even when extreme peaks are present.")
 
 
 // Basic Visuals
@@ -44,28 +45,29 @@ mtf_opacity       = input.int(15, "Opacity %", minval=0, maxval=100, group=grp_m
 
 // Additional Context Inputs 
 grp_add         = "Additional Context"
-use_sess_1st    = input.bool(false, "1st Session Candle", group=grp_add, tooltip="Lines remain at the high and low of the first candle of the running trading session.")
-show_pch_pcl    = input.bool(true, "Previous Candle High/Low", group=grp_add, inline="add_1", tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe.")
-pch_pcl_tf      = input.timeframe("D", "", group=grp_add, inline="add_1", tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe. Select the timeframe for the Previous Candle High/Low calculation.")
+use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", group=grp_add, inline="sess_1st", tooltip="")
+sess_1st_tf     = input.timeframe("5", "", group=grp_add, inline="sess_1st", tooltip="Lines remain at the high and low of the first candle of the running trading session. \nSelect the timeframe for the 1st Session Candle calculation.")
+show_pch_pcl    = input.bool(true, "Previous Candle High/Low", group=grp_add, inline="add_1", tooltip="")
+pch_pcl_tf      = input.timeframe("D", "", group=grp_add, inline="add_1", tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe. \nSelect the timeframe for the Previous Candle High/Low calculation.")
 
-show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀", group=grp_add, inline="l_rf", tooltip="Draws lines at the last confirmed Up/Down Fractals similar to PDH/PDL. Every new trend begins with the breaking of a fractal. (Time Frame dependent).")
-last_frac_tf    = input.timeframe("240", "", group=grp_add, inline="l_rf", tooltip="Draws lines at the last confirmed Up/Down Fractals similar to PDH/PDL. Every new trend begins with the breaking of a fractal. (Time Frame dependent). Select the timeframe for the Last Fractal calculation.")
+show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀", group=grp_add, inline="l_rf", tooltip="")
+last_frac_tf    = input.timeframe("240", "", group=grp_add, inline="l_rf", tooltip="Draws lines at the last confirmed Up/Down Fractals. Every new trend begins with the breaking of a fractal. (Time Frame dependent). \nSelect the timeframe for the Last Fractal calculation.")
 
 show_vol        = input.bool(true, "High Volume Spikes ⠀", group=grp_add, inline="vol_sp", tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
 vol_mult        = input.float(2.0, "Threshold (x Avg)", inline="vol_sp", group=grp_add)
 
 // FVG Inputs 
 grp_fvg1        = "Price Imbalance (Fair Value Gap) 1"
-plot_fvg1       = input.bool(true, title="FVG 1 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg1, inline="f1_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement). Also reveals institutional interest (new trend).")
-fvg1_tf_sel     = input.timeframe("", title="Timeframe", group=grp_fvg1, inline="f1_1", tooltip="Select the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
+plot_fvg1       = input.bool(true, title="FVG 1 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg1, inline="f1_1", tooltip="")
+fvg1_tf_sel     = input.timeframe("", title="Timeframe", group=grp_fvg1, inline="f1_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement). Also reveals institutional interest (new trend). \nSelect the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
 fvg1_len        = input.int(1, title="Box Length", minval=1, group=grp_fvg1, inline="f1_2")
 fvg1_limit      = input.int(50, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg1, inline="f1_2")
 col_fvg1_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg1, inline="f1_3")
 col_fvg1_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg1, inline="f1_3")
 
 grp_fvg2        = "Price Imbalance (Fair Value Gap) 2"
-plot_fvg2       = input.bool(false, title="FVG 2 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg2, inline="f2_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement). Also reveals institutional interest (new trend).")
-fvg2_tf_sel     = input.timeframe("", title="Timeframe", group=grp_fvg2, inline="f2_1")
+plot_fvg2       = input.bool(false, title="FVG 2 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg2, inline="f2_1", tooltip="")
+fvg2_tf_sel     = input.timeframe("", title="Timeframe", group=grp_fvg2, inline="f2_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement). Also reveals institutional interest (new trend). \nSelect the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
 fvg2_len        = input.int(1, title="Box Length", minval=1, group=grp_fvg2, inline="f2_2")
 fvg2_limit      = input.int(5, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg2, inline="f2_2")
 col_fvg2_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg2, inline="f2_3")
@@ -82,8 +84,8 @@ BB_sdev_3           = 4//input.float(4.0, minval=0.001, title='BB 3 StdDev', gro
 BB_sdev_4           = 5//input.float(5.0, minval=0.001, title='BB 4 StdDev', group='Bollinger Bands:', tooltip='')
 
 // sr lines inputs
-plot_sr_lines       = input.bool(false, title='SR Lines ⠀', tooltip='Plot horizontal support and resistance levels.', inline="sr_l", group='SR lines:')
-auto_adaption       = input.bool(true, title='Auto Adaption', inline="sr_l", tooltip='Plot horizontal support and resistance levels. Automatically adapt the Fractal Size and Time Frame based on the current chart timeframe.', group='SR lines:')
+plot_sr_lines       = input.bool(false, title='SR Lines ⠀', tooltip='', inline="sr_l", group='SR lines:')
+auto_adaption       = input.bool(true, title='Auto Adaption', inline="sr_l", tooltip='Horizontal support and resistance levels. \nAutomatically adapt the Fractal Size and Time Frame based on the current chart timeframe.', group='SR lines:')
 extend              = input.bool(false, title='Toggle Line Extention', tooltip='Toggle line extention both/right. To the right = default = not selected', group='SR lines:')
 fr_size             = input.int(1, title='Fractal Size', minval=1, step=1, tooltip='The Size of fractals used to plot the SR-levels. The lower the value the more line are drawn.', group='SR lines:')
 sr_tf               = input.timeframe('W', title='Time Frame Of Fractals', options=['3','5', '15', '30', '60', '120', '240', '480', 'D', 'W', 'M', '3M', '6M'], tooltip='The time frame of fractals used to plot the SR-levels. Select always: \'Time Frame Of Fractals\' >= current time frame', group='SR lines:')
@@ -94,8 +96,8 @@ grp_ma              = 'MA cloud, HMA slope, DMI ADX:'
 en_cloud            = input.bool(false, title='EMA Cloud', group=grp_ma, tooltip='This EMA cloud works as dynamic support and resistance and as trend indication. A wide cloud indicates high volatility, a narrow cloud indicates low volatility and breakout potential. Interesting pairs: 8/21, 40/97')
 sig_plot            = input.bool(true, title='EMA Cloud Color Signal', group=grp_ma, tooltip='EMA1 cross EMA2 color signal')
 
-ema_inp1            = input.int(8, title='Cloud EMA1 Length', minval=1, group=grp_ma, tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
-ema_inp2            = input.int(21, title='Cloud EMA2 Length', minval=1, group=grp_ma, tooltip="Value for current time frame. Also affects 'Entry Direction' -> 'auto'")
+ema_inp1            = input.int(8, title='Cloud EMA1 Length', minval=1, group=grp_ma, tooltip="")
+ema_inp2            = input.int(21, title='Cloud EMA2 Length', minval=1, group=grp_ma, tooltip="")
 
 // MA 1 Inputs
 ma1_type            = input.string("SMA", title="MA 1", options=["None", "SMA", "EMA"], inline="ma1", group=grp_ma)
@@ -108,20 +110,20 @@ ma2_len             = input.int(200, title="", minval=1, inline="ma2", group=grp
 ma2_slope_c         = input.bool(false, title="Slope Color", inline="ma2", group=grp_ma)
 
 // two fractals trendlines inputs
-plot_trendline      = input.bool(false, title='Fractal Trend Lines ⠀', inline="fr_tr", group='Trend lines:', tooltip='The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal.')
-fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group='Trend lines:', tooltip="The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal. Number of bars to the left and right of the fractal bar for trendlines. Default is 2 (5-bar fractal). 
+plot_trendline      = input.bool(false, title='Fractal Trend Lines ⠀', inline="fr_tr", group='Trend lines:', tooltip='')
+fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group='Trend lines:', tooltip="The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal. \nNumber of bars to the left and right of the fractal bar for trendlines. Default is 2 (5-bar fractal). 
                      Min=0 (Fractal(2) using anchored linear regression, follow the highs/lows of the subsequent candles to align with the current trend), Max=10 (21 bars).")
 
 // divergence signal inputs
-plot_div            = input.bool(true, title='Divergence Signal Arrow', group='Divergences:', tooltip='These divergences are very early signals and must be used in confluence with other signals. hd = hidden divergence, cd = classic divergence')
-div_indi            = input.string('rsi', title='Divergence Indicator', options=['rsi', 'macd(fast_line)', 'macd(slow_line)'], tooltip='Select an Indicators for divergence calculation.', group='Divergences:')
+plot_div            = input.bool(true, title='Divergence Signal Arrow', group='Divergences:', tooltip='These divergences are very early signals and must be used in confluence with other signals. Hidden and classic divergence are used')
+div_indi            = input.string('rsi', title='Divergence Indicator', options=['rsi', 'macd(fast_line)', 'macd(slow_line)'], tooltip='Select an Indicator for divergence calculation.', group='Divergences:')
 rsi_length          = input.int(14, title='RSI Length', minval=1, step=2, group='Divergences:')
 bar_div_p           = input.int(25, title='Bar Period', minval=1, step=1, tooltip='The number of bars in which divergences are detected.', group='Divergences:')
 src_div             = input.string('high/low', title='Bar Divergence Source', options=['high/low', 'close'], tooltip='The bar source for divergence calculation.', group='Divergences:')
 
 // bar signals inputs
-plot_l12_bar        = input.bool(true, title='Last 12 Bar (L12) ⠀', inline="l12", tooltip='Letter: L, L12 => highest low of last 12 bars -> long. Lowest high of last 12 bars -> short. Indicates a new trend.', group='Bar signals:')
-L12_input           = input.int(12, minval=1, title='Bar count', inline="l12", group='Bar signals:', tooltip='"Letter: L, L12 => highest low of last 12 bars -> long. Lowest high of last 12 bars -> short. Indicates a new trend. Last 12 Bar" Bar count.')
+plot_l12_bar        = input.bool(true, title='Last 12 Bar (L12) ⠀', inline="l12", tooltip='', group='Bar signals:')
+L12_input           = input.int(12, minval=1, title='Bar count', inline="l12", group='Bar signals:', tooltip='"Letter: L, L12 => highest low of last 12 bars -> long. Lowest high of last 12 bars -> short. Indicates a new trend. \nLast 12 Bar" Bar count.')
 plot_nr_bar         = input.bool(true, title='Narrow Range Bar (NR7)', tooltip='Letter: n, NR7 = narrowest range of a bar of the last seven bars. Indicates market tension.', group='Bar signals:')
 plot_i_bar          = input.bool(true, title='Inside Bar', tooltip='Letter: i. An inside bar is a triangle formation on smaller time frame.', group='Bar signals:')
 plot_o_bar          = input.bool(true, title='Outside Bar', tooltip='Letter: o. An outside bar is an opening funnel formation on smaller time frames. gray-> normal outside bar, valid at least for the next bar: red-> short, green-> long', group='Bar signals:')
@@ -129,9 +131,9 @@ plot_s_bar          = input.bool(true, title='Sandwich Bar', tooltip='Letter: s.
 plot_f_bar          = input.bool(true, title='Fakey', tooltip='Letter: F. An inside bar false breakout.', group='Bar signals:')
 
 // segments inputs
-plot_segments       = input.bool(false, title='Segments ⠀', inline="seg", tooltip='Gray lines that follow the highest highs and lowest lows. This is a subtle way to detect a new trend. The higher the timeframe the more reliable the signal.', group='Segment signal:')
+plot_segments       = input.bool(false, title='Segments ⠀', inline="seg", tooltip='', group='Segment signal:')
 sb                  = input.int(10 ,title='Max Bars', inline="seg", minval=0, step=1, tooltip='Gray lines that follow the highest highs and lowest lows. This is a subtle way to detect a new trend. The higher the timeframe the more reliable the signal. 
-                      Max bars between two segment highs or segment lows.', group='Segment signal:')
+                      \nMax bars between two segment highs or segment lows.', group='Segment signal:')
 
 // Background Color Filter INPUT
 selected_bg_signal  = input.string("None", title="Background Color Filter", options=
@@ -157,7 +159,7 @@ plot_pivots_12m     = input.bool(true, title='12 Month Classic Pivot Points', gr
 // TRADING SESSIONS INPUTS ---
 grp_sess      = "Trading Sessions"
 sess_timezone = input.string("Europe/Berlin", title="Timezone", tooltip="Standard: Europe/Berlin. Change to 'UTC' or 'America/New_York' if needed.", group=grp_sess)
-sess_style    = input.string("Vertical Line", title="Session Style", options=["Vertical Line", "Box", "Background"], group=grp_sess, tooltip="Choose between a high/low box, a vertical background area or a vertical line. 
+sess_style    = input.string("Vertical Line", title="Session Style", options=["Vertical Line", "Box", "Background"], group=grp_sess, tooltip="Choose between a high/low box, a vertical background area or a vertical line.
                  1st blue line = NY a.m. session, 2nd blue line  = NY p.m. session")
 
 // London - ORANGE
@@ -1709,30 +1711,64 @@ if use_rt_alert and barstate.isrealtime and (rt_up_frac or rt_dn_frac)
 
 //--------------------------------------------------------- Additional Context (No Plot-Limit Usage) ---------------------------------------------------------
 
-/// --- 1. Previous Candle High/Low (Lines & Labels) ---
-// Fetch High/Low of the previous completed candle + its exact time window (start/end)
-[pc_h_val, pc_l_val, pc_start_time, pc_end_time] = request.security(syminfo.tickerid, pch_pcl_tf, [high[1], low[1], time[1], time], lookahead=barmerge.lookahead_on)
-
-// --- Session Tracking for 1st Candle Feature ---
-var float sess_1st_h = na
-var float sess_1st_l = na
-var int   sess_1st_t = na
-
-// Helper to check session start
+// Helper to check session start (Used by both functionalities)
 f_is_sess_start(_show, _sess) =>
     _show and not na(time(timeframe.period, _sess, sess_timezone)) and na(time(timeframe.period, _sess, sess_timezone)[1])
 
-// Check all sessions
-bool s_lon_start = f_is_sess_start(london_show, london_sess)
-bool s_ny_start  = f_is_sess_start(ny_show, ny_sess)
-bool s_tok_start = f_is_sess_start(tokyo_show, tokyo_sess)
-bool s_syd_start = f_is_sess_start(sydney_show, sydney_sess)
-bool s_nypm_start = f_is_sess_start(ny_show, "1930-2359")
+/// --- 1. 1st Session Candle (Separate Logic) ---
+// Function to run on the target timeframe
+f_calc_sess_1st() =>
+    // Check all sessions using global inputs
+    bool s_lon_s = f_is_sess_start(london_show, london_sess)
+    bool s_ny_s  = f_is_sess_start(ny_show, ny_sess)
+    bool s_tok_s = f_is_sess_start(tokyo_show, tokyo_sess)
+    bool s_syd_s = f_is_sess_start(sydney_show, sydney_sess)
+    bool s_nypm_s = f_is_sess_start(ny_show, "1930-2359")
 
-if s_lon_start or s_ny_start or s_tok_start or s_syd_start or s_nypm_start
-    sess_1st_h := high
-    sess_1st_l := low
-    sess_1st_t := time
+    // Store latest session start values
+    var float saved_h = na
+    var float saved_l = na
+    var int saved_t = na
+
+    if s_lon_s or s_ny_s or s_tok_s or s_syd_s or s_nypm_s
+        saved_h := high
+        saved_l := low
+        saved_t := time
+
+    [saved_h, saved_l, saved_t]
+
+// Retrieve from selected timeframe
+[s1_h_val, s1_l_val, s1_t_val] = request.security(syminfo.tickerid, sess_1st_tf, f_calc_sess_1st(), lookahead=barmerge.lookahead_on)
+
+// Variables for 1st Session Lines/Labels
+var line l_s1_h = na
+var line l_s1_l = na
+var label lb_s1_h = na
+var label lb_s1_l = na
+
+if use_sess_1st and barstate.islast
+    line.delete(l_s1_h)
+    line.delete(l_s1_l)
+    label.delete(lb_s1_h)
+    label.delete(lb_s1_l)
+
+    // Check visibility: Chart TF <= Selected 1st Session TF
+    // Note: empty string "" for tf means current chart, treated as 0 or handling it specifically?
+    // timeframe.in_seconds("") returns current chart seconds.
+    // If sess_1st_tf is "" it works correctly.
+    if timeframe.in_seconds(timeframe.period) <= timeframe.in_seconds(sess_1st_tf)
+        if not na(s1_h_val) and not na(s1_t_val)
+            l_s1_h := line.new(x1=s1_t_val, y1=s1_h_val, x2=time, y2=s1_h_val, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.gray, 50), style=line.style_solid, width=1)
+            lb_s1_h := label.new(x=bar_index + 4, y=s1_h_val, text="1st High", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+
+        if not na(s1_l_val) and not na(s1_t_val)
+            l_s1_l := line.new(x1=s1_t_val, y1=s1_l_val, x2=time, y2=s1_l_val, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.gray, 50), style=line.style_solid, width=1)
+            lb_s1_l := label.new(x=bar_index + 4, y=s1_l_val, text="1st Low", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+
+
+/// --- 2. Previous Candle High/Low (Lines & Labels) ---
+// Fetch High/Low of the previous completed candle + its exact time window (start/end)
+[pc_h_val, pc_l_val, pc_start_time, pc_end_time] = request.security(syminfo.tickerid, pch_pcl_tf, [high[1], low[1], time[1], time], lookahead=barmerge.lookahead_on)
 
 // Variables for Lines and Labels
 var line  l_pch  = na
@@ -1762,49 +1798,32 @@ if show_pch_pcl and barstate.islast
         float pch_y     = na
         float pcl_y     = na
 
-        if use_sess_1st
-            // --- 1st Session Candle Mode ---
-            // Use stored session values
-            pch_y := sess_1st_h
-            pcl_y := sess_1st_l
+        // --- Standard Previous Candle Mode ---
+        for i = 0 to lookback_limit
+            if not na(pc_start_time) and not na(pc_end_time) and time[i] >= pc_start_time and time[i] < pc_end_time
+                if na(max_h) or high[i] > max_h
+                    max_h := high[i]
+                    pch_index := bar_index - i
+                if na(min_l) or low[i] < min_l
+                    min_l := low[i]
+                    pcl_index := bar_index - i
 
-            // Find the index of the start time (sess_1st_t)
-            if not na(sess_1st_t)
-                for i = 0 to lookback_limit
-                    if time[i] == sess_1st_t
-                        pch_index := bar_index - i
-                        pcl_index := bar_index - i
-                        break
-        else
-            // --- Standard Previous Candle Mode ---
-            for i = 0 to lookback_limit
-                if not na(pc_start_time) and not na(pc_end_time) and time[i] >= pc_start_time and time[i] < pc_end_time
-                    if na(max_h) or high[i] > max_h
-                        max_h := high[i]
-                        pch_index := bar_index - i
-                    if na(min_l) or low[i] < min_l
-                        min_l := low[i]
-                        pcl_index := bar_index - i
-
-            pch_y := not na(pc_h_val) ? pc_h_val : max_h
-            pcl_y := not na(pc_l_val) ? pc_l_val : min_l
+        pch_y := not na(pc_h_val) ? pc_h_val : max_h
+        pcl_y := not na(pc_l_val) ? pc_l_val : min_l
 
         // Stable fallbacks
         pch_index := na(pch_index) ? bar_index : pch_index
         pcl_index := na(pcl_index) ? bar_index : pcl_index
 
         // Draw PCH Line (Start at found index, Extend Right)
-        string txt_h = use_sess_1st ? "1st High" : "Prev High"
-        string txt_l = use_sess_1st ? "1st Low" : "Prev Low"
-
         if not na(pch_y)
             l_pch := line.new(x1=pch_index, y1=pch_y, x2=bar_index, y2=pch_y, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
-            lb_pch := label.new(x=bar_index + 4, y=pch_y, text=txt_h, xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+            lb_pch := label.new(x=bar_index + 10, y=pch_y, text="Prev High", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
 
         // Draw PCL Line (Start at found index, Extend Right)
         if not na(pcl_y)
             l_pcl := line.new(x1=pcl_index, y1=pcl_y, x2=bar_index, y2=pcl_y, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
-            lb_pcl := label.new(x=bar_index + 4, y=pcl_y, text=txt_l, xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+            lb_pcl := label.new(x=bar_index + 10, y=pcl_y, text="Prev Low", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
 
 
 // --- 2. Last Fractal S/R (Lines & Labels) ---
@@ -1984,5 +2003,3 @@ if barstate.islast
                         color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
                         line l = line.new(x1=xLoc, y1=y1, x2=xLoc, y2=y2, xloc=xloc.bar_index, color=col, width=vp_width)
                         array.push(vp_lines, l)
-
-
