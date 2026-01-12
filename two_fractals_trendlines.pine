@@ -23,7 +23,8 @@ vp_enable   = input.bool(false, "Volume Profile ⠀⠀", inline="line4")
 // Smart Contrast
 vp_smart    = input.bool(false, "Contrast Factor", inline="line4", tooltip="")
 vp_clip     = input.float(2.5, "", minval=1.0, step=0.1, inline="line4", tooltip="Visualizes trading volume distribution by price level over the visible chart range. Higher color intensity highlights High Volume Nodes (HVN), representing areas of significant market interest. 
-              Includes 'Smart Contrast' to automatically adjust saturation, ensuring key volume clusters remain visible even when extreme peaks are present.")
+              Includes 'Smart Contrast' to automatically adjust saturation, ensuring key volume clusters remain visible even when extreme peaks are present.
+              \n⚠ Heavy Calculation: O(Scan Depth * Rows). Use carefully.")
 
 
 // Basic Visuals
@@ -339,6 +340,7 @@ if ps_mode != "None"
                         box.set_top(lvl.id_box, math.max(cur_top, s_ph_val))
                         box.set_bottom(lvl.id_box, math.min(cur_bot, s_ph_val))
 
+                    array.set(sr_levels, i, lvl)
                     merged := true
                     break
 
@@ -370,6 +372,7 @@ if ps_mode != "None"
                         box.set_top(lvl.id_box, math.max(cur_top, s_pl_val))
                         box.set_bottom(lvl.id_box, math.min(cur_bot, s_pl_val))
 
+                    array.set(sr_levels, i, lvl)
                     merged := true
                     break
 
@@ -533,37 +536,97 @@ if not na(pl_val)
     y0_dn := pl_val
     x0_dn := bar_index - n_tl
 
-// --- Helper Function: Anchored Linear Regression Slope (Closed Candles) ---
-// Instead of average price, we calculate the 'Best Fit Slope' starting from the pivot.
-// Formula: Slope = Sum(dx * dy) / Sum(dx * dx)
-f_calc_anchored_slope(pivot_idx, pivot_val, _src) =>
-    float sum_xy = 0.0
-    float sum_x2 = 0.0
-    
-    if not na(pivot_idx) and not na(pivot_val)
-        int start_idx = pivot_idx + 1
-        int end_idx   = bar_index - 1
-        
-        if end_idx >= start_idx
-            // Loop from last closed bar (offset 1) back to start
-            int dist_to_start = bar_index - start_idx
-            for i = 1 to dist_to_start
-                // Calculate relative X and Y from the Pivot Point
-                // dx = distance from pivot to current bar i
-                // dy = difference in price from pivot to current bar i
-                int bar_idx_i = bar_index - i
-                int dx = bar_idx_i - pivot_idx
-                float dy = _src[i] - pivot_val
-                
-                sum_xy := sum_xy + (dx * dy)
-                sum_x2 := sum_x2 + (float(dx) * float(dx))
-                
-    // Return slope m
-    sum_x2 != 0 ? sum_xy / sum_x2 : na
+// --- Optimized Anchored Regression (O(1) Running Sums) ---
 
-// Calculate Best Fit Slope based on Pivot 0
-slope_up = use_special_trend ? f_calc_anchored_slope(x0_up, y0_up, high) : na
-slope_dn = use_special_trend ? f_calc_anchored_slope(x0_dn, y0_dn, low)  : na
+// Globale Running Sums for Up-Trend
+var float sum_xy_up_run = 0.0
+var float sum_x2_up_run = 0.0
+
+// Globale Running Sums for Down-Trend
+var float sum_xy_dn_run = 0.0
+var float sum_x2_dn_run = 0.0
+
+// Variables to track changes in pivots for reset logic
+var int last_x0_up = na
+var int last_x0_dn = na
+
+// LOGIC for Up-Trend Regression
+if use_special_trend
+    // Check if new pivot detected (x0_up changed)
+    if x0_up != last_x0_up
+        // Reset sums
+        sum_xy_up_run := 0.0
+        sum_x2_up_run := 0.0
+        
+        // Backfill loop (Only runs once per new pivot, for n_tl bars)
+        // From pivot+1 to current bar (approx 2 bars in special mode)
+        // We only include CLOSED bars (up to bar_index - 1)
+        if not na(x0_up) and not na(y0_up)
+            int start_idx = x0_up + 1
+            int end_idx = bar_index - 1
+            if end_idx >= start_idx
+                // Just loop forward conceptually using offset j from current bar
+                int j_max = bar_index - start_idx
+                for j = 1 to j_max
+                    // Calculate terms
+                    // Real Index: bar_index - j
+                    int dx = (bar_index - j) - x0_up
+                    float dy = high[j] - y0_up
+
+                    sum_xy_up_run += (dx * dy)
+                    sum_x2_up_run += (float(dx) * float(dx))
+
+        last_x0_up := x0_up
+
+    else
+        // Incremental Update (Every bar)
+        // Add the term for the LAST COMPLETED BAR (bar_index - 1)
+        // Wait, 'bar_index' increases by 1 each step.
+        // We need to ensure we don't double count.
+        // We need to add the term for the bar that JUST CLOSED.
+        // At bar_index N, bar N-1 is newly closed.
+        if not na(x0_up) and not na(y0_up)
+            int dx = (bar_index - 1) - x0_up
+            // dx must be > 0
+            if dx > 0
+                float dy = high[1] - y0_up
+                sum_xy_up_run += (dx * dy)
+                sum_x2_up_run += (float(dx) * float(dx))
+
+// Calculate Slope Up
+slope_up = (use_special_trend and sum_x2_up_run != 0) ? sum_xy_up_run / sum_x2_up_run : na
+
+
+// LOGIC for Down-Trend Regression
+if use_special_trend
+    if x0_dn != last_x0_dn
+        // Reset
+        sum_xy_dn_run := 0.0
+        sum_x2_dn_run := 0.0
+        last_x0_dn := x0_dn
+
+        // Backfill
+        if not na(x0_dn) and not na(y0_dn)
+            int start_idx = x0_dn + 1
+            int end_idx = bar_index - 1
+            if end_idx >= start_idx
+                int j_max = bar_index - start_idx
+                for j = 1 to j_max
+                    int dx = (bar_index - j) - x0_dn
+                    float dy = low[j] - y0_dn
+                    sum_xy_dn_run += (dx * dy)
+                    sum_x2_dn_run += (float(dx) * float(dx))
+    else
+        // Incremental
+        if not na(x0_dn) and not na(y0_dn)
+            int dx = (bar_index - 1) - x0_dn
+            if dx > 0
+                float dy = low[1] - y0_dn
+                sum_xy_dn_run += (dx * dy)
+                sum_x2_dn_run += (float(dx) * float(dx))
+
+// Calculate Slope Down
+slope_dn = (use_special_trend and sum_x2_dn_run != 0) ? sum_xy_dn_run / sum_x2_dn_run : na
 
 // --- Draw Trendlines ---
 var line upper_line = na
@@ -1185,7 +1248,9 @@ f_calc_bg_signal() =>
     
     bg_color_res
 // --- Execute MTF Request ---
-final_bg_color = request.security(syminfo.tickerid, bg_tf_select, f_calc_bg_signal())
+// Fix: Handle empty string input for current timeframe
+bg_tf_final = (bg_tf_select == "" ? timeframe.period : bg_tf_select)
+final_bg_color = request.security(syminfo.tickerid, bg_tf_final, f_calc_bg_signal())
 
 // Apply the calculated background color
 bgcolor(final_bg_color, title="Selected Background Signal")
@@ -1606,7 +1671,8 @@ fill(bdn_1, bdn_3, color=color.new(color.green, 80))
 //----------------- Trading Sessions Logic -----------------
 
 // Function to calculate state and draw Session Boxes or Lines
-f_draw_session(_show, _sess, _tz, _col, _style) =>
+// UPDATED: Now accepts state variables as arguments to avoid scope issues
+f_draw_session(_show, _sess, _tz, _col, _style, _box, _high, _low) =>
     is_weekend = dayofweek == dayofweek.saturday or dayofweek == dayofweek.sunday
     
     // Calculate if session is active
@@ -1620,32 +1686,49 @@ f_draw_session(_show, _sess, _tz, _col, _style) =>
         line.new(x1=bar_index, y1=low, x2=bar_index, y2=high, extend=extend.both, color=color.new(_col, 70), style=line.style_solid, width=1)
 
     // Box Logic (Only executed if style is Box and session is active)
-    var box sess_box = na
-    var float sess_high = na
-    var float sess_low = na
+    // We use the passed-in arguments for state
     
+    // Create local mutable variables from arguments
+    box b_cur = _box
+    float h_cur = _high
+    float l_cur = _low
+
     if _style == "Box" and is_sess
         if is_start // Session Start
-            sess_high := high
-            sess_low := low
+            h_cur := high
+            l_cur := low
             // Create box
-            sess_box := box.new(left=bar_index, top=sess_high, right=bar_index, bottom=sess_low, border_color=_col, bgcolor=_col)
+            b_cur := box.new(left=bar_index, top=h_cur, right=bar_index, bottom=l_cur, border_color=_col, bgcolor=_col)
         else // Session Ongoing
-            sess_high := math.max(sess_high, high)
-            sess_low := math.min(sess_low, low)
-            box.set_top(sess_box, sess_high)
-            box.set_bottom(sess_box, sess_low)
-            box.set_right(sess_box, bar_index + 1)
+            h_cur := math.max(h_cur, high)
+            l_cur := math.min(l_cur, low)
+            box.set_top(b_cur, h_cur)
+            box.set_bottom(b_cur, l_cur)
+            box.set_right(b_cur, bar_index + 1)
     
-    // Return the status
-    is_sess
+    // Return the status and the updated state
+    [is_sess, b_cur, h_cur, l_cur]
 
 // Check TF Constraint (Visible only if TF <= 1 Hour)
 show_sess_on_tf = timeframe.isintraday and timeframe.multiplier <= 60
 
-// Execute Function and capture return value
-lon_active = f_draw_session(london_show and show_sess_on_tf, london_sess, sess_timezone, london_col, sess_style)
-ny_active  = f_draw_session(ny_show and show_sess_on_tf, ny_sess, sess_timezone, ny_col, sess_style)
+// Define Global State Variables for each Session
+var box b_lon = na, var float h_lon = na, var float l_lon = na
+var box b_ny = na, var float h_ny = na, var float l_ny = na
+var box b_tok = na, var float h_tok = na, var float l_tok = na
+var box b_syd = na, var float h_syd = na, var float l_syd = na
+
+// Execute Function and capture return value (Unpack Tuple)
+// We use temporary variables to avoid tuple-reassignment syntax errors, then update globals
+[lon_active, t_b_lon, t_h_lon, t_l_lon] = f_draw_session(london_show and show_sess_on_tf, london_sess, sess_timezone, london_col, sess_style, b_lon, h_lon, l_lon)
+b_lon := t_b_lon
+h_lon := t_h_lon
+l_lon := t_l_lon
+
+[ny_active, t_b_ny, t_h_ny, t_l_ny] = f_draw_session(ny_show and show_sess_on_tf, ny_sess, sess_timezone, ny_col, sess_style, b_ny, h_ny, l_ny)
+b_ny := t_b_ny
+h_ny := t_h_ny
+l_ny := t_l_ny
 
 // --- ZUSATZ: Zweite Linie um 19:30 Uhr für New York (nur bei Vertical Line) ---
 if ny_show and show_sess_on_tf and sess_style == "Vertical Line"
@@ -1660,8 +1743,15 @@ if ny_show and show_sess_on_tf and sess_style == "Vertical Line"
         line.new(x1=bar_index, y1=low, x2=bar_index, y2=high, extend=extend.both, color=color.new(ny_col, 70), style=line.style_dashed, width=1)
 // -------------------------------------------------------------------------------
 
-tok_active = f_draw_session(tokyo_show and show_sess_on_tf, tokyo_sess, sess_timezone, tokyo_col, sess_style)
-syd_active = f_draw_session(sydney_show and show_sess_on_tf, sydney_sess, sess_timezone, sydney_col, sess_style)
+[tok_active, t_b_tok, t_h_tok, t_l_tok] = f_draw_session(tokyo_show and show_sess_on_tf, tokyo_sess, sess_timezone, tokyo_col, sess_style, b_tok, h_tok, l_tok)
+b_tok := t_b_tok
+h_tok := t_h_tok
+l_tok := t_l_tok
+
+[syd_active, t_b_syd, t_h_syd, t_l_syd] = f_draw_session(sydney_show and show_sess_on_tf, sydney_sess, sess_timezone, sydney_col, sess_style, b_syd, h_syd, l_syd)
+b_syd := t_b_syd
+h_syd := t_h_syd
+l_syd := t_l_syd
 
 // Draw Backgrounds - COMBINED
 // Priority: NY > London > Tokyo > Sydney (in case of overlapping times)
