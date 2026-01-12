@@ -45,7 +45,7 @@ mtf_opacity       = input.int(15, "Opacity %", minval=0, maxval=100, group=grp_m
 
 // Additional Context Inputs 
 grp_add         = "Additional Context"
-use_sess_1st    = input.bool(true, "1st Session Candle ⠀⠀⠀⠀⠀", group=grp_add, inline="sess_1st", tooltip="")
+use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", group=grp_add, inline="sess_1st", tooltip="")
 sess_1st_tf     = input.timeframe("5", "", group=grp_add, inline="sess_1st", tooltip="Lines remain at the high and low of the first candle of the running trading session. \nSelect the timeframe for the 1st Session Candle calculation.")
 show_pch_pcl    = input.bool(true, "Previous Candle High/Low", group=grp_add, inline="add_1", tooltip="")
 pch_pcl_tf      = input.timeframe("D", "", group=grp_add, inline="add_1", tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe. \nSelect the timeframe for the Previous Candle High/Low calculation.")
