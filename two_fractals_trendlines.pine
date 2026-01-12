@@ -73,6 +73,13 @@ fvg2_limit      = input.int(5, title="⠀⠀ Visible Boxes", minval=1, maxval=50
 col_fvg2_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg2, inline="f2_3")
 col_fvg2_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg2, inline="f2_3")
 
+// Supply & Demand Inputs
+grp_sd          = "Supply & Demand Zones"
+plot_sd         = input.bool(false, title="S&D Zones ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_sd, inline="sd_1", tooltip="Identifies Supply (Bearish) and Demand (Bullish) zones based on the candle preceding a Fair Value Gap (FVG). \nZones are drawn until mitigated.")
+sd_tf_sel       = input.timeframe("", title="Timeframe", group=grp_sd, inline="sd_1")
+sd_mitigation   = input.string("Wick (Touch)", title="Mitigation", options=["Wick (Touch)", "Close (Inside)", "Break (Close Beyond)"], group=grp_sd, inline="sd_2", tooltip="Condition to stop extending the zone. \nWick (Touch): High/Low touches the zone. \nClose (Inside): Close ends inside the zone. \nBreak (Close Beyond): Close breaks through the zone.")
+sd_limit        = input.int(5, title="⠀⠀⠀Visible Boxes", minval=1, maxval=100, group=grp_sd, inline="sd_2")
+
 // Smart MTF S&R
 grp_psr             = "Smart S&R (Support & Resistance)"
 ps_mode             = input.string("None", title="Smart S&R", options=["None", "Manuell", "Auto"], group=grp_psr, inline="en_tf", tooltip="")
@@ -101,6 +108,14 @@ type SRLevel
     line  id_line
     box   id_box      // Used if merged into a zone
     bool  is_zone
+
+type ActiveSD
+    box   id_box
+    float top
+    float bottom
+    bool  is_bull
+    bool  mitigated
+    int   start_time
 
 // Bollinger Bands
 grp_bb              = 'Bollinger Bands'
@@ -1824,6 +1839,219 @@ if plot_fvg2
         array.push(boxes_fvg2, b_new)
         if array.size(boxes_fvg2) > fvg2_limit
             box.delete(array.shift(boxes_fvg2))
+
+
+//--------------------------------------------------------- Supply & Demand (S&D) ---------------------------------------------------------
+
+// --- Function to detect S&D Zones (MTF compatible) ---
+f_scan_sd() =>
+    // Index Logic:
+    // FVG confirmed at 0. Pattern: [2] [1] [0].
+    // S&D Candle (Source) = Candle before FVG Start = [3].
+
+    // Check FVG (Standard Def)
+    // Bull: Low[0] > High[2]
+    bool is_fvg_bull = low > high[2]
+    // Bear: High[0] < Low[2]
+    bool is_fvg_bear = high < low[2]
+
+    // --- Pending State Management ---
+    // We only confirm a zone if the S&D Candle High (Bull) or Low (Bear) is broken.
+    // We must track the "Last Potential Zone" and wait for this break.
+
+    var bool  p_bull_active = false
+    var float p_bull_top = na
+    var float p_bull_bot = na
+    var float p_bull_trig = na
+    var int   p_bull_time = na
+
+    var bool  p_bear_active = false
+    var float p_bear_top = na
+    var float p_bear_bot = na
+    var float p_bear_trig = na
+    var int   p_bear_time = na
+
+    // 1. Update Pending if New FVG Found
+    // "Last one valid" rule: Overwrite previous pending if new FVG appears.
+    if is_fvg_bull
+        p_bull_active := true
+        p_bull_top    := high[3]
+        // Adjustment: If Low[2] (Candle 1) or Low[1] (Candle 2) < Low[3], extend bottom
+        p_bull_bot    := math.min(low[3], low[2], low[1])
+        p_bull_trig   := high[3]
+        p_bull_time   := time[3]
+
+    if is_fvg_bear
+        p_bear_active := true
+        // Adjustment: If High[2] (Candle 1) or High[1] (Candle 2) > High[3], extend top
+        p_bear_top    := math.max(high[3], high[2], high[1])
+        p_bear_bot    := low[3]
+        p_bear_trig   := low[3]
+        p_bear_time   := time[3]
+
+    // 2. Fractal & Overlap Check State
+    var bool last_confirmed_is_bull = na
+    var bool fractal_since_last = false
+
+    // Track Last Zone Coordinates for Overlap Check
+    var float last_bull_top = na
+    var float last_bull_bot = na
+    var float last_bear_top = na
+    var float last_bear_bot = na
+
+    // Check 3-candle Fractal (Pivot 1,1)
+    // Pivot detected at bar_index means peak was at bar_index[1]
+    bool is_frac = not na(ta.pivothigh(1,1)) or not na(ta.pivotlow(1,1))
+    if is_frac
+        fractal_since_last := true
+
+    // 3. Check Confirmation (Break of S&D Candle)
+    // Bull: Needs High > Trigger
+    // Bear: Needs Low < Trigger
+
+    bool confirm_bull = false
+    if p_bull_active
+        // Check current bar OR historical bars if this is the FVG creation moment
+        // If is_fvg_bull is true, we are at index 0. We need to check if 0, 1, or 2 broke the trigger.
+        // If not at FVG creation, we just check current bar.
+
+        bool break_now = high > p_bull_trig
+        // If we just detected the FVG, we must check if the FVG structure itself broke the level
+        bool break_fvg = is_fvg_bull and (high[1] > p_bull_trig or high[2] > p_bull_trig)
+
+        if break_now or break_fvg
+            // Sequence Check: If same type, need fractal
+            bool allowed = true
+            if not na(last_confirmed_is_bull) and last_confirmed_is_bull
+                if not fractal_since_last
+                    allowed := false
+
+            // Overlap Check: New Bull Zone vs Last Bull Zone
+            if allowed and not na(last_bull_top)
+                // Overlap exists if max(bot1, bot2) < min(top1, top2)
+                float overlap_bot = math.max(p_bull_bot, last_bull_bot)
+                float overlap_top = math.min(p_bull_top, last_bull_top)
+                if overlap_bot < overlap_top
+                    allowed := false
+
+            if allowed
+                confirm_bull := true
+                p_bull_active := false // Consumed
+                last_confirmed_is_bull := true
+                fractal_since_last := false // Reset after confirmation
+                last_bull_top := p_bull_top
+                last_bull_bot := p_bull_bot
+
+    bool confirm_bear = false
+    if p_bear_active
+        bool break_now = low < p_bear_trig
+        bool break_fvg = is_fvg_bear and (low[1] < p_bear_trig or low[2] < p_bear_trig)
+
+        if break_now or break_fvg
+            // Sequence Check: If same type, need fractal
+            bool allowed = true
+            if not na(last_confirmed_is_bull) and not last_confirmed_is_bull
+                if not fractal_since_last
+                    allowed := false
+
+            // Overlap Check: New Bear Zone vs Last Bear Zone
+            if allowed and not na(last_bear_top)
+                float overlap_bot = math.max(p_bear_bot, last_bear_bot)
+                float overlap_top = math.min(p_bear_top, last_bear_top)
+                if overlap_bot < overlap_top
+                    allowed := false
+
+            if allowed
+                confirm_bear := true
+                p_bear_active := false // Consumed
+                last_confirmed_is_bull := false
+                fractal_since_last := false // Reset after confirmation
+                last_bear_top := p_bear_top
+                last_bear_bot := p_bear_bot
+
+    // Return Confirmed Values
+    [confirm_bull, p_bull_top, p_bull_bot, confirm_bear, p_bear_top, p_bear_bot, confirm_bull ? p_bull_time : p_bear_time]
+
+// --- State Variables ---
+var ActiveSD[] sd_zones = array.new<ActiveSD>()
+var int last_sd_time = 0
+
+// --- Execution ---
+// Fetch MTF Data
+[sd_new_bull, sd_bull_top, sd_bull_bot, sd_new_bear, sd_bear_top, sd_bear_bot, sd_t] = request.security(syminfo.tickerid, sd_tf_sel, f_scan_sd())
+
+if plot_sd
+    // 1. New Zones
+    if (sd_new_bull or sd_new_bear) and sd_t != last_sd_time
+        last_sd_time := sd_t
+
+        float z_top = na
+        float z_bot = na
+        color z_col = na
+        bool is_bull = false
+
+        if sd_new_bull
+            z_top := sd_bull_top
+            z_bot := sd_bull_bot
+            z_col := color.new(color.green, 60)
+            is_bull := true
+        else
+            z_top := sd_bear_top
+            z_bot := sd_bear_bot
+            z_col := color.new(color.red, 60)
+            is_bull := false
+
+        // Start Box
+        box b = box.new(left=sd_t, top=z_top, right=time, bottom=z_bot, xloc=xloc.bar_time, border_color=na, bgcolor=z_col)
+
+        // Push
+        array.push(sd_zones, ActiveSD.new(b, z_top, z_bot, is_bull, false, sd_t))
+
+    // 2. Manage Existing
+    if array.size(sd_zones) > 0
+        for i = 0 to array.size(sd_zones) - 1
+            ActiveSD sd = array.get(sd_zones, i)
+
+            if not sd.mitigated
+                bool mit = false
+
+                // Logic based on inputs
+                // Note: We check against current chart prices (high, low, close)
+
+                if sd.is_bull // Demand
+                    if sd_mitigation == "Wick (Touch)"
+                        if low <= sd.top
+                            mit := true
+                    else if sd_mitigation == "Close (Inside)"
+                        if close <= sd.top
+                            mit := true
+                    else // Break
+                        if close < sd.bottom
+                            mit := true
+
+                else // Supply
+                    if sd_mitigation == "Wick (Touch)"
+                        if high >= sd.bottom
+                            mit := true
+                    else if sd_mitigation == "Close (Inside)"
+                        if close >= sd.bottom
+                            mit := true
+                    else // Break
+                        if close > sd.top
+                            mit := true
+
+                if mit
+                    sd.mitigated := true
+                    // Draw up to and including the mitigating candle
+                    box.set_right(sd.id_box, time)
+                else
+                    // Extend
+                    box.set_right(sd.id_box, time)
+
+    // 3. Cleanup (Limit)
+    while array.size(sd_zones) > sd_limit
+        ActiveSD rem = array.shift(sd_zones)
+        box.delete(rem.id_box)
 
 
 //--------------------------------------------------------- Real-time Fractal Alert ---------------------------------------------------------
