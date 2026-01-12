@@ -75,22 +75,22 @@ col_fvg2_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀�
 
 // Smart MTF S&R
 grp_psr             = "Smart S&R (Support & Resistance)"
-ps_enable           = input.bool(false, title="Smart S&R ⠀⠀⠀⠀⠀⠀", group=grp_psr, inline="en_tf", tooltip="")
-ps_tf               = input.timeframe("240", title="Pivot TF", inline="en_tf", group=grp_psr, tooltip="Activates the 'Smart Market Structure' system:
+ps_mode             = input.string("None", title="Smart S&R", options=["None", "Manuell", "Auto"], group=grp_psr, inline="en_tf", tooltip="")
+ps_tf               = input.timeframe("D", title="⠀Pivot TF", inline="en_tf", group=grp_psr, tooltip="Activates the 'Smart Market Structure' system:
                       \n• Multi-Timeframe Analysis: Identifies significant Swing Highs/Lows from a higher timeframe (e.g., 4H levels on a 15m chart).
                       \n• Noise Filtering: Uses adjustable pivot strength to ignore minor price fluctuations.
                       \n• Smart Zones: Automatically merges levels that are close together into a single 'Zone' (Box) to reduce clutter.
                       \n• Dynamic State: Tracks confirmed breakouts and can automatically flip Support to Resistance (Role Reversal) or remove broken levels.
-                      \n• Clutter Control: Manages a fixed number of active levels, removing old or irrelevant ones automatically. \nSelect the Higher Timeframe to scan for significant Swing Highs/Lows.")
-ps_left             = input.int(2, title="Pivot Strength (Left)⠀⠀⠀⠀⠀⠀⠀⠀⠀", minval=1, group=grp_psr, inline="ps_str")
-ps_right            = input.int(2, title="Pivot Strength (Right)⠀⠀⠀⠀⠀⠀⠀⠀", minval=1, group=grp_psr, inline="ps_str", tooltip="Higher values filter out minor market noise. Standard=2 (Bill Williams Fractal).")
-ps_max              = input.int(10, title="Max Active Levels", minval=1, maxval=50, group=grp_psr, tooltip="Limits the number of visible lines to prevent chart clutter. FIFO (First In, First Out).")
-ps_break_act        = input.string("Role Reversal", title="On Break Action", options=["Keep", "Delete", "Role Reversal"], group=grp_psr, tooltip="How the script handles a level when price crosses it. \nKeep: Do nothing. \nDelete: Remove line. \nRole Reversal: Support becomes Resistance (Color change).")
-ps_merge_en         = input.bool(true, title="Merge Nearby Levels (Zones) ⠀", group=grp_psr, inline="ps_m")
-ps_merge_pct        = input.float(0.1, title="Merge Threshold %", minval=0.01, step=0.05, group=grp_psr, inline="ps_m", tooltip="If a new level appears within X% of an existing level, they are merged into a Zone.")
+                      \n• Clutter Control: Manages a fixed number of active levels, removing old or irrelevant ones automatically. \nSelect the Higher Timeframe to scan for significant Swing Highs/Lows. \nSmart S&R 'Auto' affects 'Pivot TF' only.")
+ps_left             = input.int(2, title="Pivot Strength (Left) ⠀⠀⠀⠀⠀⠀⠀⠀", minval=1, group=grp_psr, tooltip="Higher values filter out minor market noise. Left Standard=2 (Bill Williams Fractal).")
+ps_right            = input.int(2, title="Pivot Strength (Right) ⠀⠀⠀⠀⠀⠀⠀", minval=1, group=grp_psr, tooltip="Higher values filter out minor market noise. Right Standard=2 (Bill Williams Fractal).")
+ps_max              = input.int(10, title="Max Active Levels ⠀", minval=1, maxval=50, group=grp_psr, tooltip="Limits the number of visible lines to prevent chart clutter. FIFO (First In, First Out).")
+ps_break_act        = input.string("Role Reversal", title="On Break Action ", options=["Keep", "Delete", "Role Reversal"], group=grp_psr, tooltip="How the script handles a level when price crosses it. \nKeep: Do nothing. \nDelete: Remove line. \nRole Reversal: Support becomes Resistance (Color change).")
+ps_merge_en         = input.bool(true, title="Merge Nearby Levels (Zones) ", group=grp_psr, inline="ps_m")
+ps_merge_pct        = input.float(0.1, title="Threshold %", minval=0.01, step=0.05, group=grp_psr, inline="ps_m", tooltip="If a new level appears within X% of an existing level, they are merged into a Zone.")
 ps_col_res          = input.color(color.new(color.red, 30), title="Res Color", group=grp_psr, inline="ps_c")
 ps_col_sup          = input.color(color.new(color.green, 30), title="⠀Sup Color", group=grp_psr, inline="ps_c")
-ps_col_zone         = input.color(color.new(color.blue, 85), title="⠀Zone Fill", group=grp_psr, inline="ps_c")
+ps_col_zone         = input.color(color.new(color.blue, 85), title="⠀Zone Fill", group=grp_psr, inline="ps_c") 
 
 // UDT for S&R Management
 type SRLevel
@@ -166,7 +166,6 @@ sb                  = input.int(10 ,title='Max Bars', inline="seg", minval=0, st
 grp_bg              = 'Background Color Filters'
 selected_bg_signal  = input.string("None", title="Background Color Filter", options=
                      ["None", "Bill Williams Fractals BG", "Anticipated Fractal BG", "Last 12 Bar BG", "Parabolic SAR BG", "DMI ADX BG", "HMA Slope BG", "MACD Slow Slope BG", "MACD Slope/Fractal Break BG (OR)", "Trend Line/Fractal Break BG (OR)", "Fractals Trend Lines", "Segments BG", 
-                     "Segments/Fractals BG (OR)", "Segments/Trend Line BG (OR)", "Segments/Fractals/Trend Line BG (OR)",
                      "Segments/Fractals BG (AND)", "Segments/Trend Line BG (AND)", "Segments/Fractals/Trend Line BG (AND)", "Segments/MACD Slope BG (AND)", "MACD Slope/Fractals Break BG (AND)", "MA1/MA2 Cross BG", "FVG Open", "FVG Close"],
                      group=grp_bg, tooltip="Signals that are alternatively displayed as a background color as a quick verification and a kind of 'backtest'.")
 bg_tf_select        = input.timeframe("", title="Background Filter Timeframe", group=grp_bg, tooltip="Select the timeframe for the background signals calculations. Empty = Current Chart Timeframe.")
@@ -266,8 +265,34 @@ f_get_mtf_pivots(_src_h, _src_l, _l, _r) =>
 
     [_ph_val, _ph_time, _pl_val, _pl_time]
 
+// Helper to calculate Auto Timeframe
+f_calc_auto_tf() =>
+    if timeframe.isseconds
+        "60" // Fallback
+    else if timeframe.isintraday
+        if timeframe.multiplier <= 15
+            "240"
+        else if timeframe.multiplier <= 240
+            "D"
+        else
+            "W"
+    else if timeframe.isdaily
+        "W"
+    else if timeframe.isweekly
+        "3M"
+    else if timeframe.ismonthly
+        if timeframe.multiplier <= 3
+            "12M"
+        else
+            "12M"
+    else
+        "12M"
+
+// Determine Effective TF
+ps_tf_final = ps_mode == "Auto" ? f_calc_auto_tf() : ps_tf
+
 // Security call to get the data from the selected timeframe
-[s_ph_val, s_ph_time, s_pl_val, s_pl_time] = request.security(syminfo.tickerid, ps_tf, f_get_mtf_pivots(high, low, ps_left, ps_right))
+[s_ph_val, s_ph_time, s_pl_val, s_pl_time] = request.security(syminfo.tickerid, ps_tf_final, f_get_mtf_pivots(high, low, ps_left, ps_right))
 
 // --- 2. State Management (Arrays) ---
 var sr_levels = array.new<SRLevel>()
@@ -279,7 +304,7 @@ f_is_near(_p1, _p2, _pct) =>
     math.abs(_p1 - _p2) <= (_p1 * (_pct / 100))
 
 // Main Logic Loop (Runs on every bar, but updates state only on new pivots or close)
-if ps_enable
+if ps_mode != "None"
     // A. Ingest New High Pivot
     if not na(s_ph_val) and s_ph_time != last_ph_t
         last_ph_t := s_ph_time
@@ -1093,9 +1118,6 @@ f_calc_bg_signal() =>
                              (selected_bg_signal == "Trend Line/Fractal Break BG (OR)" and fr_tl_buy_c) or 
                              (selected_bg_signal == "Fractals Trend Lines" and buy_up_line_c) or
                              (selected_bg_signal == "Segments BG" and segments_buy_c) or
-                             (selected_bg_signal == "Segments/Fractals BG (OR)" and segments_fractals_buy_c) or 
-                             (selected_bg_signal == "Segments/Trend Line BG (OR)" and segments_fr_trend_buy_c) or 
-                             (selected_bg_signal == "Segments/Fractals/Trend Line BG (OR)" and segments_fractals_fr_trend_buy_c) or 
                              (selected_bg_signal == "Segments/Fractals BG (AND)" and seg_buy_occurred_c and frac_buy_occurred_c) or
                              (selected_bg_signal == "Segments/Trend Line BG (AND)" and seg_buy_occurred_c and tl_buy_occurred_c) or
                              (selected_bg_signal == "Segments/Fractals/Trend Line BG (AND)" and seg_buy_occurred_c and frac_buy_occurred_c and tl_buy_occurred_c) or
@@ -1112,9 +1134,6 @@ f_calc_bg_signal() =>
                               (selected_bg_signal == "Trend Line/Fractal Break BG (OR)" and fr_tl_sell_c) or 
                               (selected_bg_signal == "Fractals Trend Lines" and sell_dn_line_c) or
                               (selected_bg_signal == "Segments BG" and segments_sell_c) or
-                              (selected_bg_signal == "Segments/Fractals BG (OR)" and segments_fractals_sell_c) or 
-                              (selected_bg_signal == "Segments/Trend Line BG (OR)" and segments_fr_trend_sell_c) or 
-                              (selected_bg_signal == "Segments/Fractals/Trend Line BG (OR)" and segments_fractals_fr_trend_sell_c) or 
                               (selected_bg_signal == "Segments/Fractals BG (AND)" and seg_sell_occurred_c and frac_sell_occurred_c) or
                               (selected_bg_signal == "Segments/Trend Line BG (AND)" and seg_sell_occurred_c and tl_sell_occurred_c) or
                               (selected_bg_signal == "Segments/Fractals/Trend Line BG (AND)" and seg_sell_occurred_c and frac_sell_occurred_c and tl_sell_occurred_c) or
@@ -1630,7 +1649,7 @@ if ny_show and show_sess_on_tf and sess_style == "Vertical Line"
     is_1930_start = is_1930_sess and not is_1930_sess[1]
 
     if is_1930_start
-        line.new(x1=bar_index, y1=low, x2=bar_index, y2=high, extend=extend.both, color=color.new(ny_col, 70), style=line.style_solid, width=1)
+        line.new(x1=bar_index, y1=low, x2=bar_index, y2=high, extend=extend.both, color=color.new(ny_col, 70), style=line.style_dashed, width=1)
 // -------------------------------------------------------------------------------
 
 tok_active = f_draw_session(tokyo_show and show_sess_on_tf, tokyo_sess, sess_timezone, tokyo_col, sess_style)
