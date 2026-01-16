@@ -26,39 +26,14 @@ vp_clip     = input.float(2.5, "", minval=1.0, step=0.1, inline="line4", tooltip
               Includes 'Smart Contrast' to automatically adjust saturation, ensuring key volume clusters remain visible even when extreme peaks are present.
               \n⚠ Heavy Calculation: O(Scan Depth * Rows). Use carefully.")
 
-// Performance Pass v3: VP Inputs
-vp_quality  = input.string("Medium", "Quality", options=["Low", "Medium", "High", "Custom"], inline="line5", tooltip="Low: 80 Rows / 800 Scan \nMedium: 120 Rows / 1500 Scan \nHigh: 200 Rows / 2500 Scan \nCustom: Use manual inputs.")
-vp_maxLines = input.int(120, "Max Draw Lines", minval=30, maxval=500, inline="line5", tooltip="Limits the number of drawn lines to maintain UI responsiveness.")
+// Performance Pass v3: VP Inputs (Simplified)
+// Fixed, stable parameters for visible range scanning
+int vp_rows     = 120
+int vp_smooth   = 3
 
 // Basic Visuals
-vp_width    = 12 //input.int(12, "Width (px)", minval=1, group=grp_vp)
-vp_offset   = 15 //input.int(15, "Offset", group=grp_vp, tooltip="Horizontal offset in bars from the last candle.")
-
-// Precision & Smoothing
-vp_rows_inp = 300 //input.int(300, "Rows", minval=50, maxval=500, group=grp_vp, tooltip="Resolution of the profile. Higher = smoother gradient.")
-vp_smooth_inp = 3 //input.int(3, "Smooth", minval=1, maxval=10, group=grp_vp, tooltip="Vertical smoothing to blur edges.")
-
-// Data Scope (Performance)
-vp_maxScan_inp = 4000 //input.int(4000, "Scan Depth", minval=500, maxval=9000, group=grp_vp, tooltip="Max number of past bars to calculate. Lower this if you encounter performance issues.")
-
-// Map Effective Parameters
-int vp_rows     = switch vp_quality
-    "Low" => 80
-    "Medium" => 120
-    "High" => 200
-    => vp_rows_inp
-
-int vp_smooth   = switch vp_quality
-    "Low" => 2
-    "Medium" => 3
-    "High" => 3
-    => vp_smooth_inp
-
-int vp_maxScan  = switch vp_quality
-    "Low" => 800
-    "Medium" => 1500
-    "High" => 2500
-    => vp_maxScan_inp
+vp_width    = 12
+vp_offset   = 15
 
 // MTF CANDLE OVERLAY INPUTS
 grp_mtf_candle    = "MTF Candle Overlay"
@@ -199,7 +174,7 @@ selected_bg_signal  = input.string("None", title="Background Color Filter", opti
                      ["None", "Bill Williams Fractals", "Anticipated Fractal", "Last 12 Bar", "Parabolic SAR", "DMI ADX", "HMA Slope", "MACD Slow Slope", "MACD Slope/Fractal Break (OR)", "Trend Line/Fractal Break (OR)", "Fractals Trend Lines", "Segments",
                      "Segments/Fractals (AND)", "Segments/Trend Line (AND)", "Segments/Fractals/Trend Line (AND)", "Segments/MACD Slope (AND)", "MACD Slope/Fractals Break (AND)", "MA1/MA2 Cross", "FVG Open", "FVG Close", "FVG/Fractal (OR)", "FVG/Fractal (AND)"],
                      group=grp_bg, tooltip="Signals that are alternatively displayed as a background color as a quick verification and a kind of 'backtest'.")
-bg_trend_max_bars   = input.int(300, "BG Trend Max Bars", minval=50, maxval=1500, group=grp_bg)
+// BG Trend Max Bars is now Auto-Calculated (TF-dependent)
 bg_tf_select        = input.timeframe("", title="Background Filter TF", group=grp_bg, tooltip="Select the timeframe for the background signals calculations. Empty = Current Chart Timeframe.")
 f_sig_enable        = input.bool(false, "Signal Arrow Only", group=grp_bg, tooltip="BG signal arrow" )
 di_len              = input.int(7, title='ADX DI Length', minval=1, group=grp_bg, tooltip="")
@@ -991,9 +966,33 @@ if plot_segments and barstate.isconfirmed
 
 //------------------------------------------------------------------------ BACKGROUND COLOR LOGIC (MTF Wrapper) ------------------------------------------------------------------
 
+// Helper to calculate Auto MaxBars for Background Trend Loops based on Timeframe
+f_bg_trend_maxbars_auto() =>
+    int sec = timeframe.in_seconds(timeframe.period)
+    int limit = 1200
+    if sec <= 60        // 1m
+        limit := 200
+    else if sec <= 300  // 5m
+        limit := 250
+    else if sec <= 900  // 15m
+        limit := 350
+    else if sec <= 3600 // 1h
+        limit := 450
+    else if sec <= 14400 // 4h
+        limit := 600
+    else if sec <= 86400 // 1D
+        limit := 800
+    else if sec <= 604800 // 1W
+        limit := 1000
+
+    math.min(limit, 1500)
+
 // This function encapsulates the logic needed to determine the background signal
 // It is called via request.security to allow MTF plotting
 f_calc_bg_signal() =>
+    // Auto-Calculate Max Bars based on current context (TF)
+    int bg_max = f_bg_trend_maxbars_auto()
+
     // Result Variables
     color bg_color_res = na
     int bg_state_res = 0
@@ -1207,7 +1206,7 @@ f_calc_bg_signal() =>
             int end_idx_u   = bar_index - 1
             if end_idx_u >= start_idx_u
                 // Limit the loop to max bars
-                int loop_cnt_u = math.min(end_idx_u - start_idx_u + 1, bg_trend_max_bars)
+                int loop_cnt_u = math.min(end_idx_u - start_idx_u + 1, bg_max)
                 for i = 1 to loop_cnt_u
                     ops_local += 1 // Count Ops
                     int bar_idx_i = bar_index - i
@@ -1227,7 +1226,7 @@ f_calc_bg_signal() =>
             int end_idx_d   = bar_index - 1
             if end_idx_d >= start_idx_d
                 // Limit the loop
-                int loop_cnt_d = math.min(end_idx_d - start_idx_d + 1, bg_trend_max_bars)
+                int loop_cnt_d = math.min(end_idx_d - start_idx_d + 1, bg_max)
                 for i = 1 to loop_cnt_d
                     ops_local += 1 // Count Ops
                     int bar_idx_i = bar_index - i
@@ -1295,7 +1294,7 @@ f_calc_bg_signal() =>
 
         // Limit Segments Loop using max bars as a safety upper bound
         // logic here is relative short, but we ensure i doesn't explode
-        int safe_sb = math.min(sb, bg_trend_max_bars)
+        int safe_sb = math.min(sb, bg_max)
 
         for i = 0 to safe_sb
             ops_local += 1 // Count Ops
@@ -2619,7 +2618,9 @@ if barstate.islast
         bool found = false
 
         // --- REPLAY FIX ---
-        int loopLimit = math.min(vp_maxScan, bar_index)
+        // Always scan visible range, capped by max_bars_back
+        int LOOKBACK_CAP = 3999
+        int loopLimit = math.min(bar_index, LOOKBACK_CAP)
 
         // SCAN 1: Price Range
         for i = 0 to loopLimit
@@ -2709,14 +2710,9 @@ if barstate.islast
 
         // 5. Drawing
         int xLoc = bar_index + vp_offset
-        int drawn_lines = 0 // Cap Counter
         
         if maxV > 0
             for j = 0 to vp_rows - 1
-                // Check Cap
-                if drawn_lines >= vp_maxLines
-                    break
-
                 float val = array.get(vp_smtArray, j)
                 if val > 0
                     float y1 = lMin + (j * step)
@@ -2728,7 +2724,6 @@ if barstate.islast
                     
                     if intens > 0.01
                         ops_vp_draw += 1 // Count Ops
-                        drawn_lines += 1 // Increment Drawn
                         color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
                         line l = line.new(x1=xLoc, y1=y1, x2=xLoc, y2=y2, xloc=xloc.bar_index, color=col, width=vp_width)
                         array.push(vp_lines, l)
@@ -2796,6 +2791,9 @@ if debug_on and barstate.islast
 
     table.cell(tbl_dbg, 0, 13, "BG Signal", text_color=color.white, text_size=size.small)
     table.cell(tbl_dbg, 1, 13, selected_bg_signal == "None" ? "OFF" : "ON", text_color=selected_bg_signal != "None" ? color.green : color.red, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 14, "BG MaxBars (Auto)", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 14, str.tostring(f_bg_trend_maxbars_auto()), text_color=color.aqua, text_size=size.small)
 else
     if not na(tbl_dbg)
         table.delete(tbl_dbg)
