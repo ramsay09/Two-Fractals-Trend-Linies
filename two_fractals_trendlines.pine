@@ -275,6 +275,9 @@ int ops_trend = 0
 int ops_pch = 0
 int ops_vp_scan = 0
 int ops_vp_draw = 0
+int ops_div = 0
+int ops_bb = 0
+int ops_bg_trend = 0
 
 // Peak Trackers
 var int peak_ops_trend = 0
@@ -520,11 +523,12 @@ if ON_PS
                         line.set_color(lvl.id_line, new_c)
                         line.set_style(lvl.id_line, line.style_dashed)
 
-            // 2. Extend visual to current time
-            if not lvl.is_zone
-                line.set_x2(lvl.id_line, time)
-            else
-                box.set_right(lvl.id_box, time)
+            // 2. Extend visual to current time (Stage 6: Micro-Opt)
+            if barstate.islast
+                if not lvl.is_zone
+                    line.set_x2(lvl.id_line, time)
+                else
+                    box.set_right(lvl.id_box, time)
 else
     // Cleanup when disabled
     if array.size(sr_levels) > 0
@@ -537,31 +541,54 @@ else
 
 //---------------------------------------------------- macd and rsi divergences (Visuals for Chart) -------------------------------------------------------------
 
-rsi_d               = ta.rsi(close, rsi_length)
+// Stage 3: Divergences Hard-Gating
+ON_DIV = plot_div
 
-fast_length         = 12 
-slow_length         = 26 
-signal_length       = 9  
-src                 = close 
+float rsi_d = na
+float macdLine = na
+float signalLine = na
+float histLine = na
+float bar_scr_bear = na
+float bar_scr_bull = na
+float indi_scr = na
 
-[macdLine, signalLine, histLine] = ta.macd(src, fast_length, slow_length, signal_length)
+bool c_div_bear = false
+bool c_div_bull = false
+bool h_div_bear = false
+bool h_div_bull = false
 
-bar_scr_bear        = src_div == 'close' ? close : high
-bar_scr_bull        = src_div == 'close' ? close : low
+if ON_DIV
+    ops_div += 1 // Count Ops (at least one block execution)
 
-indi_scr            = div_indi == 'rsi' ? rsi_d : div_indi == 'macd(fast_line)' ? macdLine : div_indi == 'macd(slow_line)' ? signalLine : na
+    rsi_d := ta.rsi(close, rsi_length)
+
+    fast_length     = 12
+    slow_length     = 26
+    signal_length   = 9
+    src             = close
+
+    [t_macd, t_sig, t_hist] = ta.macd(src, fast_length, slow_length, signal_length)
+    macdLine := t_macd
+    signalLine := t_sig
+    histLine := t_hist
+
+    bar_scr_bear := src_div == 'close' ? close : high
+    bar_scr_bull := src_div == 'close' ? close : low
+
+    indi_scr := div_indi == 'rsi' ? rsi_d : div_indi == 'macd(fast_line)' ? macdLine : div_indi == 'macd(slow_line)' ? signalLine : na
+
+    //rsi and macd divergence calc
+    // Check if indi_scr is valid before calculation
+    if not na(indi_scr)
+        c_div_bear := bar_scr_bear > ta.highest(bar_scr_bear, bar_div_p)[1] and indi_scr < ta.highest(indi_scr, bar_div_p)[1]
+        c_div_bull := bar_scr_bull < ta.lowest(bar_scr_bull, bar_div_p)[1] and indi_scr > ta.lowest(indi_scr, bar_div_p)[1]
+
+        h_div_bear := bar_scr_bear < ta.highest(bar_scr_bear, bar_div_p)[1] and indi_scr > ta.highest(indi_scr, bar_div_p)[1]
+        h_div_bull := bar_scr_bull > ta.lowest(bar_scr_bull, bar_div_p)[1] and indi_scr < ta.lowest(indi_scr, bar_div_p)[1]
 
 
-//rsi and macd divergence calc
-c_div_bear          = bar_scr_bear > ta.highest(bar_scr_bear, bar_div_p)[1] and indi_scr < ta.highest(indi_scr, bar_div_p)[1]
-c_div_bull          = bar_scr_bull < ta.lowest(bar_scr_bull, bar_div_p)[1] and indi_scr > ta.lowest(indi_scr, bar_div_p)[1]
-
-h_div_bear          = bar_scr_bear < ta.highest(bar_scr_bear, bar_div_p)[1] and indi_scr > ta.highest(indi_scr, bar_div_p)[1]
-h_div_bull          = bar_scr_bull > ta.lowest(bar_scr_bull, bar_div_p)[1] and indi_scr < ta.lowest(indi_scr, bar_div_p)[1]
-
-
-plot_bear_combined = plot_div and (c_div_bear or h_div_bear)
-plot_bull_combined = plot_div and (c_div_bull or h_div_bull)
+plot_bear_combined = ON_DIV and (c_div_bear or h_div_bear)
+plot_bull_combined = ON_DIV and (c_div_bull or h_div_bull)
 
 plotshape(plot_bear_combined, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,  textcolor=color.new(color.red, 0),  color=color.new(color.red, 0), title='Bear divergence') 
 plotshape(plot_bull_combined, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,  textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Bull divergence')
@@ -991,9 +1018,14 @@ f_calc_bg_signal() =>
     need_fvg            = selected_bg_signal == "FVG Open" or selected_bg_signal == "FVG Close" or selected_bg_signal == "FVG/Fractal (OR)" or selected_bg_signal == "FVG/Fractal (AND)"
     need_seg            = has_segments
 
-    // Trendlines Math is needed if "Trend" is in name OR if "Fractal" is in name but NOT BW and NOT Anticipated
-    // Because "Fractal" in other context refers to the Trendline-based fractals (pivothigh/low used for trendlines)
-    need_trend_math     = has_trend or (has_fractal and not need_bw and not need_ant) or str.contains(selected_bg_signal, "Segments/Trend")
+    // Stage 2: Background Filter Trendline Split
+    // Need Fractal Levels (y0_up, y0_dn): Any signal needing pivot highs/lows from trendline logic
+    // Includes: "Trend Line/Fractal Break", "Fractals Trend Lines", "Segments/Fractals", "MACD Slope/Fractal Break"
+    need_fractal_levels = selected_bg_signal == "Trend Line/Fractal Break (OR)" or selected_bg_signal == "Fractals Trend Lines" or str.contains(selected_bg_signal, "Segments/Fractals") or str.contains(selected_bg_signal, "MACD Slope/Fractal Break")
+
+    // Need Trend Projection (Regression Slope + Line): Only if projected line state is needed
+    // Includes: "Fractals Trend Lines", "Trend Line/Fractal Break", "Segments/Trend Line"
+    need_trend_projection = selected_bg_signal == "Fractals Trend Lines" or selected_bg_signal == "Trend Line/Fractal Break (OR)" or str.contains(selected_bg_signal, "Segments/Trend Line")
 
     // 1. Re-calculate Component Indicators for this Context (CONDITIONAL)
 
@@ -1114,26 +1146,31 @@ f_calc_bg_signal() =>
     bool fr_tl_buy_c = false
     bool fr_tl_sell_c = false
     
-    // Trendlines Logic Block
-    if need_trend_math
+    // Trendlines Logic Block (Refactored Stage 2)
+    // 1. Pivot Levels Calculation
+
+    // Using VAR to maintain stable state
+    var float v_y0_up_c = na
+    var int v_x0_up_c = na
+    var float v_y1_up_c = na
+    var int v_x1_up_c = na
+    var float v_y0_dn_c = na
+    var int v_x0_dn_c = na
+    var float v_y1_dn_c = na
+    var int v_x1_dn_c = na
+
+    if need_fractal_levels or need_trend_projection
         use_special_trend_c = fractalBarsPerSide == 0
         n_tl_c = use_special_trend_c ? 2 : fractalBarsPerSide
 
         ph_val_c = ta.pivothigh(high, n_tl_c, n_tl_c)
         pl_val_c = ta.pivotlow(low, n_tl_c, n_tl_c)
 
-        // Using VAR to maintain stable state
-        var float v_y0_up_c = na, var int v_x0_up_c = na
-        var float v_y1_up_c = na, var int v_x1_up_c = na
-
         if not na(ph_val_c)
             v_y1_up_c := v_y0_up_c
             v_x1_up_c := v_x0_up_c
             v_y0_up_c := ph_val_c
             v_x0_up_c := bar_index - n_tl_c
-
-        var float v_y0_dn_c = na, var int v_x0_dn_c = na
-        var float v_y1_dn_c = na, var int v_x1_dn_c = na
 
         if not na(pl_val_c)
             v_y1_dn_c := v_y0_dn_c
@@ -1144,6 +1181,13 @@ f_calc_bg_signal() =>
         // Export vars to scope
         y0_up_c := v_y0_up_c
         y0_dn_c := v_y0_dn_c
+
+    // 2. Trend Projection (Heavy Math)
+    if need_trend_projection
+        // Re-declare local use_special_trend_c if scope isolation is an issue,
+        // but it should be available if executed in same function scope sequence.
+        // To be safe we re-evaluate or assume scope is valid.
+        use_special_trend_c = fractalBarsPerSide == 0 // Recalc for safety
 
         // --- Slope Calculation (Anchored Regression on Closed Candles) ---
         float slope_up_c = na
@@ -1209,7 +1253,8 @@ f_calc_bg_signal() =>
         buy_up_line_c  := not na(y_up_lvl_c) and close > y_up_lvl_c
         sell_dn_line_c := not na(y_dn_lvl_c) and close < y_dn_lvl_c
 
-        // Standard Fractal Levels
+    // 3. Standard Fractal Levels (Needed if levels are required)
+    if need_fractal_levels
         frup_buy_std_c = ta.crossover(high, v_y0_up_c)
         frdn_sell_std_c = ta.crossunder(low, v_y0_dn_c)
 
@@ -1435,84 +1480,24 @@ plotchar(arrow_bear, char='⬇', location=location.abovebar, color=color.red, si
 
 //indicator funktions for 4h, d, w, m 
 
-f_dmi(_di_len, _len_smo)            => [_diplus_p, _diminus_p, _adx_p] =  ta.dmi(_di_len, _len_smo) 
+// Helper function for HTF Logic (Correctness Fix)
+// Must return [adx_up, adx_dn, hma_up, ema_up]
+// Logic must include rising(adx, 1) check for adx_up/dn
+f_inf_htf(_diLen, _smo, _hmaLen, _ema1Len, _ema2Len) =>
+    [_diplus, _diminus, _adx] = ta.dmi(_diLen, _smo)
+    _hma = ta.hma(close, _hmaLen)
+    _ema1 = ta.ema(close, _ema1Len)
+    _ema2 = ta.ema(close, _ema2Len)
 
-f_rising(_src, _len)                => ta.rising(_src, _len)
+    // Logic
+    _adx_slope_up = ta.rising(_adx, 1)
+    _adx_up       = _adx_slope_up and _diplus > _diminus
+    _adx_dn       = _adx_slope_up and _diplus < _diminus
+    _hma_up       = ta.rising(_hma, 1)
+    _ema_up       = _ema1 > _ema2
 
-f_ema(_ema_len)                     => ta.ema(close, _ema_len)
+    [_adx_up, _adx_dn, _hma_up, _ema_up]
 
-f_hma(_hma_len)                     => ta.hma(close, _hma_len) 
-
-
-//------------------------ 4h, d, w, m indicators signals -----------------------
-//4h indicator values
-[_diplus_4h, _diminus_4h, _adx_4h] =  f_dmi(7, 7) 
-
-adx_slope_up_4h      = f_rising(_adx_4h, 1)
-
-adx_up_4h           = adx_slope_up_4h and _diplus_4h > _diminus_4h                       
-adx_dn_4h           = adx_slope_up_4h and _diplus_4h < _diminus_4h 
-
-ema1_4h             = f_ema(8)
-ema2_4h             = f_ema(21)
-
-ema_x_up_4h         = ema1_4h > ema2_4h   
-
-hma_4h              = f_hma(15)                  
-hma_slo_up_4h       = f_rising(hma_4h, 1)     
-
-
-//day indicator values
-[_diplus_d, _diminus_d, _adx_d] =  f_dmi(7, 7) 
-
-adx_slope_up_d      = f_rising(_adx_d, 1)
-
-adx_up_d            = adx_slope_up_d and _diplus_d > _diminus_d                       
-adx_dn_d            = adx_slope_up_d and _diplus_d < _diminus_d 
-
-ema1_d              = f_ema(5)
-ema2_d              = f_ema(21)
-
-ema_x_up_d          = ema1_d > ema2_d   
-
-hma_d               = f_hma(10)                  
-hma_slo_up_d           = f_rising(hma_d, 1)  
-
-
-//week indicator values
-[_diplus_w, _diminus_w, _adx_w] =  f_dmi(2, 7) 
-
-adx_slope_up_w      = f_rising(_adx_w, 1)
-
-adx_up_w            = adx_slope_up_w and _diplus_w > _diminus_w                       
-adx_dn_w            = adx_slope_up_w and _diplus_w < _diminus_w 
-
-ema1_w              = f_ema(5)
-ema2_w              = f_ema(8)
-
-ema_x_up_w          = ema1_w > ema2_w   
-
-hma_w               = f_hma(10)                  
-hma_slo_up_w           = f_rising(hma_w, 1)  
-
-
-//month indicator values
-[_diplus_m, _diminus_m, _adx_m] =  f_dmi(2, 2) 
-
-adx_slope_up_m      = f_rising(_adx_m, 1)
-
-adx_up_m            = adx_slope_up_m and _diplus_m > _diminus_m                       
-adx_dn_m            = adx_slope_up_m and _diplus_m < _diminus_m 
-
-ema1_m              = f_ema(3)
-ema2_m              = f_ema(8)
-
-ema_x_up_m          = ema1_m > ema2_m   
-
-hma_m               = f_hma(5)                  
-hma_slo_up_m           = f_rising(hma_m, 1)  
-
-  
 //colors
 color_blue_1    = color.new(color.blue, 30)
 color_red_1     = color.new(color.red, 30)
@@ -1546,36 +1531,53 @@ e_color_c       = ema_x_up_inf ? color_blue_1 : not ema_x_up_inf ? color_red_1 :
 // Info Panel Table (Declared global to allow deletion)
 var table info_panel = na
 
+// Define Variables for HTF colors (Init to default)
+color a_color_4h = na
+color a_color_d  = na
+color a_color_w  = na
+color a_color_m  = na
+
+color h_color_4h = na
+color h_color_d  = na
+color h_color_w  = na
+color h_color_m  = na
+
+color e_color_4h = na
+color e_color_d  = na
+color e_color_w  = na
+color e_color_m  = na
+
 // 2. Gated HTF & Table Update
 if adx_trend
-    // Optimization: Combine security calls for Info Panel (16 calls -> 4 calls)
-    [adx_4h_up, adx_4h_dn, hma_4h_up, e1xe2_4h_up] = request.security(syminfo.tickerid, '240', [adx_up_4h, adx_dn_4h, hma_slo_up_4h, ema_x_up_4h])
-    [adx_d_up, adx_d_dn, hma_d_up, e1xe2_d_up]     = request.security(syminfo.tickerid, 'D',   [adx_up_d, adx_dn_d, hma_slo_up_d, ema_x_up_d])
-    [adx_w_up, adx_w_dn, hma_w_up, e1xe2_w_up]     = request.security(syminfo.tickerid, 'W',   [adx_up_w, adx_dn_w, hma_slo_up_w, ema_x_up_w])
-    [adx_m_up, adx_m_dn, hma_m_up, e1xe2_m_up]     = request.security(syminfo.tickerid, 'M',   [adx_up_m, adx_dn_m, hma_slo_up_m, ema_x_up_m])
+    if barstate.islast // Stage 5: Last-Bar Gating for Security & Logic
+        // Optimization: Combine security calls for Info Panel (16 calls -> 4 calls)
+        // Stage 1: Correctness Fix using f_inf_htf helper
+        [adx_4h_up, adx_4h_dn, hma_4h_up, e1xe2_4h_up] = request.security(syminfo.tickerid, '240', f_inf_htf(7, 7, 15, 8, 21))
+        [adx_d_up, adx_d_dn, hma_d_up, e1xe2_d_up]     = request.security(syminfo.tickerid, 'D',   f_inf_htf(7, 7, 10, 5, 21))
+        [adx_w_up, adx_w_dn, hma_w_up, e1xe2_w_up]     = request.security(syminfo.tickerid, 'W',   f_inf_htf(2, 7, 10, 5, 8))
+        [adx_m_up, adx_m_dn, hma_m_up, e1xe2_m_up]     = request.security(syminfo.tickerid, 'M',   f_inf_htf(2, 2, 5, 3, 8))
 
-    // Stage 6: Debug Instrument
-    active_sec_calls += 4
+        // Stage 6: Debug Instrument
+        active_sec_calls += 4
 
-    //adx conditions
-    a_color_4h        = adx_4h_up ? color_blue_1 : adx_4h_dn ? color_red_1 : color_gray_1
-    a_color_d         = adx_d_up ? color_blue_1 : adx_d_dn ? color_red_1 : color_gray_1
-    a_color_w         = adx_w_up ? color_blue_1 : adx_w_dn ? color_red_1 : color_gray_1
-    a_color_m         = adx_m_up ? color_blue_1 : adx_m_dn ? color_red_1 : color_gray_1
+        //adx conditions
+        a_color_4h        := adx_4h_up ? color_blue_1 : adx_4h_dn ? color_red_1 : color_gray_1
+        a_color_d         := adx_d_up ? color_blue_1 : adx_d_dn ? color_red_1 : color_gray_1
+        a_color_w         := adx_w_up ? color_blue_1 : adx_w_dn ? color_red_1 : color_gray_1
+        a_color_m         := adx_m_up ? color_blue_1 : adx_m_dn ? color_red_1 : color_gray_1
 
-    //hma conditions
-    h_color_4h      = hma_4h_up ? color_blue_1 : not hma_4h_up ? color_red_1 : color_gray_1
-    h_color_d       = hma_d_up ? color_blue_1 : not hma_d_up ? color_red_1 : color_gray_1
-    h_color_w       = hma_w_up ? color_blue_1 : not hma_w_up ? color_red_1 : color_gray_1
-    h_color_m       = hma_m_up ? color_blue_1 : not hma_m_up ? color_red_1 : color_gray_1
+        //hma conditions
+        h_color_4h      := hma_4h_up ? color_blue_1 : not hma_4h_up ? color_red_1 : color_gray_1
+        h_color_d       := hma_d_up ? color_blue_1 : not hma_d_up ? color_red_1 : color_gray_1
+        h_color_w       := hma_w_up ? color_blue_1 : not hma_w_up ? color_red_1 : color_gray_1
+        h_color_m       := hma_m_up ? color_blue_1 : not hma_m_up ? color_red_1 : color_gray_1
 
-    //ema1 x ema2 condition
-    e_color_4h      = e1xe2_4h_up ? color_blue_1 : not e1xe2_4h_up ? color_red_1 : color_gray_1
-    e_color_d       = e1xe2_d_up ? color_blue_1 : not e1xe2_d_up ? color_red_1 : color_gray_1
-    e_color_w       = e1xe2_w_up ? color_blue_1 : not e1xe2_w_up ? color_red_1 : color_gray_1
-    e_color_m       = e1xe2_m_up ? color_blue_1 : not e1xe2_m_up ? color_red_1 : color_gray_1
+        //ema1 x ema2 condition
+        e_color_4h      := e1xe2_4h_up ? color_blue_1 : not e1xe2_4h_up ? color_red_1 : color_gray_1
+        e_color_d       := e1xe2_d_up ? color_blue_1 : not e1xe2_d_up ? color_red_1 : color_gray_1
+        e_color_w       := e1xe2_w_up ? color_blue_1 : not e1xe2_w_up ? color_red_1 : color_gray_1
+        e_color_m       := e1xe2_m_up ? color_blue_1 : not e1xe2_m_up ? color_red_1 : color_gray_1
 
-    if barstate.islast
         if na(info_panel)
             info_panel := table.new(position = position.bottom_left, columns = 4, rows = 7, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50))
 
@@ -1668,55 +1670,56 @@ float m12_high = na
 float m12_low = na
 float m12_close = na
 
-// Gated Security Calls
-if need_h1
-    [h1_high_t, h1_low_t, h1_close_t] = request.security(syminfo.tickerid, "60", [high[1], low[1], close[1]])
-    h1_high := h1_high_t
-    h1_low := h1_low_t
-    h1_close := h1_close_t
-    active_sec_calls += 1
+// Gated Security Calls - Stage 5: Last Bar Optimization
+if barstate.islast
+    if need_h1
+        [h1_high_t, h1_low_t, h1_close_t] = request.security(syminfo.tickerid, "60", [high[1], low[1], close[1]])
+        h1_high := h1_high_t
+        h1_low := h1_low_t
+        h1_close := h1_close_t
+        active_sec_calls += 1
 
-if need_h4
-    [h4_high_t, h4_low_t, h4_close_t] = request.security(syminfo.tickerid, "240", [high[1], low[1], close[1]])
-    h4_high := h4_high_t
-    h4_low := h4_low_t
-    h4_close := h4_close_t
-    active_sec_calls += 1
+    if need_h4
+        [h4_high_t, h4_low_t, h4_close_t] = request.security(syminfo.tickerid, "240", [high[1], low[1], close[1]])
+        h4_high := h4_high_t
+        h4_low := h4_low_t
+        h4_close := h4_close_t
+        active_sec_calls += 1
 
-if need_d
-    [d_high_t, d_low_t, d_close_t] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]])
-    d_high := d_high_t
-    d_low := d_low_t
-    d_close := d_close_t
-    active_sec_calls += 1
+    if need_d
+        [d_high_t, d_low_t, d_close_t] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]])
+        d_high := d_high_t
+        d_low := d_low_t
+        d_close := d_close_t
+        active_sec_calls += 1
 
-if need_w
-    [w_high_t, w_low_t, w_close_t] = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]])
-    w_high := w_high_t
-    w_low := w_low_t
-    w_close := w_close_t
-    active_sec_calls += 1
+    if need_w
+        [w_high_t, w_low_t, w_close_t] = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]])
+        w_high := w_high_t
+        w_low := w_low_t
+        w_close := w_close_t
+        active_sec_calls += 1
 
-if need_m
-    [m_high_t, m_low_t, m_close_t] = request.security(syminfo.tickerid, "M", [high[1], low[1], close[1]])
-    m_high := m_high_t
-    m_low := m_low_t
-    m_close := m_close_t
-    active_sec_calls += 1
+    if need_m
+        [m_high_t, m_low_t, m_close_t] = request.security(syminfo.tickerid, "M", [high[1], low[1], close[1]])
+        m_high := m_high_t
+        m_low := m_low_t
+        m_close := m_close_t
+        active_sec_calls += 1
 
-if need_3m
-    [m3_high_t, m3_low_t, m3_close_t] = request.security(syminfo.tickerid, "3M", [high[1], low[1], close[1]])
-    m3_high := m3_high_t
-    m3_low := m3_low_t
-    m3_close := m3_close_t
-    active_sec_calls += 1
+    if need_3m
+        [m3_high_t, m3_low_t, m3_close_t] = request.security(syminfo.tickerid, "3M", [high[1], low[1], close[1]])
+        m3_high := m3_high_t
+        m3_low := m3_low_t
+        m3_close := m3_close_t
+        active_sec_calls += 1
 
-if need_12m
-    [m12_high_t, m12_low_t, m12_close_t] = request.security(syminfo.tickerid, "12M", [high[1], low[1], close[1]])
-    m12_high := m12_high_t
-    m12_low := m12_low_t
-    m12_close := m12_close_t
-    active_sec_calls += 1
+    if need_12m
+        [m12_high_t, m12_low_t, m12_close_t] = request.security(syminfo.tickerid, "12M", [high[1], low[1], close[1]])
+        m12_high := m12_high_t
+        m12_low := m12_low_t
+        m12_close := m12_close_t
+        active_sec_calls += 1
 
 // --- Calculations ---
 
@@ -1927,19 +1930,33 @@ f_bb_dev(_sma_len) => BB_calc_tog ? f_stdev(_sma_len) : math.sqrt(ta.sma((((open
      / 4 - ta.ema((open + high + low + close) / 4, _sma_len)) * ((open + high + low + close) 
      / 4 - ta.ema((open + high + low + close) / 4, _sma_len))), _sma_len))
 
-//bb1
-basis = f_bb_basis(BB_length_1)
-dev_1 = BB_sdev_1 * f_bb_dev(BB_length_1)
-upper_1 = basis + dev_1
-lower_1 = basis - dev_1
+// Stage 4: Bollinger Bands Hard-Gating
+float basis = na
+float dev_1 = na
+float upper_1 = na
+float lower_1 = na
+float dev_3 = na
+float upper_3 = na
+float lower_3 = na
+bool approach_up = false
+bool approach_dn = false
 
-//bb3
-dev_3 = BB_sdev_3 * f_bb_dev(BB_length_1)
-upper_3 = basis + dev_3
-lower_3 = basis - dev_3
+if BB_plot
+    ops_bb += 1 // Count Ops
 
-approach_up = near_bb ? high > upper_1 : true
-approach_dn = near_bb ? low < lower_1 : true
+    //bb1
+    basis := f_bb_basis(BB_length_1)
+    dev_1 := BB_sdev_1 * f_bb_dev(BB_length_1)
+    upper_1 := basis + dev_1
+    lower_1 := basis - dev_1
+
+    //bb3
+    dev_3 := BB_sdev_3 * f_bb_dev(BB_length_1)
+    upper_3 := basis + dev_3
+    lower_3 := basis - dev_3
+
+    approach_up := near_bb ? high > upper_1 : true
+    approach_dn := near_bb ? low < lower_1 : true
 
 bup_1 = plot(BB_plot and approach_up ? upper_1 : na, title='Upper BB1', color=color.new(color.gray, 100), linewidth=1)
 bdn_1 = plot(BB_plot and approach_dn ? lower_1 : na, title='Lower BB1', color=color.new(color.gray, 100), linewidth=1)
@@ -2713,7 +2730,7 @@ if (ops_vp_scan + ops_vp_draw) > peak_ops_vp
 
 if debug_on and barstate.islast
     if na(tbl_dbg)
-        tbl_dbg := table.new(position.bottom_right, 2, 12, bgcolor=color.new(color.black, 50), frame_width=1, frame_color=color.gray)
+        tbl_dbg := table.new(position.bottom_right, 2, 15, bgcolor=color.new(color.black, 50), frame_width=1, frame_color=color.gray)
 
     // Header
     table.cell(tbl_dbg, 0, 0, "Metric", text_color=color.white, text_size=size.small)
@@ -2733,24 +2750,33 @@ if debug_on and barstate.islast
     table.cell(tbl_dbg, 0, 4, "Ops VP (Peak)", text_color=color.white, text_size=size.small)
     table.cell(tbl_dbg, 1, 4, str.tostring(ops_vp_scan + ops_vp_draw) + " (" + str.tostring(peak_ops_vp) + ")", text_color=(ops_vp_scan + ops_vp_draw) > 1000 ? color.red : color.green, text_size=size.small)
 
+    table.cell(tbl_dbg, 0, 5, "Ops DIV", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 5, str.tostring(ops_div), text_color=ops_div > 0 ? color.orange : color.green, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 6, "Ops BB", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 6, str.tostring(ops_bb), text_color=ops_bb > 0 ? color.orange : color.green, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 7, "Ops BG Trend", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 7, str.tostring(ops_bg_trend), text_color=ops_bg_trend > 0 ? color.orange : color.green, text_size=size.small)
+
     // Flags Status
-    table.cell(tbl_dbg, 0, 5, "ON_PS", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 5, str.tostring(ON_PS), text_color=ON_PS ? color.green : color.red, text_size=size.small)
+    table.cell(tbl_dbg, 0, 8, "ON_PS", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 8, str.tostring(ON_PS), text_color=ON_PS ? color.green : color.red, text_size=size.small)
 
-    table.cell(tbl_dbg, 0, 6, "ON_MTF_OV", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 6, str.tostring(ON_MTF_OV), text_color=ON_MTF_OV ? color.green : color.red, text_size=size.small)
+    table.cell(tbl_dbg, 0, 9, "ON_MTF_OV", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 9, str.tostring(ON_MTF_OV), text_color=ON_MTF_OV ? color.green : color.red, text_size=size.small)
 
-    table.cell(tbl_dbg, 0, 7, "ON_FVG1", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 7, str.tostring(ON_FVG1), text_color=ON_FVG1 ? color.green : color.red, text_size=size.small)
+    table.cell(tbl_dbg, 0, 10, "ON_FVG1", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 10, str.tostring(ON_FVG1), text_color=ON_FVG1 ? color.green : color.red, text_size=size.small)
 
-    table.cell(tbl_dbg, 0, 8, "ON_SESS_1ST", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 8, str.tostring(ON_SESS_1ST), text_color=ON_SESS_1ST ? color.green : color.red, text_size=size.small)
+    table.cell(tbl_dbg, 0, 11, "ON_SESS_1ST", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 11, str.tostring(ON_SESS_1ST), text_color=ON_SESS_1ST ? color.green : color.red, text_size=size.small)
 
-    table.cell(tbl_dbg, 0, 9, "ON_PCH", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 9, str.tostring(ON_PCH), text_color=ON_PCH ? color.green : color.red, text_size=size.small)
+    table.cell(tbl_dbg, 0, 12, "ON_PCH", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 12, str.tostring(ON_PCH), text_color=ON_PCH ? color.green : color.red, text_size=size.small)
 
-    table.cell(tbl_dbg, 0, 10, "BG Signal", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 10, selected_bg_signal == "None" ? "OFF" : "ON", text_color=selected_bg_signal != "None" ? color.green : color.red, text_size=size.small)
+    table.cell(tbl_dbg, 0, 13, "BG Signal", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 13, selected_bg_signal == "None" ? "OFF" : "ON", text_color=selected_bg_signal != "None" ? color.green : color.red, text_size=size.small)
 else
     if not na(tbl_dbg)
         table.delete(tbl_dbg)
