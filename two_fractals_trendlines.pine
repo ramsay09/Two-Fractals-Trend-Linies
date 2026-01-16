@@ -5,9 +5,6 @@ indicator('Two Fractals Trend Lines', overlay=true, shorttitle='fr lines', max_b
 general_info   = input.bool(title='General Description', defval=false, tooltip='Use the signals in confluence and as an indication of market tension, which will discharged in higher volatility or trend continuation. ... context matters.
                  Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
 
-// Debug (Performance)
-debug_on       = input.bool(false, "Debug (Perf)", group="Debug")
-
 // adx, hma and ema1 x ema2 mtf trend info panel
 adx_trend      = input.bool(title='MTF Info Panel', defval=false, 
                  tooltip='Provides an overview of multi time frame trends as DMI ADX, HMA slope and EMA1 cross EMA2 (down(red), consolidation(gray), up(blue)) for the current (C = current tf, these parameters are optimizable) and the supported higher time frames (4H, D, W, M, these indicator parameters are fixed and optimized for Bitcoin).')
@@ -29,17 +26,39 @@ vp_clip     = input.float(2.5, "", minval=1.0, step=0.1, inline="line4", tooltip
               Includes 'Smart Contrast' to automatically adjust saturation, ensuring key volume clusters remain visible even when extreme peaks are present.
               \n⚠ Heavy Calculation: O(Scan Depth * Rows). Use carefully.")
 
+// Performance Pass v3: VP Inputs
+vp_quality  = input.string("Medium", "Quality", options=["Low", "Medium", "High", "Custom"], inline="line5", tooltip="Low: 80 Rows / 800 Scan \nMedium: 120 Rows / 1500 Scan \nHigh: 200 Rows / 2500 Scan \nCustom: Use manual inputs.")
+vp_maxLines = input.int(120, "Max Draw Lines", minval=30, maxval=500, inline="line5", tooltip="Limits the number of drawn lines to maintain UI responsiveness.")
 
 // Basic Visuals
 vp_width    = 12 //input.int(12, "Width (px)", minval=1, group=grp_vp)
 vp_offset   = 15 //input.int(15, "Offset", group=grp_vp, tooltip="Horizontal offset in bars from the last candle.")
 
 // Precision & Smoothing
-vp_rows     = 300 //input.int(300, "Rows", minval=50, maxval=500, group=grp_vp, tooltip="Resolution of the profile. Higher = smoother gradient.")
-vp_smooth   = 3 //input.int(3, "Smooth", minval=1, maxval=10, group=grp_vp, tooltip="Vertical smoothing to blur edges.")
+vp_rows_inp = 300 //input.int(300, "Rows", minval=50, maxval=500, group=grp_vp, tooltip="Resolution of the profile. Higher = smoother gradient.")
+vp_smooth_inp = 3 //input.int(3, "Smooth", minval=1, maxval=10, group=grp_vp, tooltip="Vertical smoothing to blur edges.")
 
 // Data Scope (Performance)
-vp_maxScan  = 4000 //input.int(4000, "Scan Depth", minval=500, maxval=9000, group=grp_vp, tooltip="Max number of past bars to calculate. Lower this if you encounter performance issues.")
+vp_maxScan_inp = 4000 //input.int(4000, "Scan Depth", minval=500, maxval=9000, group=grp_vp, tooltip="Max number of past bars to calculate. Lower this if you encounter performance issues.")
+
+// Map Effective Parameters
+int vp_rows     = switch vp_quality
+    "Low" => 80
+    "Medium" => 120
+    "High" => 200
+    => vp_rows_inp
+
+int vp_smooth   = switch vp_quality
+    "Low" => 2
+    "Medium" => 3
+    "High" => 3
+    => vp_smooth_inp
+
+int vp_maxScan  = switch vp_quality
+    "Low" => 800
+    "Medium" => 1500
+    "High" => 2500
+    => vp_maxScan_inp
 
 // MTF CANDLE OVERLAY INPUTS
 grp_mtf_candle    = "MTF Candle Overlay"
@@ -223,6 +242,9 @@ sydney_show   = input.bool(false, title="Sydney Session ⠀⠀", group=grp_sess,
 sydney_sess   = input.session("2200-0700", title="", group=grp_sess, inline="syd")
 sydney_col    = input.color(color.new(color.red, 90), title="", group=grp_sess, inline="syd")
 
+// Debug (Performance)
+debug_on       = input.bool(false, "Debug (Perf)", group="Debug")
+
 // attributes inputs
 grp_atri            = "Attributes of drawn objects"
 vp_color            = input.color(color.new(color.red, 0), "Volume Profile Color", group=grp_atri)
@@ -248,6 +270,16 @@ transp_bg           = input.int(85, 'Background Color Transparency', minval=1, m
 //-------------------------------------------------------- GLOBAL ON-FLAGS (Performance / Gating) --------------------------------------------------------
 // Stage 0: Centralized Gating Flags as aliases for inputs
 int active_sec_calls = 0
+// Performance Counters (Per Bar)
+int ops_trend = 0
+int ops_pch = 0
+int ops_vp_scan = 0
+int ops_vp_draw = 0
+
+// Peak Trackers
+var int peak_ops_trend = 0
+var int peak_ops_vp = 0
+
 var table tbl_dbg = na
 
 ON_PCH          = show_pch_pcl
@@ -618,89 +650,86 @@ var float sum_x2_dn_run = 0.0
 var int last_x0_up = na
 var int last_x0_dn = na
 
-// LOGIC for Up-Trend Regression
-if use_special_trend
-    // Check if new pivot detected (x0_up changed)
-    if x0_up != last_x0_up
-        // Reset sums
-        sum_xy_up_run := 0.0
-        sum_x2_up_run := 0.0
-        
-        // Backfill loop (Only runs once per new pivot, for n_tl bars)
-        // From pivot+1 to current bar (approx 2 bars in special mode)
-        // We only include CLOSED bars (up to bar_index - 1)
-        if not na(x0_up) and not na(y0_up)
-            int start_idx = x0_up + 1
-            int end_idx = bar_index - 1
-            if end_idx >= start_idx
-                // Just loop forward conceptually using offset j from current bar
-                int j_max = bar_index - start_idx
-                for j = 1 to j_max
-                    // Calculate terms
-                    // Real Index: bar_index - j
-                    int dx = (bar_index - j) - x0_up
-                    float dy = high[j] - y0_up
-
-                    sum_xy_up_run += (dx * dy)
-                    sum_x2_up_run += (float(dx) * float(dx))
-
-        last_x0_up := x0_up
-
-    else
-        // Incremental Update (Every bar)
-        // Add the term for the LAST COMPLETED BAR (bar_index - 1)
-        // Wait, 'bar_index' increases by 1 each step.
-        // We need to ensure we don't double count.
-        // We need to add the term for the bar that JUST CLOSED.
-        // At bar_index N, bar N-1 is newly closed.
-        if not na(x0_up) and not na(y0_up)
-            int dx = (bar_index - 1) - x0_up
-            // dx must be > 0
-            if dx > 0
-                float dy = high[1] - y0_up
-                sum_xy_up_run += (dx * dy)
-                sum_x2_up_run += (float(dx) * float(dx))
-
-// Calculate Slope Up
-slope_up = (use_special_trend and sum_x2_up_run != 0) ? sum_xy_up_run / sum_x2_up_run : na
-
-
-// LOGIC for Down-Trend Regression
-if use_special_trend
-    if x0_dn != last_x0_dn
-        // Reset
-        sum_xy_dn_run := 0.0
-        sum_x2_dn_run := 0.0
-        last_x0_dn := x0_dn
-
-        // Backfill
-        if not na(x0_dn) and not na(y0_dn)
-            int start_idx = x0_dn + 1
-            int end_idx = bar_index - 1
-            if end_idx >= start_idx
-                int j_max = bar_index - start_idx
-                for j = 1 to j_max
-                    int dx = (bar_index - j) - x0_dn
-                    float dy = low[j] - y0_dn
-                    sum_xy_dn_run += (dx * dy)
-                    sum_x2_dn_run += (float(dx) * float(dx))
-    else
-        // Incremental
-        if not na(x0_dn) and not na(y0_dn)
-            int dx = (bar_index - 1) - x0_dn
-            if dx > 0
-                float dy = low[1] - y0_dn
-                sum_xy_dn_run += (dx * dy)
-                sum_x2_dn_run += (float(dx) * float(dx))
-
-// Calculate Slope Down
-slope_dn = (use_special_trend and sum_x2_dn_run != 0) ? sum_xy_dn_run / sum_x2_dn_run : na
-
-// --- Draw Trendlines ---
+// Drawing Objects
 var line upper_line = na
 var line lower_line = na
 
-if (plot_trendline)
+// STAGE 1: HYBRID HARD GATING
+// We only run the heavy regression and drawing logic if enabled.
+if plot_trendline
+    // LOGIC for Up-Trend Regression
+    if use_special_trend
+        // Check if new pivot detected (x0_up changed)
+        if x0_up != last_x0_up
+            // Reset sums
+            sum_xy_up_run := 0.0
+            sum_x2_up_run := 0.0
+
+            // Backfill loop (Only runs once per new pivot, for n_tl bars)
+            if not na(x0_up) and not na(y0_up)
+                int start_idx = x0_up + 1
+                int end_idx = bar_index - 1
+                if end_idx >= start_idx
+                    // Just loop forward conceptually using offset j from current bar
+                    int j_max = bar_index - start_idx
+                    for j = 1 to j_max
+                        ops_trend += 1 // Count Ops
+                        // Calculate terms
+                        // Real Index: bar_index - j
+                        int dx = (bar_index - j) - x0_up
+                        float dy = high[j] - y0_up
+
+                        sum_xy_up_run += (dx * dy)
+                        sum_x2_up_run += (float(dx) * float(dx))
+
+            last_x0_up := x0_up
+
+        else
+            // Incremental Update (Every bar)
+            if not na(x0_up) and not na(y0_up)
+                int dx = (bar_index - 1) - x0_up
+                if dx > 0
+                    float dy = high[1] - y0_up
+                    sum_xy_up_run += (dx * dy)
+                    sum_x2_up_run += (float(dx) * float(dx))
+
+    // Calculate Slope Up
+    slope_up = (use_special_trend and sum_x2_up_run != 0) ? sum_xy_up_run / sum_x2_up_run : na
+
+
+    // LOGIC for Down-Trend Regression
+    if use_special_trend
+        if x0_dn != last_x0_dn
+            // Reset
+            sum_xy_dn_run := 0.0
+            sum_x2_dn_run := 0.0
+            last_x0_dn := x0_dn
+
+            // Backfill
+            if not na(x0_dn) and not na(y0_dn)
+                int start_idx = x0_dn + 1
+                int end_idx = bar_index - 1
+                if end_idx >= start_idx
+                    int j_max = bar_index - start_idx
+                    for j = 1 to j_max
+                        ops_trend += 1 // Count Ops
+                        int dx = (bar_index - j) - x0_dn
+                        float dy = low[j] - y0_dn
+                        sum_xy_dn_run += (dx * dy)
+                        sum_x2_dn_run += (float(dx) * float(dx))
+        else
+            // Incremental
+            if not na(x0_dn) and not na(y0_dn)
+                int dx = (bar_index - 1) - x0_dn
+                if dx > 0
+                    float dy = low[1] - y0_dn
+                    sum_xy_dn_run += (dx * dy)
+                    sum_x2_dn_run += (float(dx) * float(dx))
+
+    // Calculate Slope Down
+    slope_dn = (use_special_trend and sum_x2_dn_run != 0) ? sum_xy_dn_run / sum_x2_dn_run : na
+
+    // --- Draw Trendlines ---
     // --- UPPER LINE ---
     // Mode 0: Start=Newest(x0), Slope based calculation
     // Mode >0: Start=Old(x1), End=Newest(x0)
@@ -748,6 +777,18 @@ if (plot_trendline)
             line.set_xy2(lower_line, x2_d, y2_d)
             line.set_color(lower_line, color.new(color_tr, transp_tr))
             line.set_width(lower_line, width_tr)
+else
+    // Cleanup & State Reset (Crucial for Resuming)
+    if not na(last_x0_up)
+        last_x0_up := na
+        last_x0_dn := na
+
+    if not na(upper_line)
+        line.delete(upper_line)
+        upper_line := na
+    if not na(lower_line)
+        line.delete(lower_line)
+        lower_line := na
 
 
 //----------------------------------------------------------- last 12 bar (Visuals for Chart) ----------------------------------------------------------
@@ -1359,11 +1400,19 @@ bg_on = selected_bg_signal != "None"
 color final_bg_color = na
 int final_bg_state = 0
 
+// Stage 3: Current-TF Optimization (No Security)
 if bg_on
-    [col_res, state_res] = request.security(syminfo.tickerid, bg_tf_final, f_calc_bg_signal())
-    final_bg_color := col_res
-    final_bg_state := state_res
-    active_sec_calls += 1
+    if bg_tf_select == ""
+        // Direct Call (No Security Cost)
+        [col_res, state_res] = f_calc_bg_signal()
+        final_bg_color := col_res
+        final_bg_state := state_res
+    else
+        // Remote Call (1 Security Cost)
+        [col_res, state_res] = request.security(syminfo.tickerid, bg_tf_final, f_calc_bg_signal())
+        final_bg_color := col_res
+        final_bg_state := state_res
+        active_sec_calls += 1
 
 // Determine if we plot background or arrows
 // If "Signal Arrow Only" is enabled, we suppress background and show arrows on state change
@@ -1478,22 +1527,27 @@ Intra_D         = timeframe.isintraday or timeframe.isdaily
 Intra_D_W       = timeframe.isintraday or timeframe.isdaily or timeframe.isweekly
 Intra_D_W_M     = timeframe.isintraday or timeframe.isdaily or timeframe.isweekly or timeframe.ismonthly
 
-// Stage 6: Info Panel Hard Gating
+// Stage 6: Info Panel Refactoring (Global Current TF + Gated HTF)
+
+// 1. Always Run Current TF (To prevent warm-up issues)
+[_diplus_inf, _diminus_inf, _adx_inf]  = ta.dmi(di_len, len_smo)
+adx_up_inf            = _diplus_inf > _diminus_inf
+adx_dn_inf            = _diplus_inf < _diminus_inf
+ema1_inf              = ta.ema(close, ema_inp1)
+ema2_inf              = ta.ema(close, ema_inp2)
+ema_x_up_inf          = ema1_inf > ema2_inf
+hma_inf               = ta.hma(close, hma_inp)
+hma_slo_up_inf        = ta.rising(hma_inf, 1)
+
+a_color_c       = adx_up_inf ? color_blue_1 : adx_dn_inf ? color_red_1 : color_gray_1
+h_color_c       = hma_slo_up_inf ? color_blue_1 : not hma_slo_up_inf ? color_red_1 : color_gray_1
+e_color_c       = ema_x_up_inf ? color_blue_1 : not ema_x_up_inf ? color_red_1 : color_gray_1
+
+// Info Panel Table (Declared global to allow deletion)
+var table info_panel = na
+
+// 2. Gated HTF & Table Update
 if adx_trend
-    [_diplus_inf, _diminus_inf, _adx_inf]  = ta.dmi(di_len, len_smo)
-    adx_up_inf            = _diplus_inf > _diminus_inf
-    adx_dn_inf            = _diplus_inf < _diminus_inf
-    ema1_inf              = ta.ema(close, ema_inp1)
-    ema2_inf              = ta.ema(close, ema_inp2)
-    ema_x_up_inf          = ema1_inf > ema2_inf
-    hma_inf               = ta.hma(close, hma_inp)
-    hma_slo_up_inf        = ta.rising(hma_inf, 1)
-
-    a_color_c       = adx_up_inf ? color_blue_1 : adx_dn_inf ? color_red_1 : color_gray_1
-    h_color_c       = hma_slo_up_inf ? color_blue_1 : not hma_slo_up_inf ? color_red_1 : color_gray_1
-    e_color_c       = ema_x_up_inf ? color_blue_1 : not ema_x_up_inf ? color_red_1 : color_gray_1
-
-
     // Optimization: Combine security calls for Info Panel (16 calls -> 4 calls)
     [adx_4h_up, adx_4h_dn, hma_4h_up, e1xe2_4h_up] = request.security(syminfo.tickerid, '240', [adx_up_4h, adx_dn_4h, hma_slo_up_4h, ema_x_up_4h])
     [adx_d_up, adx_d_dn, hma_d_up, e1xe2_d_up]     = request.security(syminfo.tickerid, 'D',   [adx_up_d, adx_dn_d, hma_slo_up_d, ema_x_up_d])
@@ -1522,7 +1576,8 @@ if adx_trend
     e_color_m       = e1xe2_m_up ? color_blue_1 : not e1xe2_m_up ? color_red_1 : color_gray_1
 
     if barstate.islast
-        var info_panel = table.new(position = position.bottom_left, columns = 4, rows = 7, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50))
+        if na(info_panel)
+            info_panel := table.new(position = position.bottom_left, columns = 4, rows = 7, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50))
 
         table.cell(table_id=info_panel, column=0, row=0, text="C", text_size= size.small, text_color=color.silver)
         table.cell(table_id=info_panel, column=1, row=0, bgcolor=(Intra_D_W_M) ? a_color_c : na, width=2)
@@ -1556,6 +1611,10 @@ if adx_trend
 
         table.cell(table_id=info_panel, column=0, row=6, text="ATR14", text_size= size.small, text_color=color.silver)
         table.cell(table_id=info_panel, column=2, row=6, text=str.tostring(ta.atr(14), '#'), text_color=color.silver)
+else
+    if not na(info_panel)
+        table.delete(info_panel)
+        info_panel := na
 
 
 // ----------------------------------------------------------- pivot points -----------------------------------------------------------------
@@ -2347,13 +2406,19 @@ if barstate.islast
 
         if pch_dirty
             // Heavy Scan Loop (Runs only when HTF candle changes)
-            int lookback_limit = 2000
+            int lookback_limit = math.min(2000, bar_index) // Adaptive Limit
             float max_h_scan = na
             float min_l_scan = na
             int pch_idx_scan = na
             int pcl_idx_scan = na
 
             for i = 0 to lookback_limit
+                ops_pch += 1 // Count Ops
+
+                // Early Break Optimization
+                if time[i] < pc_start_time
+                    break
+
                 if not na(pc_start_time) and not na(pc_end_time) and time[i] >= pc_start_time and time[i] < pc_end_time
                     if na(max_h_scan) or high[i] > max_h_scan
                         max_h_scan := high[i]
@@ -2522,6 +2587,7 @@ if barstate.islast
 
         // SCAN 1: Price Range
         for i = 0 to loopLimit
+            ops_vp_scan += 1 // Count Ops
             int t = time[i]
             if t < vStart
                 break 
@@ -2607,9 +2673,14 @@ if barstate.islast
 
         // 5. Drawing
         int xLoc = bar_index + vp_offset
+        int drawn_lines = 0 // Cap Counter
         
         if maxV > 0
             for j = 0 to vp_rows - 1
+                // Check Cap
+                if drawn_lines >= vp_maxLines
+                    break
+
                 float val = array.get(vp_smtArray, j)
                 if val > 0
                     float y1 = lMin + (j * step)
@@ -2620,6 +2691,8 @@ if barstate.islast
                         intens := 1.0
                     
                     if intens > 0.01
+                        ops_vp_draw += 1 // Count Ops
+                        drawn_lines += 1 // Increment Drawn
                         color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
                         line l = line.new(x1=xLoc, y1=y1, x2=xLoc, y2=y2, xloc=xloc.bar_index, color=col, width=vp_width)
                         array.push(vp_lines, l)
@@ -2632,9 +2705,15 @@ if barstate.islast
 // -------------------------------------------------------------------------
 // DEBUG PANEL (Stage 0)
 // -------------------------------------------------------------------------
+// Update Peaks
+if ops_trend > peak_ops_trend
+    peak_ops_trend := ops_trend
+if (ops_vp_scan + ops_vp_draw) > peak_ops_vp
+    peak_ops_vp := (ops_vp_scan + ops_vp_draw)
+
 if debug_on and barstate.islast
     if na(tbl_dbg)
-        tbl_dbg := table.new(position.bottom_right, 2, 8, bgcolor=color.new(color.black, 50), frame_width=1, frame_color=color.gray)
+        tbl_dbg := table.new(position.bottom_right, 2, 12, bgcolor=color.new(color.black, 50), frame_width=1, frame_color=color.gray)
 
     // Header
     table.cell(tbl_dbg, 0, 0, "Metric", text_color=color.white, text_size=size.small)
@@ -2644,24 +2723,34 @@ if debug_on and barstate.islast
     table.cell(tbl_dbg, 0, 1, "Sec Calls", text_color=color.white, text_size=size.small)
     table.cell(tbl_dbg, 1, 1, str.tostring(active_sec_calls), text_color=color.yellow, text_size=size.small)
 
+    // Heavy Ops
+    table.cell(tbl_dbg, 0, 2, "Ops Trend (Peak)", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 2, str.tostring(ops_trend) + " (" + str.tostring(peak_ops_trend) + ")", text_color=ops_trend > 0 ? color.orange : color.green, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 3, "Ops PCH", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 3, str.tostring(ops_pch), text_color=ops_pch > 500 ? color.red : color.green, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 4, "Ops VP (Peak)", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 4, str.tostring(ops_vp_scan + ops_vp_draw) + " (" + str.tostring(peak_ops_vp) + ")", text_color=(ops_vp_scan + ops_vp_draw) > 1000 ? color.red : color.green, text_size=size.small)
+
     // Flags Status
-    table.cell(tbl_dbg, 0, 2, "ON_PS", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 2, str.tostring(ON_PS), text_color=ON_PS ? color.green : color.red, text_size=size.small)
+    table.cell(tbl_dbg, 0, 5, "ON_PS", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 5, str.tostring(ON_PS), text_color=ON_PS ? color.green : color.red, text_size=size.small)
 
-    table.cell(tbl_dbg, 0, 3, "ON_MTF_OV", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 3, str.tostring(ON_MTF_OV), text_color=ON_MTF_OV ? color.green : color.red, text_size=size.small)
+    table.cell(tbl_dbg, 0, 6, "ON_MTF_OV", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 6, str.tostring(ON_MTF_OV), text_color=ON_MTF_OV ? color.green : color.red, text_size=size.small)
 
-    table.cell(tbl_dbg, 0, 4, "ON_FVG1", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 4, str.tostring(ON_FVG1), text_color=ON_FVG1 ? color.green : color.red, text_size=size.small)
+    table.cell(tbl_dbg, 0, 7, "ON_FVG1", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 7, str.tostring(ON_FVG1), text_color=ON_FVG1 ? color.green : color.red, text_size=size.small)
 
-    table.cell(tbl_dbg, 0, 5, "ON_SESS_1ST", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 5, str.tostring(ON_SESS_1ST), text_color=ON_SESS_1ST ? color.green : color.red, text_size=size.small)
+    table.cell(tbl_dbg, 0, 8, "ON_SESS_1ST", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 8, str.tostring(ON_SESS_1ST), text_color=ON_SESS_1ST ? color.green : color.red, text_size=size.small)
 
-    table.cell(tbl_dbg, 0, 6, "ON_PCH", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 6, str.tostring(ON_PCH), text_color=ON_PCH ? color.green : color.red, text_size=size.small)
+    table.cell(tbl_dbg, 0, 9, "ON_PCH", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 9, str.tostring(ON_PCH), text_color=ON_PCH ? color.green : color.red, text_size=size.small)
 
-    table.cell(tbl_dbg, 0, 7, "BG Signal", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 7, selected_bg_signal == "None" ? "OFF" : "ON", text_color=selected_bg_signal != "None" ? color.green : color.red, text_size=size.small)
+    table.cell(tbl_dbg, 0, 10, "BG Signal", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 10, selected_bg_signal == "None" ? "OFF" : "ON", text_color=selected_bg_signal != "None" ? color.green : color.red, text_size=size.small)
 else
     if not na(tbl_dbg)
         table.delete(tbl_dbg)
