@@ -997,6 +997,7 @@ f_calc_bg_signal() =>
     // Result Variables
     color bg_color_res = na
     int bg_state_res = 0
+    int ops_local = 0
 
     // --- Optimization: Pre-calculate requirements ---
     // Shortcuts for regex-like matching
@@ -1004,6 +1005,13 @@ f_calc_bg_signal() =>
     has_segments        = str.contains(selected_bg_signal, "Segments")
     has_trend           = str.contains(selected_bg_signal, "Trend Line") or str.contains(selected_bg_signal, "Trend Lines")
     has_macd            = str.contains(selected_bg_signal, "MACD")
+
+    // Stage 1: Explicit Flags for Complex Selections (Robust Gating)
+    is_seg_fr_and       = selected_bg_signal == "Segments/Fractals (AND)"
+    is_seg_tl_and       = selected_bg_signal == "Segments/Trend Line (AND)"
+    is_seg_fr_tl_and    = selected_bg_signal == "Segments/Fractals/Trend Line (AND)"
+    is_macd_fr_or       = selected_bg_signal == "MACD Slope/Fractal Break (OR)"
+    is_macd_fr_and      = selected_bg_signal == "MACD Slope/Fractals Break (AND)"
 
     // Flags for specific modules
     // Bill Williams Fractals: Explicitly named "Bill Williams Fractals"
@@ -1021,11 +1029,11 @@ f_calc_bg_signal() =>
     // Stage 2: Background Filter Trendline Split
     // Need Fractal Levels (y0_up, y0_dn): Any signal needing pivot highs/lows from trendline logic
     // Includes: "Trend Line/Fractal Break", "Fractals Trend Lines", "Segments/Fractals", "MACD Slope/Fractal Break"
-    need_fractal_levels = selected_bg_signal == "Trend Line/Fractal Break (OR)" or selected_bg_signal == "Fractals Trend Lines" or str.contains(selected_bg_signal, "Segments/Fractals") or str.contains(selected_bg_signal, "MACD Slope/Fractal Break")
+    need_fractal_levels = selected_bg_signal == "Trend Line/Fractal Break (OR)" or selected_bg_signal == "Fractals Trend Lines" or is_seg_fr_and or is_seg_fr_tl_and or is_macd_fr_or or is_macd_fr_and
 
     // Need Trend Projection (Regression Slope + Line): Only if projected line state is needed
     // Includes: "Fractals Trend Lines", "Trend Line/Fractal Break", "Segments/Trend Line"
-    need_trend_projection = selected_bg_signal == "Fractals Trend Lines" or selected_bg_signal == "Trend Line/Fractal Break (OR)" or str.contains(selected_bg_signal, "Segments/Trend Line")
+    need_trend_projection = selected_bg_signal == "Fractals Trend Lines" or selected_bg_signal == "Trend Line/Fractal Break (OR)" or is_seg_tl_and or is_seg_fr_tl_and
 
     // 1. Re-calculate Component Indicators for this Context (CONDITIONAL)
 
@@ -1201,6 +1209,7 @@ f_calc_bg_signal() =>
                 // Limit the loop to max bars
                 int loop_cnt_u = math.min(end_idx_u - start_idx_u + 1, bg_trend_max_bars)
                 for i = 1 to loop_cnt_u
+                    ops_local += 1 // Count Ops
                     int bar_idx_i = bar_index - i
                     int dx = bar_idx_i - v_x0_up_c
                     float dy = high[i] - v_y0_up_c
@@ -1220,6 +1229,7 @@ f_calc_bg_signal() =>
                 // Limit the loop
                 int loop_cnt_d = math.min(end_idx_d - start_idx_d + 1, bg_trend_max_bars)
                 for i = 1 to loop_cnt_d
+                    ops_local += 1 // Count Ops
                     int bar_idx_i = bar_index - i
                     int dx = bar_idx_i - v_x0_dn_c
                     float dy = low[i] - v_y0_dn_c
@@ -1288,31 +1298,37 @@ f_calc_bg_signal() =>
         int safe_sb = math.min(sb, bg_trend_max_bars)
 
         for i = 0 to safe_sb
+            ops_local += 1 // Count Ops
             count1_l_c := count1_l_c + 1
             if low[1] > low[i + 2]
                 segment_1_stat_l_c := true
                 break
         for i = count1_l_c to safe_sb + count1_l_c
+            ops_local += 1 // Count Ops
             count2_l_c := count2_l_c + 1
             if low[1 + count1_l_c] > low[i + 2] and segment_1_stat_l_c
                 segment_2_stat_l_c := true
                 break
         for i = count2_l_c to safe_sb + count2_l_c
+            ops_local += 1 // Count Ops
             if low[1 + count1_l_c + count2_l_c] > low[i + 2 + count1_l_c] and segment_2_stat_l_c
                 segment_3_stat_l_c := true
                 break
 
         for i = 0 to safe_sb
+            ops_local += 1 // Count Ops
             count1_s_c := count1_s_c + 1
             if high[1] < high[i + 2]
                 segment_1_stat_s_c := true
                 break
         for i = count1_s_c to safe_sb + count1_s_c
+            ops_local += 1 // Count Ops
             count2_s_c := count2_s_c + 1
             if high[1 + count1_s_c] < high[i + 2] and segment_1_stat_s_c
                 segment_2_stat_s_c := true
                 break
         for i = count2_s_c to safe_sb + count2_s_c
+            ops_local += 1 // Count Ops
             if high[1 + count1_s_c + count2_s_c] < high[i + 2 + count1_s_c] and segment_2_stat_s_c
                 segment_3_stat_s_c := true
                 break
@@ -1436,7 +1452,7 @@ f_calc_bg_signal() =>
         bg_color_res := na(bg_state_is_green) ? na : bg_state_is_green ? color.new(color.green, transp_bg) : color.new(color.red, transp_bg)
         bg_state_res := na(bg_state_is_green) ? 0 : bg_state_is_green ? 1 : -1
     
-    [bg_color_res, bg_state_res]
+    [bg_color_res, bg_state_res, ops_local]
 // --- Execute MTF Request ---
 // Fix: Handle empty string input for current timeframe
 bg_tf_final = (bg_tf_select == "" ? timeframe.period : bg_tf_select)
@@ -1449,14 +1465,16 @@ int final_bg_state = 0
 if bg_on
     if bg_tf_select == ""
         // Direct Call (No Security Cost)
-        [col_res, state_res] = f_calc_bg_signal()
+        [col_res, state_res, ops_res] = f_calc_bg_signal()
         final_bg_color := col_res
         final_bg_state := state_res
+        ops_bg_trend   += ops_res
     else
         // Remote Call (1 Security Cost)
-        [col_res, state_res] = request.security(syminfo.tickerid, bg_tf_final, f_calc_bg_signal())
+        [col_res, state_res, ops_res] = request.security(syminfo.tickerid, bg_tf_final, f_calc_bg_signal())
         final_bg_color := col_res
         final_bg_state := state_res
+        ops_bg_trend   += ops_res
         active_sec_calls += 1
 
 // Determine if we plot background or arrows
@@ -1516,8 +1534,9 @@ Intra_D_W_M     = timeframe.isintraday or timeframe.isdaily or timeframe.isweekl
 
 // 1. Always Run Current TF (To prevent warm-up issues)
 [_diplus_inf, _diminus_inf, _adx_inf]  = ta.dmi(di_len, len_smo)
-adx_up_inf            = _diplus_inf > _diminus_inf
-adx_dn_inf            = _diplus_inf < _diminus_inf
+adx_slope_up_inf      = ta.rising(_adx_inf, 1)
+adx_up_inf            = adx_slope_up_inf and _diplus_inf > _diminus_inf
+adx_dn_inf            = adx_slope_up_inf and _diplus_inf < _diminus_inf
 ema1_inf              = ta.ema(close, ema_inp1)
 ema2_inf              = ta.ema(close, ema_inp2)
 ema_x_up_inf          = ema1_inf > ema2_inf
