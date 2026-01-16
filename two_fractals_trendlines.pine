@@ -241,6 +241,40 @@ transp_seg          = input.int(65, 'Segment Line Transparency', minval=1, maxva
 transp_bg           = input.int(85, 'Background Color Transparency', minval=1, maxval= 100, group=grp_atri)
 
 
+//-------------------------------------------------------- GLOBAL ON-FLAGS (Performance / Gating) --------------------------------------------------------
+// Stage 0: Centralized Gating Flags as aliases for inputs
+ON_PCH          = show_pch_pcl
+ON_FVG1         = plot_fvg1
+ON_FVG2         = plot_fvg2
+ON_MTF_OV       = show_mtf_candles
+ON_SESS_1ST     = use_sess_1st
+ON_LAST_FR      = show_last_frac
+ON_PS           = ps_mode != "None"
+
+
+// Helper Functions for Object Reuse (Unified)
+f_line_get_or_create(_l, _x1, _y1, _x2, _y2, _col, _style, _xloc=xloc.bar_index) =>
+    line ret = _l
+    if na(ret)
+        ret := line.new(_x1, _y1, _x2, _y2, extend=extend.right, color=_col, style=_style, width=1, xloc=_xloc)
+    else
+        line.set_xy1(ret, _x1, _y1)
+        line.set_xy2(ret, _x2, _y2)
+        line.set_color(ret, _col)
+        line.set_style(ret, _style)
+    ret
+
+f_label_get_or_create(_lb, _x, _y, _txt, _col) =>
+    label ret = _lb
+    if na(ret)
+        ret := label.new(_x, _y, _txt, xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=_col, size=size.small, textalign=text.align_left)
+    else
+        label.set_xy(ret, _x, _y)
+        label.set_text(ret, _txt)
+        label.set_textcolor(ret, _col)
+    ret
+
+
 //-------------------------------------------------------- williams fractals (Visuals for Chart) --------------------------------------------------------------
 
 up_fr               = ta.pivothigh(2, 2)
@@ -313,7 +347,7 @@ f_is_near(_p1, _p2, _pct) =>
     math.abs(_p1 - _p2) <= (_p1 * (_pct / 100))
 
 // Main Logic Loop (Runs on every bar, but updates state only on new pivots or close)
-if ps_mode != "None"
+if ON_PS
     // A. Ingest New High Pivot
     if not na(s_ph_val) and s_ph_time != last_ph_t
         last_ph_t := s_ph_time
@@ -402,7 +436,15 @@ if ps_mode != "None"
             bool broken_now = false
 
             if not lvl.is_broken
-                float check_price = lvl.is_zone ? (lvl.is_res ? box.get_top(lvl.id_box) : box.get_bottom(lvl.id_box)) : lvl.price
+                // Stage 6: Getter Caching (Micro-Opt)
+                // Cache top/bottom to avoid double calling get_top/get_bottom in expressions
+                float zone_top = na
+                float zone_bot = na
+                if lvl.is_zone
+                    zone_top := box.get_top(lvl.id_box)
+                    zone_bot := box.get_bottom(lvl.id_box)
+
+                float check_price = lvl.is_zone ? (lvl.is_res ? zone_top : zone_bot) : lvl.price
 
                 if lvl.is_res and close > check_price
                     broken_now := true
@@ -798,7 +840,9 @@ var line segment_high_1     = na
 var line segment_high_2     = na
 var line segment_high_3     = na
 
-if plot_segments
+// Stage 5: Segments Optimization (Bar Close Only)
+// Only run the heavy loops when the bar is confirmed (historical bars or realtime bar close)
+if plot_segments and barstate.isconfirmed
     // long segments
     for i = 0 to sb by 1
         count1_l := count1_l + 1
@@ -1247,33 +1291,59 @@ f_calc_bg_signal() =>
     else
         bg_state_is_green := bg_state_is_green[1]
 
-    // 3. Return Result Color
-    bg_color_res = if selected_bg_signal == "None"
-        na 
+    // 3. Return Result Color and State (1=Bull, -1=Bear, 0=Neutral)
+    int bg_state_res = 0
+    color bg_color_res = na
+
+    if selected_bg_signal == "None"
+        bg_color_res := na
+        bg_state_res := 0
     else if selected_bg_signal == "DMI ADX"
-        adx_up_c_val ? color.new(color.green, transp_bg) : adx_dn_c_val ? color.new(color.red, transp_bg) : color.new(color.gray, transp_bg) 
+        bg_color_res := adx_up_c_val ? color.new(color.green, transp_bg) : adx_dn_c_val ? color.new(color.red, transp_bg) : color.new(color.gray, transp_bg)
+        bg_state_res := adx_up_c_val ? 1 : adx_dn_c_val ? -1 : 0
     else if selected_bg_signal == "HMA Slope"
-        hma_slo_up_c ? color.new(color.green, transp_bg) : not hma_slo_up_c ? color.new(color.red, transp_bg) : na 
+        bg_color_res := hma_slo_up_c ? color.new(color.green, transp_bg) : not hma_slo_up_c ? color.new(color.red, transp_bg) : na
+        bg_state_res := hma_slo_up_c ? 1 : -1
     else if selected_bg_signal == "Parabolic SAR"
-        sar_is_long_c ? color.new(color.green, transp_bg) : color.new(color.red, transp_bg)
+        bg_color_res := sar_is_long_c ? color.new(color.green, transp_bg) : color.new(color.red, transp_bg)
+        bg_state_res := sar_is_long_c ? 1 : -1
     else if selected_bg_signal == "MACD Slow Slope"
-        macd_slow_up_c ? color.new(color.green, transp_bg) : macd_slow_dn_c ? color.new(color.red, transp_bg) : color.new(color.gray, transp_bg)
+        bg_color_res := macd_slow_up_c ? color.new(color.green, transp_bg) : macd_slow_dn_c ? color.new(color.red, transp_bg) : color.new(color.gray, transp_bg)
+        bg_state_res := macd_slow_up_c ? 1 : macd_slow_dn_c ? -1 : 0
     else 
-        na(bg_state_is_green) ? na : bg_state_is_green ? color.new(color.green, transp_bg) : color.new(color.red, transp_bg)
+        // Standard State (Green/Red)
+        bg_color_res := na(bg_state_is_green) ? na : bg_state_is_green ? color.new(color.green, transp_bg) : color.new(color.red, transp_bg)
+        bg_state_res := na(bg_state_is_green) ? 0 : bg_state_is_green ? 1 : -1
     
-    bg_color_res
+    [bg_color_res, bg_state_res]
 // --- Execute MTF Request ---
 // Fix: Handle empty string input for current timeframe
 bg_tf_final = (bg_tf_select == "" ? timeframe.period : bg_tf_select)
 
 bg_on = selected_bg_signal != "None"
 color final_bg_color = na
+int final_bg_state = 0
 
 if bg_on
-    final_bg_color := request.security(syminfo.tickerid, bg_tf_final, f_calc_bg_signal())
+    [col_res, state_res] = request.security(syminfo.tickerid, bg_tf_final, f_calc_bg_signal())
+    final_bg_color := col_res
+    final_bg_state := state_res
 
-// Apply the calculated background color
-bgcolor(final_bg_color, title="Selected Background Signal")
+// Determine if we plot background or arrows
+// If "Signal Arrow Only" is enabled, we suppress background and show arrows on state change
+plot_bg_color = f_sig_enable ? na : final_bg_color
+
+// Apply Background
+bgcolor(plot_bg_color, title="Selected Background Signal")
+
+// Apply Signal Arrows (Only if enabled and state changed)
+// Check for state change: 1 (Bull) or -1 (Bear)
+// Use [1] to detect edge (rising/falling edge of state)
+arrow_bull = f_sig_enable and final_bg_state == 1 and final_bg_state[1] != 1
+arrow_bear = f_sig_enable and final_bg_state == -1 and final_bg_state[1] != -1
+
+plotchar(arrow_bull, char='⬆', location=location.belowbar, color=color.green, size=size.small, title="BG Signal Bull")
+plotchar(arrow_bear, char='⬇', location=location.abovebar, color=color.red, size=size.small, title="BG Signal Bear")
 
 
 //-------------------------------------------------------------------- info panel -------------------------------------------------------------------------
@@ -1454,32 +1524,94 @@ if adx_trend
 // Optimierte Datenabfrage (Tuples), um das "Security Limit" von 40 nicht zu sprengen
 // Wir holen High, Low und Close in EINEM Aufruf pro Timeframe statt in drei.
 
-any_pivot_on = plot_pivots_h1 or plot_pivots_h4 or plot_pivots_d or plot_pivots_w or plot_pivots_m or plot_pivots_3m or plot_pivots_12m
+// Stage 1: Pivot Points Optimization
+// Strict Gating: request.security only if input is active AND timeframe is valid
 
-float h1_high = na, float h1_low = na, float h1_close = na
-float h4_high = na, float h4_low = na, float h4_close = na
-float d_high = na, float d_low = na, float d_close = na
-float w_high = na, float w_low = na, float w_close = na
-float m_high = na, float m_low = na, float m_close = na
-float m3_high = na, float m3_low = na, float m3_close = na
-float m12_high = na, float m12_low = na, float m12_close = na
+// Conditions (Visibility)
+cond_h1 = timeframe.isintraday and timeframe.multiplier < 60
+cond_h4 = timeframe.isintraday and timeframe.multiplier < 240
 
-if any_pivot_on
-    [h1_high_t, h1_low_t, h1_close_t]    = request.security(syminfo.tickerid, "60", [high[1], low[1], close[1]])
-    [h4_high_t, h4_low_t, h4_close_t]    = request.security(syminfo.tickerid, "240", [high[1], low[1], close[1]])
-    [d_high_t, d_low_t, d_close_t]       = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]])
-    [w_high_t, w_low_t, w_close_t]       = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]])
-    [m_high_t, m_low_t, m_close_t]       = request.security(syminfo.tickerid, "M", [high[1], low[1], close[1]])
-    [m3_high_t, m3_low_t, m3_close_t]    = request.security(syminfo.tickerid, "3M", [high[1], low[1], close[1]])
+
+// Need Flags
+need_h1 = plot_pivots_h1 and cond_h1
+need_h4 = plot_pivots_h4 and cond_h4
+need_d  = plot_pivots_d  and Intra
+need_w  = plot_pivots_w  and Intra_D
+need_m  = plot_pivots_m  and Intra_D_W
+need_3m = plot_pivots_3m and Intra_D_W_M
+need_12m= plot_pivots_12m and Intra_D_W_M
+
+// Data Variables (Initial NA)
+float h1_high = na
+float h1_low = na
+float h1_close = na
+
+float h4_high = na
+float h4_low = na
+float h4_close = na
+
+float d_high = na
+float d_low = na
+float d_close = na
+
+float w_high = na
+float w_low = na
+float w_close = na
+
+float m_high = na
+float m_low = na
+float m_close = na
+
+float m3_high = na
+float m3_low = na
+float m3_close = na
+
+float m12_high = na
+float m12_low = na
+float m12_close = na
+
+// Gated Security Calls
+if need_h1
+    [h1_high_t, h1_low_t, h1_close_t] = request.security(syminfo.tickerid, "60", [high[1], low[1], close[1]])
+    h1_high := h1_high_t
+    h1_low := h1_low_t
+    h1_close := h1_close_t
+
+if need_h4
+    [h4_high_t, h4_low_t, h4_close_t] = request.security(syminfo.tickerid, "240", [high[1], low[1], close[1]])
+    h4_high := h4_high_t
+    h4_low := h4_low_t
+    h4_close := h4_close_t
+
+if need_d
+    [d_high_t, d_low_t, d_close_t] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]])
+    d_high := d_high_t
+    d_low := d_low_t
+    d_close := d_close_t
+
+if need_w
+    [w_high_t, w_low_t, w_close_t] = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]])
+    w_high := w_high_t
+    w_low := w_low_t
+    w_close := w_close_t
+
+if need_m
+    [m_high_t, m_low_t, m_close_t] = request.security(syminfo.tickerid, "M", [high[1], low[1], close[1]])
+    m_high := m_high_t
+    m_low := m_low_t
+    m_close := m_close_t
+
+if need_3m
+    [m3_high_t, m3_low_t, m3_close_t] = request.security(syminfo.tickerid, "3M", [high[1], low[1], close[1]])
+    m3_high := m3_high_t
+    m3_low := m3_low_t
+    m3_close := m3_close_t
+
+if need_12m
     [m12_high_t, m12_low_t, m12_close_t] = request.security(syminfo.tickerid, "12M", [high[1], low[1], close[1]])
-
-    h1_high := h1_high_t, h1_low := h1_low_t, h1_close := h1_close_t
-    h4_high := h4_high_t, h4_low := h4_low_t, h4_close := h4_close_t
-    d_high := d_high_t, d_low := d_low_t, d_close := d_close_t
-    w_high := w_high_t, w_low := w_low_t, w_close := w_close_t
-    m_high := m_high_t, m_low := m_low_t, m_close := m_close_t
-    m3_high := m3_high_t, m3_low := m3_low_t, m3_close := m3_close_t
-    m12_high := m12_high_t, m12_low := m12_low_t, m12_close := m12_close_t
+    m12_high := m12_high_t
+    m12_low := m12_low_t
+    m12_close := m12_close_t
 
 // --- Calculations ---
 
@@ -1600,8 +1732,6 @@ f_draw_pivot(_line, _val, _col, _width, _offset_start, _show_cond, _input_active
 // 3. Execution (Drawing)
 
 // Bedingungen für Sichtbarkeit
-cond_h1 = timeframe.isintraday and timeframe.multiplier < 60
-cond_h4 = timeframe.isintraday and timeframe.multiplier < 240
 
 // 1H: Offset 1, Width 1 (Analog zu Daily)
 l_h1_pp := f_draw_pivot(l_h1_pp, h1_PP, color.orange, 1, 1, cond_h1, plot_pivots_h1)
@@ -1844,10 +1974,11 @@ col_bear = color.new(color.red, t_val)
 col_border_bull = color.new(color.green, 80) 
 col_border_bear = color.new(color.red, 80) 
 
-// Persistent Variable
+// Persistent Variables (Stage 4: Array FIFO)
+var box[] mtf_boxes = array.new_box()
 var box mtf_body = na
 
-if show_mtf_candles and is_higher_tf
+if ON_MTF_OV and is_higher_tf
     
     // Determine Bull/Bear state
     is_up = mtf_c >= mtf_o
@@ -1861,11 +1992,17 @@ if show_mtf_candles and is_higher_tf
     // --- Logic ---
     if new_mtf_bar
         // Create NEW object to avoid overlap
-        // Box starts at current bar_index
         mtf_body := box.new(bar_index, body_top, bar_index, body_bot, border_color=cur_border, border_width=1, bgcolor=cur_fill)
+        array.push(mtf_boxes, mtf_body)
+
+        // FIFO Limit (e.g., 50)
+        if array.size(mtf_boxes) > 50
+            box.delete(array.shift(mtf_boxes))
 
     else
-        // Update Existing Object (extend to right)
+        // Update Existing Object (Last one created)
+        // If mtf_body is maintained, we can use it directly, but getting from array is safer if logic was complex
+        // Here we just reuse mtf_body var which holds the current active box
         if not na(mtf_body)
             box.set_right(mtf_body, bar_index)
             box.set_top(mtf_body, body_top)
@@ -1891,7 +2028,7 @@ tf_ms1 = (fvg1_tf_sel == "" ? timeframe.in_seconds(timeframe.period) : timeframe
 // Variable to track the last drawn FVG time
 var int last_fvg_time1 = 0
 
-if plot_fvg1
+if ON_FVG1
     box b_new = na
     // CASE A: Current Timeframe
     if fvg1_tf_sel == ""
@@ -1937,7 +2074,7 @@ tf_ms2 = (fvg2_tf_sel == "" ? timeframe.in_seconds(timeframe.period) : timeframe
 // Variable to track the last drawn FVG time
 var int last_fvg_time2 = 0
 
-if plot_fvg2
+if ON_FVG2
     box b_new = na
     // CASE A: Current Timeframe
     if fvg2_tf_sel == ""
@@ -2034,24 +2171,30 @@ var line l_s1_l = na
 var label lb_s1_h = na
 var label lb_s1_l = na
 
-if use_sess_1st and barstate.islast
-    line.delete(l_s1_h)
-    line.delete(l_s1_l)
-    label.delete(lb_s1_h)
-    label.delete(lb_s1_l)
+// Stage 3: 1st Session Candle & Last Fractal S/R (Reuse)
 
-    // Check visibility: Chart TF <= Selected 1st Session TF
-    // Note: empty string "" for tf means current chart, treated as 0 or handling it specifically?
-    // timeframe.in_seconds("") returns current chart seconds.
-    // If sess_1st_tf is "" it works correctly.
-    if timeframe.in_seconds(timeframe.period) <= timeframe.in_seconds(sess_1st_tf)
+if barstate.islast
+    // Check Visibility
+    is_valid_s1_tf = timeframe.in_seconds(timeframe.period) <= timeframe.in_seconds(sess_1st_tf)
+
+    if ON_SESS_1ST and is_valid_s1_tf
         if not na(s1_h_val) and not na(s1_t_val)
-            l_s1_h := line.new(x1=s1_t_val, y1=s1_h_val, x2=time, y2=s1_h_val, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.gray, 50), style=line.style_solid, width=1)
-            lb_s1_h := label.new(x=bar_index + 4, y=s1_h_val, text="1st High", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+            l_s1_h := f_line_get_or_create(l_s1_h, s1_t_val, s1_h_val, time, s1_h_val, color.new(color.gray, 50), line.style_solid, xloc.bar_time)
+            lb_s1_h := f_label_get_or_create(lb_s1_h, bar_index + 4, s1_h_val, "1st High", color.new(color.gray, 30))
 
         if not na(s1_l_val) and not na(s1_t_val)
-            l_s1_l := line.new(x1=s1_t_val, y1=s1_l_val, x2=time, y2=s1_l_val, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.gray, 50), style=line.style_solid, width=1)
-            lb_s1_l := label.new(x=bar_index + 4, y=s1_l_val, text="1st Low", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+            l_s1_l := f_line_get_or_create(l_s1_l, s1_t_val, s1_l_val, time, s1_l_val, color.new(color.gray, 50), line.style_solid, xloc.bar_time)
+            lb_s1_l := f_label_get_or_create(lb_s1_l, bar_index + 4, s1_l_val, "1st Low", color.new(color.gray, 30))
+
+    else
+        line.delete(l_s1_h)
+        l_s1_h := na
+        line.delete(l_s1_l)
+        l_s1_l := na
+        label.delete(lb_s1_h)
+        lb_s1_h := na
+        label.delete(lb_s1_l)
+        lb_s1_l := na
 
 
 /// --- 2. Previous Candle High/Low (Lines & Labels) ---
@@ -2064,54 +2207,81 @@ var line  l_pcl  = na
 var label lb_pch = na
 var label lb_pcl = na
 
-if show_pch_pcl and barstate.islast
-    // Delete old objects so they update dynamically and don't clutter history
-    line.delete(l_pch)
-    line.delete(l_pcl)
-    label.delete(lb_pch)
-    label.delete(lb_pcl)
+// Stage 2: PCH/PCL Object Reuse & Dirty Scan
 
-    // Check visibility: Current TF must be <= Selected TF
+// State for Dirty Check
+var int last_pc_start = 0
+var int last_pc_end = 0
+
+// Cached Scan Results
+var int   c_pch_idx = na
+var int   c_pcl_idx = na
+var float c_max_h   = na
+var float c_min_l   = na
+
+
+if barstate.islast
+    // Check Visibility & Enable
     is_valid_pch_tf = timeframe.in_seconds(timeframe.period) <= timeframe.in_seconds(pch_pcl_tf)
 
-    if is_valid_pch_tf
-        int lookback_limit = 2000
+    if ON_PCH and is_valid_pch_tf
+        // Dirty Logic
+        bool pch_dirty = (pc_start_time != last_pc_start) or (pc_end_time != last_pc_end)
 
-        // Find the exact LTF bar INSIDE the previous HTF candle window that made the high/low
-        int   pch_index = na
-        int   pcl_index = na
-        float max_h     = na
-        float min_l     = na
+        if pch_dirty
+            // Heavy Scan Loop (Runs only when HTF candle changes)
+            int lookback_limit = 2000
+            float max_h_scan = na
+            float min_l_scan = na
+            int pch_idx_scan = na
+            int pcl_idx_scan = na
 
-        float pch_y     = na
-        float pcl_y     = na
+            for i = 0 to lookback_limit
+                if not na(pc_start_time) and not na(pc_end_time) and time[i] >= pc_start_time and time[i] < pc_end_time
+                    if na(max_h_scan) or high[i] > max_h_scan
+                        max_h_scan := high[i]
+                        pch_idx_scan := bar_index - i
+                    if na(min_l_scan) or low[i] < min_l_scan
+                        min_l_scan := low[i]
+                        pcl_idx_scan := bar_index - i
 
-        // --- Standard Previous Candle Mode ---
-        for i = 0 to lookback_limit
-            if not na(pc_start_time) and not na(pc_end_time) and time[i] >= pc_start_time and time[i] < pc_end_time
-                if na(max_h) or high[i] > max_h
-                    max_h := high[i]
-                    pch_index := bar_index - i
-                if na(min_l) or low[i] < min_l
-                    min_l := low[i]
-                    pcl_index := bar_index - i
+            // Update Cache
+            c_max_h   := max_h_scan
+            c_min_l   := min_l_scan
+            c_pch_idx := pch_idx_scan
+            c_pcl_idx := pcl_idx_scan
 
-        pch_y := not na(pc_h_val) ? pc_h_val : max_h
-        pcl_y := not na(pc_l_val) ? pc_l_val : min_l
+            // Update State
+            last_pc_start := pc_start_time
+            last_pc_end   := pc_end_time
 
-        // Stable fallbacks
-        pch_index := na(pch_index) ? bar_index : pch_index
-        pcl_index := na(pcl_index) ? bar_index : pcl_index
+        // Determine Y Values (Fallback to cached scan if security returns na)
+        float pch_y = not na(pc_h_val) ? pc_h_val : c_max_h
+        float pcl_y = not na(pc_l_val) ? pc_l_val : c_min_l
 
-        // Draw PCH Line (Start at found index, Extend Right)
+        // Use cached indices (ensure not na)
+        int pch_index = na(c_pch_idx) ? bar_index : c_pch_idx
+        int pcl_index = na(c_pcl_idx) ? bar_index : c_pcl_idx
+
+        // Draw/Update Objects (Reuse)
         if not na(pch_y)
-            l_pch := line.new(x1=pch_index, y1=pch_y, x2=bar_index, y2=pch_y, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
-            lb_pch := label.new(x=bar_index + 10, y=pch_y, text="Prev High", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+            l_pch  := f_line_get_or_create(l_pch, pch_index, pch_y, bar_index, pch_y, color.new(color.gray, 50), line.style_dashed)
+            lb_pch := f_label_get_or_create(lb_pch, bar_index + 10, pch_y, "Prev High", color.new(color.gray, 30))
 
-        // Draw PCL Line (Start at found index, Extend Right)
         if not na(pcl_y)
-            l_pcl := line.new(x1=pcl_index, y1=pcl_y, x2=bar_index, y2=pcl_y, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
-            lb_pcl := label.new(x=bar_index + 10, y=pcl_y, text="Prev Low", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+            l_pcl  := f_line_get_or_create(l_pcl, pcl_index, pcl_y, bar_index, pcl_y, color.new(color.gray, 50), line.style_dashed)
+            lb_pcl := f_label_get_or_create(lb_pcl, bar_index + 10, pcl_y, "Prev Low", color.new(color.gray, 30))
+
+    else
+        // Cleanup if disabled or invalid TF
+        line.delete(l_pch)
+        l_pch := na
+        line.delete(l_pcl)
+        l_pcl := na
+        label.delete(lb_pch)
+        lb_pch := na
+        label.delete(lb_pcl)
+        lb_pcl := na
 
 
 // --- 2. Last Fractal S/R (Lines & Labels) ---
@@ -2134,23 +2304,27 @@ var line l_last_fl = na
 var label lb_last_fh = na
 var label lb_last_fl = na
 
-if show_last_frac and barstate.islast
-    line.delete(l_last_fh)
-    line.delete(l_last_fl)
-    label.delete(lb_last_fh)
-    label.delete(lb_last_fl)
-
-    // Check visibility: Current TF must be <= Selected TF
+if barstate.islast
+    // Check Visibility
     is_valid_frac_tf = timeframe.in_seconds(timeframe.period) <= timeframe.in_seconds(last_frac_tf)
 
-    if is_valid_frac_tf
+    if ON_LAST_FR and is_valid_frac_tf
         if not na(frac_h_val)
-            l_last_fh := line.new(x1=frac_h_time, y1=frac_h_val, x2=time, y2=frac_h_val, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
-            lb_last_fh := label.new(x=bar_index + 8, y=frac_h_val, text="Frac High", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+            l_last_fh := f_line_get_or_create(l_last_fh, frac_h_time, frac_h_val, time, frac_h_val, color.new(color.gray, 50), line.style_dashed, xloc.bar_time)
+            lb_last_fh := f_label_get_or_create(lb_last_fh, bar_index + 8, frac_h_val, "Frac High", color.new(color.gray, 30))
 
         if not na(frac_l_val)
-            l_last_fl := line.new(x1=frac_l_time, y1=frac_l_val, x2=time, y2=frac_l_val, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.gray, 50), style=line.style_dashed, width=1)
-            lb_last_fl := label.new(x=bar_index + 8, y=frac_l_val, text="Frac Low", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.gray, 30), size=size.small, textalign=text.align_left)
+            l_last_fl := f_line_get_or_create(l_last_fl, frac_l_time, frac_l_val, time, frac_l_val, color.new(color.gray, 50), line.style_dashed, xloc.bar_time)
+            lb_last_fl := f_label_get_or_create(lb_last_fl, bar_index + 8, frac_l_val, "Frac Low", color.new(color.gray, 30))
+    else
+        line.delete(l_last_fh)
+        l_last_fh := na
+        line.delete(l_last_fl)
+        l_last_fl := na
+        label.delete(lb_last_fh)
+        lb_last_fh := na
+        label.delete(lb_last_fl)
+        lb_last_fl := na
 
 
 // --- 3. Volume Spikes (Char) ---
