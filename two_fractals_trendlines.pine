@@ -132,12 +132,12 @@ ema_inp1            = input.int(8, title='Cloud EMA1 Length', minval=1, group=gr
 ema_inp2            = input.int(21, title='Cloud EMA2 Length', minval=1, group=grp_ma, tooltip="")
 
 // MA 1 Inputs
-ma1_type            = input.string("SMA", title="MA 1", options=["None", "SMA", "EMA"], inline="ma1", group=grp_ma)
+ma1_type            = input.string("EMA", title="MA 1", options=["None", "SMA", "EMA"], inline="ma1", group=grp_ma)
 ma1_len             = input.int(200, title="", minval=1, inline="ma1", group=grp_ma)
 ma1_slope_c         = input.bool(false, title="Slope Color", inline="ma1", group=grp_ma)
 
 // MA 2 Inputs
-ma2_type            = input.string("EMA", title="MA 2", options=["None", "SMA", "EMA"], inline="ma2", group=grp_ma)
+ma2_type            = input.string("SMA", title="MA 2", options=["None", "SMA", "EMA"], inline="ma2", group=grp_ma)
 ma2_len             = input.int(200, title="", minval=1, inline="ma2", group=grp_ma)
 ma2_slope_c         = input.bool(false, title="Slope Color", inline="ma2", group=grp_ma)
 
@@ -178,7 +178,7 @@ selected_bg_signal  = input.string("None", title="Background Color Filter", opti
                      "Segments/Fractals (AND)", "Segments/Trend Line (AND)", "Segments/Fractals/Trend Line (AND)", "Segments/MACD Slope (AND)", "MACD Slope/Fractals Break (AND)", "MA1/MA2 Cross", "FVG Open", "FVG Close", "FVG/Fractal (OR)", "FVG/Fractal (AND)"],
                      group=grp_bg, tooltip="Signals that are alternatively displayed as a background color as a quick verification and a kind of 'backtest'.")
 bg_tf_select        = input.timeframe("", title="Background Filter TF", group=grp_bg, tooltip="Select the timeframe for the background signals calculations. Empty = Current Chart Timeframe.")
-
+f_sig_enable        = input.bool(false, "Signal Arrow Only", group=grp_bg, tooltip="BG signal arrow" )
 di_len              = input.int(7, title='ADX DI Length', minval=1, group=grp_bg, tooltip="")
 len_smo             = input.int(7, title='ADX Smoothing', minval=1, group=grp_bg, tooltip="")
 hma_inp             = input.int(20, title='HMA Length', minval=1, group=grp_bg, tooltip="")
