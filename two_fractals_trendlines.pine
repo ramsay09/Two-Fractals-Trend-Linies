@@ -1,6 +1,6 @@
 //@version=5
 
-indicator('Two Fractals Trend Lines', overlay=true, shorttitle='fr lines', max_bars_back=4000, max_lines_count=500, max_boxes_count=500)
+indicator('Two Fractals Trend Lines', overlay=true, shorttitle='fr lines', max_bars_back=4000, max_lines_count=500, max_boxes_count=500, dynamic_requests=true)
 
 general_info   = input.bool(title='General Description', defval=false, tooltip='Use the signals in confluence and as an indication of market tension, which will discharged in higher volatility or trend continuation. ... context matters.
                  Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
@@ -652,8 +652,13 @@ if (plot_trendline)
 
     // Draw
     if not na(x1_u) and not na(x2_u) and x1_u != x2_u and not na(y2_u)
-        line.delete(upper_line) 
-        upper_line := line.new(x1 = x1_u, y1 = y1_u, x2 = x2_u, y2 = y2_u, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
+        if na(upper_line)
+            upper_line := line.new(x1 = x1_u, y1 = y1_u, x2 = x2_u, y2 = y2_u, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
+        else
+            line.set_xy1(upper_line, x1_u, y1_u)
+            line.set_xy2(upper_line, x2_u, y2_u)
+            line.set_color(upper_line, color.new(color_tr, transp_tr))
+            line.set_width(upper_line, width_tr)
 
     // --- LOWER LINE ---
     x1_d = use_special_trend ? x0_dn : x1_dn
@@ -668,8 +673,13 @@ if (plot_trendline)
         y2_d := y0_dn
 
     if not na(x1_d) and not na(x2_d) and x1_d != x2_d and not na(y2_d)
-        line.delete(lower_line) 
-        lower_line := line.new(x1 = x1_d, y1 = y1_d, x2 = x2_d, y2 = y2_d, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
+        if na(lower_line)
+            lower_line := line.new(x1 = x1_d, y1 = y1_d, x2 = x2_d, y2 = y2_d, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
+        else
+            line.set_xy1(lower_line, x1_d, y1_d)
+            line.set_xy2(lower_line, x2_d, y2_d)
+            line.set_color(lower_line, color.new(color_tr, transp_tr))
+            line.set_width(lower_line, width_tr)
 
 
 //----------------------------------------------------------- last 12 bar (Visuals for Chart) ----------------------------------------------------------
@@ -778,66 +788,67 @@ var line segment_low_1_l    = na
 var line segment_low_2_l    = na
 var line segment_low_3_l    = na
 
-// long segments
-for i = 0 to sb by 1
-    count1_l := count1_l + 1
-    if low[1] > low[i + 2] 
-        segment_low_1_l := line.new(x1=bar_index[2 + i], y1=low[2 + i], x2=bar_index[1], y2=low[1], color=color.new(color_seg, transp_seg), width=3)
-        segment_1_stat_l := true
-        break
+count1_s                    = 0
+count2_s                    = 0
+segment_1_stat_s            = false
+segment_2_stat_s            = false
+segment_3_stat_s            = false
 
-for i = count1_l to sb + count1_l by 1
-    count2_l := count2_l + 1
-    if low[1 + count1_l] > low[i + 2] and segment_1_stat_l
-        segment_low_2_l := line.new(x1=bar_index[2 + i], y1=low[2 + i], x2=bar_index[1 + count1_l], y2=low[1 + count1_l], color=color.new(color_seg, transp_seg), width=2)
-        segment_2_stat_l := true
-        break
+var line segment_high_1     = na
+var line segment_high_2     = na
+var line segment_high_3     = na
 
-for i = count2_l to sb + count2_l by 1
-    if low[1 + count1_l + count2_l] > low[i + 2 + count1_l] and segment_2_stat_l
-        segment_low_3_l := line.new(x1=bar_index[i + 2 + count1_l], y1=low[i + 2 + count1_l], x2=bar_index[1 + count1_l + count2_l], y2=low[1 + count1_l + count2_l], color=color.new(color_seg, transp_seg), width=1)
-        segment_3_stat_l := true
-        break
+if plot_segments
+    // long segments
+    for i = 0 to sb by 1
+        count1_l := count1_l + 1
+        if low[1] > low[i + 2]
+            segment_low_1_l := line.new(x1=bar_index[2 + i], y1=low[2 + i], x2=bar_index[1], y2=low[1], color=color.new(color_seg, transp_seg), width=3)
+            segment_1_stat_l := true
+            break
 
-line.delete(plot_segments ? segment_low_1_l[1] : segment_low_1_l[0])
-line.delete(plot_segments ? segment_low_2_l[1] : segment_low_2_l[0])
-line.delete(plot_segments ? segment_low_3_l[1] : segment_low_3_l[0])
+    for i = count1_l to sb + count1_l by 1
+        count2_l := count2_l + 1
+        if low[1 + count1_l] > low[i + 2] and segment_1_stat_l
+            segment_low_2_l := line.new(x1=bar_index[2 + i], y1=low[2 + i], x2=bar_index[1 + count1_l], y2=low[1 + count1_l], color=color.new(color_seg, transp_seg), width=2)
+            segment_2_stat_l := true
+            break
+
+    for i = count2_l to sb + count2_l by 1
+        if low[1 + count1_l + count2_l] > low[i + 2 + count1_l] and segment_2_stat_l
+            segment_low_3_l := line.new(x1=bar_index[i + 2 + count1_l], y1=low[i + 2 + count1_l], x2=bar_index[1 + count1_l + count2_l], y2=low[1 + count1_l + count2_l], color=color.new(color_seg, transp_seg), width=1)
+            segment_3_stat_l := true
+            break
+
+    line.delete(segment_low_1_l[1])
+    line.delete(segment_low_2_l[1])
+    line.delete(segment_low_3_l[1])
 
 
-// short segments
-count1_s                = 0
-count2_s                = 0
-segment_1_stat_s        = false
-segment_2_stat_s        = false
-segment_3_stat_s        = false
+    // short segments
+    for i = 0 to sb by 1
+        count1_s := count1_s + 1
+        if high[1] < high[i + 2]
+            segment_high_1 := line.new(x1=bar_index[2 + i], y1=high[2 + i], x2=bar_index[1], y2=high[1], color=color.new(color_seg, transp_seg), width=3)
+            segment_1_stat_s := true
+            break
 
-var line segment_high_1 = na
-var line segment_high_2 = na
-var line segment_high_3 = na
+    for i = count1_s to sb + count1_s by 1
+        count2_s := count2_s + 1
+        if high[1 + count1_s] < high[i + 2] and segment_1_stat_s
+            segment_high_2 := line.new(x1=bar_index[2 + i], y1=high[2 + i], x2=bar_index[1 + count1_s], y2=high[1 + count1_s], color=color.new(color_seg, transp_seg), width=2)
+            segment_2_stat_s := true
+            break
 
-for i = 0 to sb by 1
-    count1_s := count1_s + 1
-    if high[1] < high[i + 2]  
-        segment_high_1 := line.new(x1=bar_index[2 + i], y1=high[2 + i], x2=bar_index[1], y2=high[1], color=color.new(color_seg, transp_seg), width=3)
-        segment_1_stat_s := true
-        break
+    for i = count2_s to sb + count2_s by 1
+        if high[1 + count1_s + count2_s] < high[i + 2 + count1_s] and segment_2_stat_s
+            segment_high_3 := line.new(x1=bar_index[i + 2 + count1_s], y1=high[i + 2 + count1_s], x2=bar_index[1 + count1_s + count2_s], y2=high[1 + count1_s + count2_s], color=color.new(color_seg, transp_seg), width=1)
+            segment_3_stat_s := true
+            break
 
-for i = count1_s to sb + count1_s by 1
-    count2_s := count2_s + 1
-    if high[1 + count1_s] < high[i + 2] and segment_1_stat_s
-        segment_high_2 := line.new(x1=bar_index[2 + i], y1=high[2 + i], x2=bar_index[1 + count1_s], y2=high[1 + count1_s], color=color.new(color_seg, transp_seg), width=2)
-        segment_2_stat_s := true
-        break
-
-for i = count2_s to sb + count2_s by 1
-    if high[1 + count1_s + count2_s] < high[i + 2 + count1_s] and segment_2_stat_s
-        segment_high_3 := line.new(x1=bar_index[i + 2 + count1_s], y1=high[i + 2 + count1_s], x2=bar_index[1 + count1_s + count2_s], y2=high[1 + count1_s + count2_s], color=color.new(color_seg, transp_seg), width=1)
-        segment_3_stat_s := true
-        break
-
-line.delete(plot_segments ? segment_high_1[1] : segment_high_1[0])
-line.delete(plot_segments ? segment_high_2[1] : segment_high_2[0])
-line.delete(plot_segments ? segment_high_3[1] : segment_high_3[0])
+    line.delete(segment_high_1[1])
+    line.delete(segment_high_2[1])
+    line.delete(segment_high_3[1])
 
 
 //------------------------------------------------------------------------ BACKGROUND COLOR LOGIC (MTF Wrapper) ------------------------------------------------------------------
@@ -1254,7 +1265,12 @@ f_calc_bg_signal() =>
 // --- Execute MTF Request ---
 // Fix: Handle empty string input for current timeframe
 bg_tf_final = (bg_tf_select == "" ? timeframe.period : bg_tf_select)
-final_bg_color = request.security(syminfo.tickerid, bg_tf_final, f_calc_bg_signal())
+
+bg_on = selected_bg_signal != "None"
+color final_bg_color = na
+
+if bg_on
+    final_bg_color := request.security(syminfo.tickerid, bg_tf_final, f_calc_bg_signal())
 
 // Apply the calculated background color
 bgcolor(final_bg_color, title="Selected Background Signal")
@@ -1349,45 +1365,6 @@ color_gray_1    = color.new(color.gray, 30)
 
 //current tf condition for adx, hama and ema
 // RECALC for info panel table to ensure it matches current chart regardless of bg signal
-[_diplus_inf, _diminus_inf, _adx_inf]  = ta.dmi(di_len, len_smo) 
-adx_up_inf            = _diplus_inf > _diminus_inf
-adx_dn_inf            = _diplus_inf < _diminus_inf
-ema1_inf              = ta.ema(close, ema_inp1)
-ema2_inf              = ta.ema(close, ema_inp2)
-ema_x_up_inf          = ema1_inf > ema2_inf   
-hma_inf               = ta.hma(close, hma_inp)                  
-hma_slo_up_inf        = ta.rising(hma_inf, 1)                
-
-a_color_c       = adx_up_inf ? color_blue_1 : adx_dn_inf ? color_red_1 : color_gray_1
-h_color_c       = hma_slo_up_inf ? color_blue_1 : not hma_slo_up_inf ? color_red_1 : color_gray_1
-e_color_c       = ema_x_up_inf ? color_blue_1 : not ema_x_up_inf ? color_red_1 : color_gray_1
-
-
-// Optimization: Combine security calls for Info Panel (16 calls -> 4 calls)
-[adx_4h_up, adx_4h_dn, hma_4h_up, e1xe2_4h_up] = request.security(syminfo.tickerid, '240', [adx_up_4h, adx_dn_4h, hma_slo_up_4h, ema_x_up_4h])
-[adx_d_up, adx_d_dn, hma_d_up, e1xe2_d_up]     = request.security(syminfo.tickerid, 'D',   [adx_up_d, adx_dn_d, hma_slo_up_d, ema_x_up_d])
-[adx_w_up, adx_w_dn, hma_w_up, e1xe2_w_up]     = request.security(syminfo.tickerid, 'W',   [adx_up_w, adx_dn_w, hma_slo_up_w, ema_x_up_w])
-[adx_m_up, adx_m_dn, hma_m_up, e1xe2_m_up]     = request.security(syminfo.tickerid, 'M',   [adx_up_m, adx_dn_m, hma_slo_up_m, ema_x_up_m])
-
-
-//adx conditions
-a_color_4h        = adx_4h_up ? color_blue_1 : adx_4h_dn ? color_red_1 : color_gray_1    
-a_color_d         = adx_d_up ? color_blue_1 : adx_d_dn ? color_red_1 : color_gray_1
-a_color_w         = adx_w_up ? color_blue_1 : adx_w_dn ? color_red_1 : color_gray_1
-a_color_m         = adx_m_up ? color_blue_1 : adx_m_dn ? color_red_1 : color_gray_1
-
-//hma conditions
-h_color_4h      = hma_4h_up ? color_blue_1 : not hma_4h_up ? color_red_1 : color_gray_1    
-h_color_d       = hma_d_up ? color_blue_1 : not hma_d_up ? color_red_1 : color_gray_1
-h_color_w       = hma_w_up ? color_blue_1 : not hma_w_up ? color_red_1 : color_gray_1
-h_color_m       = hma_m_up ? color_blue_1 : not hma_m_up ? color_red_1 : color_gray_1
-
-//ema1 x ema2 condition
-e_color_4h      = e1xe2_4h_up ? color_blue_1 : not e1xe2_4h_up ? color_red_1 : color_gray_1    
-e_color_d       = e1xe2_d_up ? color_blue_1 : not e1xe2_d_up ? color_red_1 : color_gray_1
-e_color_w       = e1xe2_w_up ? color_blue_1 : not e1xe2_w_up ? color_red_1 : color_gray_1
-e_color_m       = e1xe2_m_up ? color_blue_1 : not e1xe2_m_up ? color_red_1 : color_gray_1
-
 
 //mtf time frames
 Intra           = timeframe.isintraday
@@ -1395,8 +1372,47 @@ Intra_D         = timeframe.isintraday or timeframe.isdaily
 Intra_D_W       = timeframe.isintraday or timeframe.isdaily or timeframe.isweekly
 Intra_D_W_M     = timeframe.isintraday or timeframe.isdaily or timeframe.isweekly or timeframe.ismonthly
 
-
 if adx_trend
+    [_diplus_inf, _diminus_inf, _adx_inf]  = ta.dmi(di_len, len_smo)
+    adx_up_inf            = _diplus_inf > _diminus_inf
+    adx_dn_inf            = _diplus_inf < _diminus_inf
+    ema1_inf              = ta.ema(close, ema_inp1)
+    ema2_inf              = ta.ema(close, ema_inp2)
+    ema_x_up_inf          = ema1_inf > ema2_inf
+    hma_inf               = ta.hma(close, hma_inp)
+    hma_slo_up_inf        = ta.rising(hma_inf, 1)
+
+    a_color_c       = adx_up_inf ? color_blue_1 : adx_dn_inf ? color_red_1 : color_gray_1
+    h_color_c       = hma_slo_up_inf ? color_blue_1 : not hma_slo_up_inf ? color_red_1 : color_gray_1
+    e_color_c       = ema_x_up_inf ? color_blue_1 : not ema_x_up_inf ? color_red_1 : color_gray_1
+
+
+    // Optimization: Combine security calls for Info Panel (16 calls -> 4 calls)
+    [adx_4h_up, adx_4h_dn, hma_4h_up, e1xe2_4h_up] = request.security(syminfo.tickerid, '240', [adx_up_4h, adx_dn_4h, hma_slo_up_4h, ema_x_up_4h])
+    [adx_d_up, adx_d_dn, hma_d_up, e1xe2_d_up]     = request.security(syminfo.tickerid, 'D',   [adx_up_d, adx_dn_d, hma_slo_up_d, ema_x_up_d])
+    [adx_w_up, adx_w_dn, hma_w_up, e1xe2_w_up]     = request.security(syminfo.tickerid, 'W',   [adx_up_w, adx_dn_w, hma_slo_up_w, ema_x_up_w])
+    [adx_m_up, adx_m_dn, hma_m_up, e1xe2_m_up]     = request.security(syminfo.tickerid, 'M',   [adx_up_m, adx_dn_m, hma_slo_up_m, ema_x_up_m])
+
+
+    //adx conditions
+    a_color_4h        = adx_4h_up ? color_blue_1 : adx_4h_dn ? color_red_1 : color_gray_1
+    a_color_d         = adx_d_up ? color_blue_1 : adx_d_dn ? color_red_1 : color_gray_1
+    a_color_w         = adx_w_up ? color_blue_1 : adx_w_dn ? color_red_1 : color_gray_1
+    a_color_m         = adx_m_up ? color_blue_1 : adx_m_dn ? color_red_1 : color_gray_1
+
+    //hma conditions
+    h_color_4h      = hma_4h_up ? color_blue_1 : not hma_4h_up ? color_red_1 : color_gray_1
+    h_color_d       = hma_d_up ? color_blue_1 : not hma_d_up ? color_red_1 : color_gray_1
+    h_color_w       = hma_w_up ? color_blue_1 : not hma_w_up ? color_red_1 : color_gray_1
+    h_color_m       = hma_m_up ? color_blue_1 : not hma_m_up ? color_red_1 : color_gray_1
+
+    //ema1 x ema2 condition
+    e_color_4h      = e1xe2_4h_up ? color_blue_1 : not e1xe2_4h_up ? color_red_1 : color_gray_1
+    e_color_d       = e1xe2_d_up ? color_blue_1 : not e1xe2_d_up ? color_red_1 : color_gray_1
+    e_color_w       = e1xe2_w_up ? color_blue_1 : not e1xe2_w_up ? color_red_1 : color_gray_1
+    e_color_m       = e1xe2_m_up ? color_blue_1 : not e1xe2_m_up ? color_red_1 : color_gray_1
+
+
     var info_panel = table.new(position = position.bottom_left, columns = 4, rows = 7, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50))
 
     table.cell(table_id=info_panel, column=0, row=0, text="C", text_size= size.small, text_color=color.silver)
@@ -1438,13 +1454,32 @@ if adx_trend
 // Optimierte Datenabfrage (Tuples), um das "Security Limit" von 40 nicht zu sprengen
 // Wir holen High, Low und Close in EINEM Aufruf pro Timeframe statt in drei.
 
-[h1_high, h1_low, h1_close]    = request.security(syminfo.tickerid, "60", [high[1], low[1], close[1]])
-[h4_high, h4_low, h4_close]    = request.security(syminfo.tickerid, "240", [high[1], low[1], close[1]])
-[d_high, d_low, d_close]       = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]])
-[w_high, w_low, w_close]       = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]])
-[m_high, m_low, m_close]       = request.security(syminfo.tickerid, "M", [high[1], low[1], close[1]])
-[m3_high, m3_low, m3_close]    = request.security(syminfo.tickerid, "3M", [high[1], low[1], close[1]])
-[m12_high, m12_low, m12_close] = request.security(syminfo.tickerid, "12M", [high[1], low[1], close[1]])
+any_pivot_on = plot_pivots_h1 or plot_pivots_h4 or plot_pivots_d or plot_pivots_w or plot_pivots_m or plot_pivots_3m or plot_pivots_12m
+
+float h1_high = na, float h1_low = na, float h1_close = na
+float h4_high = na, float h4_low = na, float h4_close = na
+float d_high = na, float d_low = na, float d_close = na
+float w_high = na, float w_low = na, float w_close = na
+float m_high = na, float m_low = na, float m_close = na
+float m3_high = na, float m3_low = na, float m3_close = na
+float m12_high = na, float m12_low = na, float m12_close = na
+
+if any_pivot_on
+    [h1_high_t, h1_low_t, h1_close_t]    = request.security(syminfo.tickerid, "60", [high[1], low[1], close[1]])
+    [h4_high_t, h4_low_t, h4_close_t]    = request.security(syminfo.tickerid, "240", [high[1], low[1], close[1]])
+    [d_high_t, d_low_t, d_close_t]       = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]])
+    [w_high_t, w_low_t, w_close_t]       = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]])
+    [m_high_t, m_low_t, m_close_t]       = request.security(syminfo.tickerid, "M", [high[1], low[1], close[1]])
+    [m3_high_t, m3_low_t, m3_close_t]    = request.security(syminfo.tickerid, "3M", [high[1], low[1], close[1]])
+    [m12_high_t, m12_low_t, m12_close_t] = request.security(syminfo.tickerid, "12M", [high[1], low[1], close[1]])
+
+    h1_high := h1_high_t, h1_low := h1_low_t, h1_close := h1_close_t
+    h4_high := h4_high_t, h4_low := h4_low_t, h4_close := h4_close_t
+    d_high := d_high_t, d_low := d_low_t, d_close := d_close_t
+    w_high := w_high_t, w_low := w_low_t, w_close := w_close_t
+    m_high := m_high_t, m_low := m_low_t, m_close := m_close_t
+    m3_high := m3_high_t, m3_low := m3_low_t, m3_close := m3_close_t
+    m12_high := m12_high_t, m12_low := m12_low_t, m12_close := m12_close_t
 
 // --- Calculations ---
 
@@ -1547,11 +1582,20 @@ var line l_12m_pp = na, var line l_12m_r1 = na, var line l_12m_r2 = na, var line
 
 // 2. Drawing function
 f_draw_pivot(_line, _val, _col, _width, _offset_start, _show_cond, _input_active) =>
-    line.delete(_line)
+    line ret_line = _line
     if barstate.islast and _input_active and _show_cond and not na(_val)
-        line.new(bar_index + _offset_start, _val, bar_index + _offset_start + 1, _val, color=_col, width=_width)
+        if na(ret_line)
+            ret_line := line.new(bar_index + _offset_start, _val, bar_index + _offset_start + 1, _val, color=_col, width=_width)
+        else
+            line.set_xy1(ret_line, bar_index + _offset_start, _val)
+            line.set_xy2(ret_line, bar_index + _offset_start + 1, _val)
+            line.set_color(ret_line, _col)
+            line.set_width(ret_line, _width)
     else
-        na
+        if not na(ret_line)
+            line.delete(ret_line)
+            ret_line := na
+    ret_line
 
 // 3. Execution (Drawing)
 
@@ -2125,15 +2169,25 @@ var float[] vp_volArray = array.new_float(vp_rows, 0.0)
 var float[] vp_smtArray = array.new_float(vp_rows, 0.0)
 var line[]  vp_lines    = array.new_line()
 
+var int last_left = na
+var int last_right = na
+var bool vp_dirty = true
+
 if barstate.islast
-    // 1. CLEANUP
-    if array.size(vp_lines) > 0
-        for i = 0 to array.size(vp_lines) - 1
-            line.delete(array.get(vp_lines, i))
-        array.clear(vp_lines)
+    // Dirty Flag check
+    if (chart.left_visible_bar_time != last_left) or (chart.right_visible_bar_time != last_right)
+        vp_dirty := true
+
+    // 1. CLEANUP (Only if dirty or disabled)
+    // If disabled, we clear. If dirty, we clear to redraw.
+    if (vp_dirty and vp_enable) or (not vp_enable and array.size(vp_lines) > 0)
+        if array.size(vp_lines) > 0
+            for i = 0 to array.size(vp_lines) - 1
+                line.delete(array.get(vp_lines, i))
+            array.clear(vp_lines)
 
     // 2. CALCULATION
-    if vp_enable
+    if vp_enable and vp_dirty
         int vStart = chart.left_visible_bar_time
         int vEnd   = chart.right_visible_bar_time
         
@@ -2247,3 +2301,8 @@ if barstate.islast
                         color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
                         line l = line.new(x1=xLoc, y1=y1, x2=xLoc, y2=y2, xloc=xloc.bar_index, color=col, width=vp_width)
                         array.push(vp_lines, l)
+
+        // Update Dirty Flag
+        last_left := vStart
+        last_right := vEnd
+        vp_dirty := false
