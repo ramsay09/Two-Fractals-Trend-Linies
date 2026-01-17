@@ -6,8 +6,8 @@ general_info   = input.bool(title='General Description', defval=false, tooltip='
                  Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
 
 // adx, hma and ema1 x ema2 mtf trend info panel
-adx_trend      = input.bool(title='MTF Info Panel', defval=false, 
-                 tooltip='Provides an overview of multi time frame trends as DMI ADX, HMA slope and EMA1 cross EMA2 (down(red), consolidation(gray), up(blue)) for the current (C = current tf, these parameters are optimizable) and the supported higher time frames (4H, D, W, M, these indicator parameters are fixed and optimized for Bitcoin).')
+panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
+                 tooltip='Provides an overview of multi time frame trends: DMI ADX, HMA Slope, FVG Close state, and Fractal Break state. Displays for 5m, 15m, 1H, 4H, 1D, 1W, 1M. Select position to enable.')
 
 // Alert Inputs 
 grp_alert      = "Real-time Alerts"
@@ -1624,7 +1624,7 @@ color fr_color_w   = na
 color fr_color_m   = na
 
 // 2. Gated HTF & Table Update
-if adx_trend
+if panel_pos != "None"
     if barstate.islast // Stage 5: Last-Bar Gating for Security & Logic
         // Optimization: Combine security calls for Info Panel (7 calls)
         // Using global input parameters for all timeframes as requested
@@ -1677,7 +1677,14 @@ if adx_trend
         fr_color_m    := fr_m == 1 ? color_blue_1 : fr_m == -1 ? color_red_1 : color_gray_1
 
         if na(info_panel)
-            info_panel := table.new(position = position.bottom_left, columns = 5, rows = 10, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50))
+            // Map string position to internal constant
+            string pos_input = position.bottom_left
+            if panel_pos == "Top Right"
+                pos_input := position.top_right
+            else if panel_pos == "Bottom Right"
+                pos_input := position.bottom_right
+
+            info_panel := table.new(position = pos_input, columns = 5, rows = 10, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50))
 
         // HEADER NAMES (Row 0)
         table.cell(table_id=info_panel, column=0, row=0, text="TF", text_size= size.small, text_color=color.silver)
