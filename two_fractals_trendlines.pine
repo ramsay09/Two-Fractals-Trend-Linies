@@ -6,8 +6,8 @@ general_info   = input.bool(title='General Description', defval=false, tooltip='
                  Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
 
 // adx, hma and ema1 x ema2 mtf trend info panel
-adx_trend      = input.bool(title='MTF Info Panel', defval=false, 
-                 tooltip='Provides an overview of multi time frame trends as DMI ADX, HMA slope and EMA1 cross EMA2 (down(red), consolidation(gray), up(blue)) for the current (C = current tf, these parameters are optimizable) and the supported higher time frames (4H, D, W, M, these indicator parameters are fixed and optimized for Bitcoin).')
+panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
+                 tooltip='Provides an overview of multi time frame trends: DMI ADX, HMA Slope, FVG Close state, and Fractal Break state. Displays for 5m, 15m, 1H, 4H, 1D, 1W, 1M. Select position to enable.')
 
 // Alert Inputs 
 grp_alert      = "Real-time Alerts"
@@ -82,7 +82,7 @@ ps_tf               = input.timeframe("D", title="⠀Pivot TF", inline="en_tf", 
                       \n• Clutter Control: Manages a fixed number of active levels, removing old or irrelevant ones automatically. \nSelect the Higher Timeframe to scan for significant Swing Highs/Lows. \nSmart S&R 'Auto' affects 'Pivot TF' only.")
 ps_left             = input.int(2, title="Pivot Strength (Left) ⠀⠀⠀⠀⠀⠀⠀⠀", minval=1, group=grp_psr, tooltip="Higher values filter out minor market noise. Left Standard=2 (Bill Williams Fractal).")
 ps_right            = input.int(2, title="Pivot Strength (Right) ⠀⠀⠀⠀⠀⠀⠀", minval=1, group=grp_psr, tooltip="Higher values filter out minor market noise. Right Standard=2 (Bill Williams Fractal).")
-ps_max              = input.int(10, title="Max Active Levels ⠀", minval=1, maxval=50, group=grp_psr, tooltip="Limits the number of visible lines to prevent chart clutter. FIFO (First In, First Out).")
+ps_max              = input.int(20, title="Max Active Levels ⠀", minval=1, maxval=50, group=grp_psr, tooltip="Limits the number of visible lines to prevent chart clutter. FIFO (First In, First Out).")
 ps_break_act        = input.string("Role Reversal", title="On Break Action ", options=["Keep", "Delete", "Role Reversal"], group=grp_psr, tooltip="How the script handles a level when price crosses it. \nKeep: Do nothing. \nDelete: Remove line. \nRole Reversal: Support becomes Resistance (Color change).")
 ps_merge_en         = input.bool(true, title="Merge Nearby Levels (Zones) ", group=grp_psr, inline="ps_m")
 ps_merge_pct        = input.float(0.1, title="Threshold %", minval=0.01, step=0.05, group=grp_psr, inline="ps_m", tooltip="If a new level appears within X% of an existing level, they are merged into a Zone.")
@@ -177,9 +177,9 @@ selected_bg_signal  = input.string("None", title="Background Color Filter", opti
 // BG Trend Max Bars is now Auto-Calculated (TF-dependent)
 bg_tf_select        = input.timeframe("", title="Background Filter TF", group=grp_bg, tooltip="Select the timeframe for the background signals calculations. Empty = Current Chart Timeframe.")
 f_sig_enable        = input.bool(false, "Signal Arrow Only", group=grp_bg, tooltip="BG signal arrow" )
-di_len              = input.int(7, title='ADX DI Length', minval=1, group=grp_bg, tooltip="")
+di_len              = input.int(5, title='ADX DI Length', minval=1, group=grp_bg, tooltip="")
 len_smo             = input.int(7, title='ADX Smoothing', minval=1, group=grp_bg, tooltip="")
-hma_inp             = input.int(20, title='HMA Length', minval=1, group=grp_bg, tooltip="")
+hma_inp             = input.int(10, title='HMA Length', minval=1, group=grp_bg, tooltip="")
 
 // pivot points inputs
 grp_pi              = 'Pivot points'
@@ -193,8 +193,8 @@ plot_pivots_12m     = input.bool(true, title='12 Month Classic Pivot Points', gr
 
 // TRADING SESSIONS INPUTS ---
 grp_sess      = "Trading Sessions"
-sess_timezone = input.string("Europe/Berlin", title="Timezone", tooltip="Standard: Europe/Berlin. Change to 'UTC' or 'America/New_York' if needed.", group=grp_sess)
-sess_style    = input.string("Vertical Line", title="Session Style", options=["Vertical Line", "Box", "Background"], group=grp_sess, tooltip="Choose between a high/low box, a vertical background area or a vertical line.
+sess_timezone = input.string("Europe/Berlin", title="Timezone", inline="ses", tooltip="", group=grp_sess)
+sess_style    = input.string("Vertical Line", title="⠀Session Style", inline="ses", options=["Vertical Line", "Box", "Background"], group=grp_sess, tooltip="Standard: Europe/Berlin. Change to 'UTC' or 'America/New_York' if needed. \nChoose between a high/low box, a vertical background area or a vertical line.
                  1st blue line = NY a.m. session, 2nd blue line  = NY p.m. session")
 
 // London - ORANGE
@@ -1497,23 +1497,41 @@ plotchar(arrow_bear, char='⬇', location=location.abovebar, color=color.red, si
 
 //indicator funktions for 4h, d, w, m 
 
-// Helper function for HTF Logic (Correctness Fix)
-// Must return [adx_up, adx_dn, hma_up, ema_up]
-// Logic must include rising(adx, 1) check for adx_up/dn
-f_inf_htf(_diLen, _smo, _hmaLen, _ema1Len, _ema2Len) =>
+// Helper function for Panel State
+f_panel_state(_diLen, _smo, _hmaLen) =>
+    // ADX
     [_diplus, _diminus, _adx] = ta.dmi(_diLen, _smo)
-    _hma = ta.hma(close, _hmaLen)
-    _ema1 = ta.ema(close, _ema1Len)
-    _ema2 = ta.ema(close, _ema2Len)
-
-    // Logic
     _adx_slope_up = ta.rising(_adx, 1)
     _adx_up       = _adx_slope_up and _diplus > _diminus
     _adx_dn       = _adx_slope_up and _diplus < _diminus
-    _hma_up       = ta.rising(_hma, 1)
-    _ema_up       = _ema1 > _ema2
 
-    [_adx_up, _adx_dn, _hma_up, _ema_up]
+    // HMA
+    _hma = ta.hma(close, _hmaLen)
+    _hma_up = ta.rising(_hma, 1)
+
+    // FVG Close State
+    var int fvg_state = 0
+    if low > high[2]
+        fvg_state := 1
+    else if high < low[2]
+        fvg_state := -1
+
+    // Bill Williams Fractals State
+    // Standard 2,2 fractals
+    up_fr = ta.pivothigh(2, 2)
+    dn_fr = ta.pivotlow(2, 2)
+
+    last_up_lvl = ta.valuewhen(not na(up_fr), high[2], 0)
+    last_dn_lvl = ta.valuewhen(not na(dn_fr), low[2], 0)
+
+    var int fr_state = 0
+    // Check breaks
+    if ta.crossover(high, last_up_lvl)
+        fr_state := 1
+    else if ta.crossunder(low, last_dn_lvl)
+        fr_state := -1
+
+    [_adx_up, _adx_dn, _hma_up, fvg_state, fr_state]
 
 //colors
 color_blue_1    = color.new(color.blue, 30)
@@ -1532,105 +1550,208 @@ Intra_D_W_M     = timeframe.isintraday or timeframe.isdaily or timeframe.isweekl
 // Stage 6: Info Panel Refactoring (Global Current TF + Gated HTF)
 
 // 1. Always Run Current TF (To prevent warm-up issues)
+atr14_val             = ta.atr(14)
 [_diplus_inf, _diminus_inf, _adx_inf]  = ta.dmi(di_len, len_smo)
 adx_slope_up_inf      = ta.rising(_adx_inf, 1)
 adx_up_inf            = adx_slope_up_inf and _diplus_inf > _diminus_inf
 adx_dn_inf            = adx_slope_up_inf and _diplus_inf < _diminus_inf
-ema1_inf              = ta.ema(close, ema_inp1)
-ema2_inf              = ta.ema(close, ema_inp2)
-ema_x_up_inf          = ema1_inf > ema2_inf
+
 hma_inf               = ta.hma(close, hma_inp)
 hma_slo_up_inf        = ta.rising(hma_inf, 1)
 
+// Global Current TF Logic (Additions)
+// FVG
+var int fvg_state_inf = 0
+if low > high[2]
+    fvg_state_inf := 1
+else if high < low[2]
+    fvg_state_inf := -1
+
+// Fractals
+up_fr_inf = ta.pivothigh(2, 2)
+dn_fr_inf = ta.pivotlow(2, 2)
+last_up_lvl_inf = ta.valuewhen(not na(up_fr_inf), high[2], 0)
+last_dn_lvl_inf = ta.valuewhen(not na(dn_fr_inf), low[2], 0)
+var int fr_state_inf = 0
+if ta.crossover(high, last_up_lvl_inf)
+    fr_state_inf := 1
+else if ta.crossunder(low, last_dn_lvl_inf)
+    fr_state_inf := -1
+
 a_color_c       = adx_up_inf ? color_blue_1 : adx_dn_inf ? color_red_1 : color_gray_1
 h_color_c       = hma_slo_up_inf ? color_blue_1 : not hma_slo_up_inf ? color_red_1 : color_gray_1
-e_color_c       = ema_x_up_inf ? color_blue_1 : not ema_x_up_inf ? color_red_1 : color_gray_1
+fvg_color_c     = fvg_state_inf == 1 ? color_blue_1 : fvg_state_inf == -1 ? color_red_1 : color_gray_1
+fr_color_c      = fr_state_inf == 1 ? color_blue_1 : fr_state_inf == -1 ? color_red_1 : color_gray_1
 
 // Info Panel Table (Declared global to allow deletion)
 var table info_panel = na
 
 // Define Variables for HTF colors (Init to default)
-color a_color_4h = na
-color a_color_d  = na
-color a_color_w  = na
-color a_color_m  = na
+// ADX Colors
+color a_color_5m  = na
+color a_color_15m = na
+color a_color_1h  = na
+color a_color_4h  = na
+color a_color_d   = na
+color a_color_w   = na
+color a_color_m   = na
 
-color h_color_4h = na
-color h_color_d  = na
-color h_color_w  = na
-color h_color_m  = na
+// HMA Colors
+color h_color_5m  = na
+color h_color_15m = na
+color h_color_1h  = na
+color h_color_4h  = na
+color h_color_d   = na
+color h_color_w   = na
+color h_color_m   = na
 
-color e_color_4h = na
-color e_color_d  = na
-color e_color_w  = na
-color e_color_m  = na
+// FVG Colors
+color fvg_color_5m  = na
+color fvg_color_15m = na
+color fvg_color_1h  = na
+color fvg_color_4h  = na
+color fvg_color_d   = na
+color fvg_color_w   = na
+color fvg_color_m   = na
+
+// FR Colors
+color fr_color_5m  = na
+color fr_color_15m = na
+color fr_color_1h  = na
+color fr_color_4h  = na
+color fr_color_d   = na
+color fr_color_w   = na
+color fr_color_m   = na
 
 // 2. Gated HTF & Table Update
-if adx_trend
+if panel_pos != "None"
     if barstate.islast // Stage 5: Last-Bar Gating for Security & Logic
-        // Optimization: Combine security calls for Info Panel (16 calls -> 4 calls)
-        // Stage 1: Correctness Fix using f_inf_htf helper
-        [adx_4h_up, adx_4h_dn, hma_4h_up, e1xe2_4h_up] = request.security(syminfo.tickerid, '240', f_inf_htf(7, 7, 15, 8, 21))
-        [adx_d_up, adx_d_dn, hma_d_up, e1xe2_d_up]     = request.security(syminfo.tickerid, 'D',   f_inf_htf(7, 7, 10, 5, 21))
-        [adx_w_up, adx_w_dn, hma_w_up, e1xe2_w_up]     = request.security(syminfo.tickerid, 'W',   f_inf_htf(2, 7, 10, 5, 8))
-        [adx_m_up, adx_m_dn, hma_m_up, e1xe2_m_up]     = request.security(syminfo.tickerid, 'M',   f_inf_htf(2, 2, 5, 3, 8))
+        // Optimization: Combine security calls for Info Panel (7 calls)
+        // Using global input parameters for all timeframes as requested
+        [adx_5m_up, adx_5m_dn, hma_5m_up, fvg_5m, fr_5m]     = request.security(syminfo.tickerid, '5',   f_panel_state(di_len, len_smo, hma_inp))
+        [adx_15m_up, adx_15m_dn, hma_15m_up, fvg_15m, fr_15m]   = request.security(syminfo.tickerid, '15',  f_panel_state(di_len, len_smo, hma_inp))
+        [adx_1h_up, adx_1h_dn, hma_1h_up, fvg_1h, fr_1h]     = request.security(syminfo.tickerid, '60',  f_panel_state(di_len, len_smo, hma_inp))
+        [adx_4h_up, adx_4h_dn, hma_4h_up, fvg_4h, fr_4h]     = request.security(syminfo.tickerid, '240', f_panel_state(di_len, len_smo, hma_inp))
+        [adx_d_up, adx_d_dn, hma_d_up, fvg_d, fr_d]       = request.security(syminfo.tickerid, 'D',   f_panel_state(di_len, len_smo, hma_inp))
+        [adx_w_up, adx_w_dn, hma_w_up, fvg_w, fr_w]       = request.security(syminfo.tickerid, 'W',   f_panel_state(di_len, len_smo, hma_inp))
+        [adx_m_up, adx_m_dn, hma_m_up, fvg_m, fr_m]       = request.security(syminfo.tickerid, 'M',   f_panel_state(di_len, len_smo, hma_inp))
 
         // Stage 6: Debug Instrument
-        active_sec_calls += 4
+        active_sec_calls += 7
 
-        //adx conditions
-        a_color_4h        := adx_4h_up ? color_blue_1 : adx_4h_dn ? color_red_1 : color_gray_1
-        a_color_d         := adx_d_up ? color_blue_1 : adx_d_dn ? color_red_1 : color_gray_1
-        a_color_w         := adx_w_up ? color_blue_1 : adx_w_dn ? color_red_1 : color_gray_1
-        a_color_m         := adx_m_up ? color_blue_1 : adx_m_dn ? color_red_1 : color_gray_1
+        // --- Color Logic ---
+        // ADX
+        a_color_5m  := adx_5m_up ? color_blue_1 : adx_5m_dn ? color_red_1 : color_gray_1
+        a_color_15m := adx_15m_up ? color_blue_1 : adx_15m_dn ? color_red_1 : color_gray_1
+        a_color_1h  := adx_1h_up ? color_blue_1 : adx_1h_dn ? color_red_1 : color_gray_1
+        a_color_4h  := adx_4h_up ? color_blue_1 : adx_4h_dn ? color_red_1 : color_gray_1
+        a_color_d   := adx_d_up ? color_blue_1 : adx_d_dn ? color_red_1 : color_gray_1
+        a_color_w   := adx_w_up ? color_blue_1 : adx_w_dn ? color_red_1 : color_gray_1
+        a_color_m   := adx_m_up ? color_blue_1 : adx_m_dn ? color_red_1 : color_gray_1
 
-        //hma conditions
-        h_color_4h      := hma_4h_up ? color_blue_1 : not hma_4h_up ? color_red_1 : color_gray_1
-        h_color_d       := hma_d_up ? color_blue_1 : not hma_d_up ? color_red_1 : color_gray_1
-        h_color_w       := hma_w_up ? color_blue_1 : not hma_w_up ? color_red_1 : color_gray_1
-        h_color_m       := hma_m_up ? color_blue_1 : not hma_m_up ? color_red_1 : color_gray_1
+        // HMA
+        h_color_5m  := hma_5m_up ? color_blue_1 : not hma_5m_up ? color_red_1 : color_gray_1
+        h_color_15m := hma_15m_up ? color_blue_1 : not hma_15m_up ? color_red_1 : color_gray_1
+        h_color_1h  := hma_1h_up ? color_blue_1 : not hma_1h_up ? color_red_1 : color_gray_1
+        h_color_4h  := hma_4h_up ? color_blue_1 : not hma_4h_up ? color_red_1 : color_gray_1
+        h_color_d   := hma_d_up ? color_blue_1 : not hma_d_up ? color_red_1 : color_gray_1
+        h_color_w   := hma_w_up ? color_blue_1 : not hma_w_up ? color_red_1 : color_gray_1
+        h_color_m   := hma_m_up ? color_blue_1 : not hma_m_up ? color_red_1 : color_gray_1
 
-        //ema1 x ema2 condition
-        e_color_4h      := e1xe2_4h_up ? color_blue_1 : not e1xe2_4h_up ? color_red_1 : color_gray_1
-        e_color_d       := e1xe2_d_up ? color_blue_1 : not e1xe2_d_up ? color_red_1 : color_gray_1
-        e_color_w       := e1xe2_w_up ? color_blue_1 : not e1xe2_w_up ? color_red_1 : color_gray_1
-        e_color_m       := e1xe2_m_up ? color_blue_1 : not e1xe2_m_up ? color_red_1 : color_gray_1
+        // FVG
+        fvg_color_5m  := fvg_5m == 1 ? color_blue_1 : fvg_5m == -1 ? color_red_1 : color_gray_1
+        fvg_color_15m := fvg_15m == 1 ? color_blue_1 : fvg_15m == -1 ? color_red_1 : color_gray_1
+        fvg_color_1h  := fvg_1h == 1 ? color_blue_1 : fvg_1h == -1 ? color_red_1 : color_gray_1
+        fvg_color_4h  := fvg_4h == 1 ? color_blue_1 : fvg_4h == -1 ? color_red_1 : color_gray_1
+        fvg_color_d   := fvg_d == 1 ? color_blue_1 : fvg_d == -1 ? color_red_1 : color_gray_1
+        fvg_color_w   := fvg_w == 1 ? color_blue_1 : fvg_w == -1 ? color_red_1 : color_gray_1
+        fvg_color_m   := fvg_m == 1 ? color_blue_1 : fvg_m == -1 ? color_red_1 : color_gray_1
+
+        // FR (Fractals)
+        fr_color_5m   := fr_5m == 1 ? color_blue_1 : fr_5m == -1 ? color_red_1 : color_gray_1
+        fr_color_15m  := fr_15m == 1 ? color_blue_1 : fr_15m == -1 ? color_red_1 : color_gray_1
+        fr_color_1h   := fr_1h == 1 ? color_blue_1 : fr_1h == -1 ? color_red_1 : color_gray_1
+        fr_color_4h   := fr_4h == 1 ? color_blue_1 : fr_4h == -1 ? color_red_1 : color_gray_1
+        fr_color_d    := fr_d == 1 ? color_blue_1 : fr_d == -1 ? color_red_1 : color_gray_1
+        fr_color_w    := fr_w == 1 ? color_blue_1 : fr_w == -1 ? color_red_1 : color_gray_1
+        fr_color_m    := fr_m == 1 ? color_blue_1 : fr_m == -1 ? color_red_1 : color_gray_1
 
         if na(info_panel)
-            info_panel := table.new(position = position.bottom_left, columns = 4, rows = 7, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50))
+            // Map string position to internal constant
+            string pos_input = position.bottom_left
+            if panel_pos == "Top Right"
+                pos_input := position.top_right
+            else if panel_pos == "Bottom Right"
+                pos_input := position.bottom_right
 
-        table.cell(table_id=info_panel, column=0, row=0, text="C", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=1, row=0, bgcolor=(Intra_D_W_M) ? a_color_c : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=0, bgcolor=(Intra_D_W_M) ? h_color_c : na, width=2)
-        table.cell(table_id=info_panel, column=3, row=0, bgcolor=(Intra_D_W_M) ? e_color_c : na, width=2)
+            info_panel := table.new(position = pos_input, columns = 5, rows = 10, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50))
 
-        table.cell(table_id=info_panel, column=0, row=1, text="TF", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=1, row=1, text= "ADX", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=2, row=1, text= "HMA", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=3, row=1, text= "EMA", text_size= size.small, text_color=color.silver)
+        // HEADER NAMES (Row 0)
+        table.cell(table_id=info_panel, column=0, row=0, text="TF", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=0, text= "ADX", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=2, row=0, text= "HMA", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=3, row=0, text= "FVG", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=4, row=0, text= "FR", text_size= size.small, text_color=color.silver)
 
-        table.cell(table_id=info_panel, column=0, row=2, text="4H", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=1, row=2, bgcolor=Intra ? a_color_4h : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=2, bgcolor=Intra ? h_color_4h : na, width=2)
-        table.cell(table_id=info_panel, column=3, row=2, bgcolor=Intra ? e_color_4h : na, width=2)
+        // 5m (Row 1)
+        table.cell(table_id=info_panel, column=0, row=1, text="5m", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=1, bgcolor=Intra ? a_color_5m : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=1, bgcolor=Intra ? h_color_5m : na, width=2)
+        table.cell(table_id=info_panel, column=3, row=1, bgcolor=Intra ? fvg_color_5m : na, width=2)
+        table.cell(table_id=info_panel, column=4, row=1, bgcolor=Intra ? fr_color_5m : na, width=2)
 
-        table.cell(table_id=info_panel, column=0, row=3, text="1D", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=1, row=3, bgcolor=(Intra_D) ? a_color_d : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=3, bgcolor=(Intra_D) ? h_color_d : na, width=2)
-        table.cell(table_id=info_panel, column=3, row=3, bgcolor=(Intra_D) ? e_color_d : na, width=2)
+        // 15m (Row 2)
+        table.cell(table_id=info_panel, column=0, row=2, text="15m", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=2, bgcolor=Intra ? a_color_15m : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=2, bgcolor=Intra ? h_color_15m : na, width=2)
+        table.cell(table_id=info_panel, column=3, row=2, bgcolor=Intra ? fvg_color_15m : na, width=2)
+        table.cell(table_id=info_panel, column=4, row=2, bgcolor=Intra ? fr_color_15m : na, width=2)
 
-        table.cell(table_id=info_panel, column=0, row=4, text="1W", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=1, row=4, bgcolor=(Intra_D_W) ? a_color_w : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=4, bgcolor=(Intra_D_W) ? h_color_w : na, width=2)
-        table.cell(table_id=info_panel, column=3, row=4, bgcolor=(Intra_D_W) ? e_color_w : na, width=2)
+        // 1H (Row 3)
+        table.cell(table_id=info_panel, column=0, row=3, text="1H", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=3, bgcolor=Intra ? a_color_1h : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=3, bgcolor=Intra ? h_color_1h : na, width=2)
+        table.cell(table_id=info_panel, column=3, row=3, bgcolor=Intra ? fvg_color_1h : na, width=2)
+        table.cell(table_id=info_panel, column=4, row=3, bgcolor=Intra ? fr_color_1h : na, width=2)
 
-        table.cell(table_id=info_panel, column=0, row=5, text="1M", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=1, row=5, bgcolor=(Intra_D_W_M) ? a_color_m : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=5, bgcolor=(Intra_D_W_M) ? h_color_m : na, width=2)
-        table.cell(table_id=info_panel, column=3, row=5, bgcolor=(Intra_D_W_M) ? e_color_m : na, width=2)
+        // 4H (Row 4)
+        table.cell(table_id=info_panel, column=0, row=4, text="4H", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=4, bgcolor=Intra ? a_color_4h : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=4, bgcolor=Intra ? h_color_4h : na, width=2)
+        table.cell(table_id=info_panel, column=3, row=4, bgcolor=Intra ? fvg_color_4h : na, width=2)
+        table.cell(table_id=info_panel, column=4, row=4, bgcolor=Intra ? fr_color_4h : na, width=2)
 
-        table.cell(table_id=info_panel, column=0, row=6, text="ATR14", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=2, row=6, text=str.tostring(ta.atr(14), '#'), text_color=color.silver)
+        // 1D (Row 5)
+        table.cell(table_id=info_panel, column=0, row=5, text="1D", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=5, bgcolor=(Intra_D) ? a_color_d : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=5, bgcolor=(Intra_D) ? h_color_d : na, width=2)
+        table.cell(table_id=info_panel, column=3, row=5, bgcolor=(Intra_D) ? fvg_color_d : na, width=2)
+        table.cell(table_id=info_panel, column=4, row=5, bgcolor=(Intra_D) ? fr_color_d : na, width=2)
+
+        // 1W (Row 6)
+        table.cell(table_id=info_panel, column=0, row=6, text="1W", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=6, bgcolor=(Intra_D_W) ? a_color_w : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=6, bgcolor=(Intra_D_W) ? h_color_w : na, width=2)
+        table.cell(table_id=info_panel, column=3, row=6, bgcolor=(Intra_D_W) ? fvg_color_w : na, width=2)
+        table.cell(table_id=info_panel, column=4, row=6, bgcolor=(Intra_D_W) ? fr_color_w : na, width=2)
+
+        // 1M (Row 7)
+        table.cell(table_id=info_panel, column=0, row=7, text="1M", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=7, bgcolor=(Intra_D_W_M) ? a_color_m : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=7, bgcolor=(Intra_D_W_M) ? h_color_m : na, width=2)
+        table.cell(table_id=info_panel, column=3, row=7, bgcolor=(Intra_D_W_M) ? fvg_color_m : na, width=2)
+        table.cell(table_id=info_panel, column=4, row=7, bgcolor=(Intra_D_W_M) ? fr_color_m : na, width=2)
+
+        // ATR14 (Row 8)
+        table.cell(table_id=info_panel, column=0, row=8, text="ATR14", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=2, row=8, text=str.tostring(atr14_val, '#'), text_color=color.silver)
+
+        // HEADER (Row 9: Current)
+        table.cell(table_id=info_panel, column=0, row=9, text="C", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=9, bgcolor=(Intra_D_W_M) ? a_color_c : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=9, bgcolor=(Intra_D_W_M) ? h_color_c : na, width=2)
+        table.cell(table_id=info_panel, column=3, row=9, bgcolor=(Intra_D_W_M) ? fvg_color_c : na, width=2)
+        table.cell(table_id=info_panel, column=4, row=9, bgcolor=(Intra_D_W_M) ? fr_color_c : na, width=2)
 else
     if not na(info_panel)
         table.delete(info_panel)
