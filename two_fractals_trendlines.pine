@@ -197,6 +197,9 @@ sess_timezone = input.string("Europe/Berlin", title="Timezone", inline="ses", to
 sess_style    = input.string("Vertical Line", title="⠀Session Style", inline="ses", options=["Vertical Line", "Box", "Background"], group=grp_sess, tooltip="Standard: Europe/Berlin. Change to 'UTC' or 'America/New_York' if needed. \nChoose between a high/low box, a vertical background area or a vertical line.
                  1st blue line = NY a.m. session, 2nd blue line  = NY p.m. session")
 
+use_sess_rest = input.bool(false, title="Session Restriction", inline="ses_rest", group=grp_sess)
+sess_rest_time = input.int(60, title="⠀⠀⠀⠀Time", inline="ses_rest", group=grp_sess)
+
 // London - ORANGE
 london_show   = input.bool(true, title="London Session ⠀⠀", group=grp_sess, inline="lon")
 london_sess   = input.session("0900-1730", title="", group=grp_sess, inline="lon")
@@ -2111,14 +2114,28 @@ fill(bdn_1, bdn_3, color=color.new(color.green, 80))
 
 // Function to calculate state and draw Session Boxes or Lines
 // UPDATED: Now accepts state variables as arguments to avoid scope issues
-f_draw_session(_show, _sess, _tz, _col, _style, _box, _high, _low) =>
+f_draw_session(_show, _sess, _tz, _col, _style, _box, _high, _low, _start_t_state, _restrict, _restrict_time) =>
     is_weekend = dayofweek == dayofweek.saturday or dayofweek == dayofweek.sunday
     
-    // Calculate if session is active
-    bool is_sess = _show and not is_weekend and not na(time(timeframe.period, _sess, _tz))
-    bool is_start = is_sess and not is_sess[1]
+    // Calculate if session is active (Raw)
+    bool is_sess_raw = _show and not is_weekend and not na(time(timeframe.period, _sess, _tz))
+    bool is_start = is_sess_raw and not is_sess_raw[1]
+
+    // Update Start Time State
+    int start_t_cur = _start_t_state
+    if is_start
+        start_t_cur := time
+
+    // Calculate Restriction (Effective Session)
+    bool is_sess = is_sess_raw
+    if _restrict and is_sess_raw and not na(start_t_cur)
+        // Convert restricted time (minutes) to ms
+        ms_limit = _restrict_time * 60 * 1000
+        if (time - start_t_cur) >= ms_limit
+            is_sess := false
     
     // Vertical Line Logic (Only executed if style is Vertical Line and session starts)
+    // We use is_start (based on raw session) so the marker always appears
     if _style == "Vertical Line" and is_start
         // Note: For a vertical line, x1 must equal x2, but y1 must differ from y2 so direction is established.
         // extend.both then stretches it infinitely up and down.
@@ -2132,6 +2149,7 @@ f_draw_session(_show, _sess, _tz, _col, _style, _box, _high, _low) =>
     float h_cur = _high
     float l_cur = _low
 
+    // For Box, we use the restricted 'is_sess'
     if _style == "Box" and is_sess
         if is_start // Session Start
             h_cur := high
@@ -2146,28 +2164,30 @@ f_draw_session(_show, _sess, _tz, _col, _style, _box, _high, _low) =>
             box.set_right(b_cur, bar_index + 1)
     
     // Return the status and the updated state
-    [is_sess, b_cur, h_cur, l_cur]
+    [is_sess, b_cur, h_cur, l_cur, start_t_cur]
 
 // Check TF Constraint (Visible only if TF <= 1 Hour)
 show_sess_on_tf = timeframe.isintraday and timeframe.multiplier <= 60
 
 // Define Global State Variables for each Session
-var box b_lon = na, var float h_lon = na, var float l_lon = na
-var box b_ny = na, var float h_ny = na, var float l_ny = na
-var box b_tok = na, var float h_tok = na, var float l_tok = na
-var box b_syd = na, var float h_syd = na, var float l_syd = na
+var box b_lon = na, var float h_lon = na, var float l_lon = na, var int st_lon = na
+var box b_ny = na, var float h_ny = na, var float l_ny = na, var int st_ny = na
+var box b_tok = na, var float h_tok = na, var float l_tok = na, var int st_tok = na
+var box b_syd = na, var float h_syd = na, var float l_syd = na, var int st_syd = na
 
 // Execute Function and capture return value (Unpack Tuple)
 // We use temporary variables to avoid tuple-reassignment syntax errors, then update globals
-[lon_active, t_b_lon, t_h_lon, t_l_lon] = f_draw_session(london_show and show_sess_on_tf, london_sess, sess_timezone, london_col, sess_style, b_lon, h_lon, l_lon)
+[lon_active, t_b_lon, t_h_lon, t_l_lon, t_st_lon] = f_draw_session(london_show and show_sess_on_tf, london_sess, sess_timezone, london_col, sess_style, b_lon, h_lon, l_lon, st_lon, use_sess_rest, sess_rest_time)
 b_lon := t_b_lon
 h_lon := t_h_lon
 l_lon := t_l_lon
+st_lon := t_st_lon
 
-[ny_active, t_b_ny, t_h_ny, t_l_ny] = f_draw_session(ny_show and show_sess_on_tf, ny_sess, sess_timezone, ny_col, sess_style, b_ny, h_ny, l_ny)
+[ny_active, t_b_ny, t_h_ny, t_l_ny, t_st_ny] = f_draw_session(ny_show and show_sess_on_tf, ny_sess, sess_timezone, ny_col, sess_style, b_ny, h_ny, l_ny, st_ny, use_sess_rest, sess_rest_time)
 b_ny := t_b_ny
 h_ny := t_h_ny
 l_ny := t_l_ny
+st_ny := t_st_ny
 
 // --- ZUSATZ: Zweite Linie um 19:30 Uhr für New York (nur bei Vertical Line) ---
 if ny_show and show_sess_on_tf and sess_style == "Vertical Line"
@@ -2182,15 +2202,17 @@ if ny_show and show_sess_on_tf and sess_style == "Vertical Line"
         line.new(x1=bar_index, y1=low, x2=bar_index, y2=high, extend=extend.both, color=color.new(ny_col, 70), style=line.style_dashed, width=1)
 // -------------------------------------------------------------------------------
 
-[tok_active, t_b_tok, t_h_tok, t_l_tok] = f_draw_session(tokyo_show and show_sess_on_tf, tokyo_sess, sess_timezone, tokyo_col, sess_style, b_tok, h_tok, l_tok)
+[tok_active, t_b_tok, t_h_tok, t_l_tok, t_st_tok] = f_draw_session(tokyo_show and show_sess_on_tf, tokyo_sess, sess_timezone, tokyo_col, sess_style, b_tok, h_tok, l_tok, st_tok, use_sess_rest, sess_rest_time)
 b_tok := t_b_tok
 h_tok := t_h_tok
 l_tok := t_l_tok
+st_tok := t_st_tok
 
-[syd_active, t_b_syd, t_h_syd, t_l_syd] = f_draw_session(sydney_show and show_sess_on_tf, sydney_sess, sess_timezone, sydney_col, sess_style, b_syd, h_syd, l_syd)
+[syd_active, t_b_syd, t_h_syd, t_l_syd, t_st_syd] = f_draw_session(sydney_show and show_sess_on_tf, sydney_sess, sess_timezone, sydney_col, sess_style, b_syd, h_syd, l_syd, st_syd, use_sess_rest, sess_rest_time)
 b_syd := t_b_syd
 h_syd := t_h_syd
 l_syd := t_l_syd
+st_syd := t_st_syd
 
 // Draw Backgrounds - COMBINED
 // Priority: NY > London > Tokyo > Sydney (in case of overlapping times)
