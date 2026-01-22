@@ -1,6 +1,6 @@
 //@version=5
 
-indicator('Two Fractals Trend Lines', overlay=true, shorttitle='fr lines', max_bars_back=4000, max_lines_count=500, max_boxes_count=500, dynamic_requests=true)
+indicator('Market Context & Confluence Suite', overlay=true, shorttitle='fr Lines', max_bars_back=4000, max_lines_count=500, max_boxes_count=500, dynamic_requests=true)
 
 general_info   = input.bool(title='General Description', defval=false, tooltip='Use the signals in confluence and as an indication of market tension, which will discharged in higher volatility or trend continuation. ... context matters.
                  Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
@@ -14,7 +14,9 @@ grp_alert      = "Real-time Alerts"
 use_rt_alert   = input.bool(false, title="Alert on 5th Fractal Candle (Real-time)", tooltip="Triggers an alert signal while the 5th candle of a fractal pattern is forming (Real-time). Select 'Any function call' when creating the alert.")
 
 // fractals input
-fracals_plot   = input.bool(title='Bill Williams Fractals', defval=true, tooltip='Symbol: white triangle. Works as support and resistance level.')
+fracals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, tooltip='')
+sub_fracals    = input.bool(title='Sub Fractals', inline="fr_s", defval=true, tooltip='Bill Williams Fractals (five Candles): white triangle. Works as support and resistance level. 
+                 \nSub Bill Williams Fractals (four Candles): Lightgray triangle. Works as support and resistance level. These are B. W. Fractals on a Lower Timeframe.')
 
 
 // Gradient Volume Profile
@@ -171,7 +173,7 @@ sb                  = input.int(10 ,title='Max Bars', inline="seg", minval=0, st
 // Background Color Filter INPUT
 grp_bg              = 'Background Color Filters'
 selected_bg_signal  = input.string("None", title="Background Color Filter", options=
-                     ["None", "Bill Williams Fractals", "Anticipated Fractal", "Last 12 Bar", "Parabolic SAR", "DMI ADX", "HMA Slope", "MACD Slow Slope", "MACD Slope/Fractal Break (OR)", "Trend Line/Fractal Break (OR)", "Fractals Trend Lines", "Segments",
+                     ["None", "Bill Williams Fractals", "Fractals & Sub Fractals", "Anticipated Fractal", "Last 12 Bar", "Parabolic SAR", "DMI ADX", "HMA Slope", "MACD Slow Slope", "MACD Slope/Fractal Break (OR)", "Trend Line/Fractal Break (OR)", "Fractals Trend Lines", "Segments",
                      "Segments/Fractals (AND)", "Segments/Trend Line (AND)", "Segments/Fractals/Trend Line (AND)", "Segments/MACD Slope (AND)", "MACD Slope/Fractals Break (AND)", "MA1/MA2 Cross", "FVG Open", "FVG Close", "FVG/Fractal (OR)", "FVG/Fractal (AND)"],
                      group=grp_bg, tooltip="Signals that are alternatively displayed as a background color as a quick verification and a kind of 'backtest'.")
 // BG Trend Max Bars is now Auto-Calculated (TF-dependent)
@@ -198,7 +200,7 @@ sess_style    = input.string("Vertical Line", title="⠀Session Style", inline="
                  1st blue line = NY a.m. session, 2nd blue line  = NY p.m. session")
 
 use_sess_rest = input.bool(false, title="Session Restriction", inline="ses_rest", group=grp_sess)
-sess_rest_time = input.int(60, title="⠀⠀⠀⠀Time", inline="ses_rest", group=grp_sess)
+sess_rest_time = input.int(60, title="⠀⠀⠀⠀Time", inline="ses_rest", tooltip="", group=grp_sess)
 
 // London - ORANGE
 london_show   = input.bool(true, title="London Session ⠀⠀", group=grp_sess, inline="lon")
