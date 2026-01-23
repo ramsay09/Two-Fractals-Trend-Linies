@@ -27,10 +27,11 @@ panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['N
 
 // Confluence & Regime
 //grp_conf            = "Confluence & Regime"
-show_conf_meter     = input.bool(true, "Confluence Meter", tooltip="Aggregates active signals (Trendlines, MA, etc.) into a 0-100 score. \n• >55: Bullish \n• <45: Bearish")
-show_regime_panel   = input.bool(true, "Squeeze/Trend Panel", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. 
+show_conf_meter     = input.bool(true, "Confluence Meter⠀⠀⠀", inline="conf_ui", tooltip="")
+show_conf_bg        = input.bool(false, "Confluence Meter BG", inline="conf_ui", tooltip="Aggregates active signals (Trendlines, MA, etc.) into a 0-100 score. \n• >55: Bullish \n• <45: Bearish \nPlots the Confluence Signal background color.")
+show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. 
                       \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n• Independent Controls: Toggle Panel and Background separately.")
-regime_bg_mode      = input.string("None", "⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
+regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
 
 // fractals input
 fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, tooltip='')
@@ -39,7 +40,7 @@ sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, 
 
 // Gradient Volume Profile
 //grp_vp = "Gradient Volume Profile"
-vp_enable   = input.bool(false, "Volume Profile ⠀⠀", inline="line4")
+vp_enable   = input.bool(false, "Volume Profile ⠀⠀⠀⠀⠀", inline="line4")
 // Smart Contrast
 vp_smart    = input.bool(false, "Contrast Factor", inline="line4", tooltip="")
 vp_clip     = input.float(2.5, "", minval=1.0, step=0.1, inline="line4", tooltip="Visualizes trading volume distribution by price level over the visible chart range. Higher color intensity highlights High Volume Nodes (HVN), representing areas of significant market interest. 
@@ -3134,99 +3135,18 @@ else
 
 
 
-//--------------------------------------------------------- STAGE 9: PRICE TAGS (Nearest-N) ---------------------------------------------------------
-
-// Inputs
-grp_tags        = "Price Tags (Key Levels)"
-show_tags       = input.bool(false, "Show Price Tags", group=grp_tags)
-tags_n          = input.int(3, "Nearest N", minval=1, maxval=10, group=grp_tags)
-tags_atr_mult   = input.float(2.0, "ATR Filter Range", minval=0.5, group=grp_tags)
-
-// Effective Flag
-eff_show_tags   = f_profile(show_tags, false, false, show_tags) // Moderate/Custom
-
-// UDT for Levels
-type TagLevel
-    float price
-    string name
-    color col
-
-// Global Array for Tags
-var label[] tag_labels = array.new_label()
-
-if barstate.islast and eff_show_tags
-    // Clear old
-    if array.size(tag_labels) > 0
-        for i = 0 to array.size(tag_labels) - 1
-            label.delete(array.get(tag_labels, i))
-        array.clear(tag_labels)
-
-    // 1. Collect Candidates
-    var TagLevel[] candidates = array.new<TagLevel>()
-    array.clear(candidates)
-
-    // Core Levels (Always exist)
-    if not na(last_up_fr_level)
-        array.push(candidates, TagLevel.new(last_up_fr_level, "Frac High", color.gray))
-    if not na(last_dn_fr_level)
-        array.push(candidates, TagLevel.new(last_dn_fr_level, "Frac Low", color.gray))
-
-    // PCH/PCL
-    if eff_show_pch_pcl
-        if not na(pc_h_val)
-            array.push(candidates, TagLevel.new(pc_h_val, "Prev High", color.gray))
-        if not na(pc_l_val)
-            array.push(candidates, TagLevel.new(pc_l_val, "Prev Low", color.gray))
-
-    // Session Open / 1st Candle
-    if eff_use_sess_1st
-        if not na(s1_h_val)
-            array.push(candidates, TagLevel.new(s1_h_val, "Sess High", color.gray))
-        if not na(s1_l_val)
-            array.push(candidates, TagLevel.new(s1_l_val, "Sess Low", color.gray))
-
-    // 2. Filter & Sort
-    float range_limit = atr14_val * tags_atr_mult
-    int plotted_count = 0
-
-    while plotted_count < tags_n and array.size(candidates) > 0
-        int best_idx = -1
-        float min_dist = 1000000000.0
-
-        for i = 0 to array.size(candidates) - 1
-            TagLevel t = array.get(candidates, i)
-            float d = math.abs(close - t.price)
-
-            // Check Filter
-            if d <= range_limit
-                if d < min_dist
-                    min_dist := d
-                    best_idx := i
-
-        if best_idx != -1
-            // Plot this one
-            TagLevel best = array.get(candidates, best_idx)
-
-            // Draw Label
-            string txt = best.name + ": " + str.tostring(best.price, format.mintick)
-            label lb = label.new(bar_index + 5, best.price, txt, xloc=xloc.bar_index, style=label.style_label_left, color=color.new(color.blue, 100), textcolor=best.col, size=size.small)
-            array.push(tag_labels, lb)
-
-            // Remove to avoid picking again
-            array.remove(candidates, best_idx)
-            plotted_count += 1
-        else
-            // No more candidates within range
-            break
 
 
 //--------------------------------------------------------- STAGE 6: CONFLUENCE METER ---------------------------------------------------------
 
 // Calculations
-var float conf_score = 50.0
-var string conf_bias = "Neutral"
+// Changed to Series (removed var) to allow historical background plotting
+float conf_score = 50.0
+string conf_bias = "Neutral"
 
-if barstate.islast and eff_show_conf_meter
+eff_calc_conf = eff_show_conf_meter or show_conf_bg
+
+if eff_calc_conf
     float bull_pts = 0.0
     float bear_pts = 0.0
     float total_w  = 0.0
@@ -3258,9 +3178,6 @@ if barstate.islast and eff_show_conf_meter
 
     // MA1/MA2
     if eff_ma1_type != "None" and eff_ma2_type != "None"
-        // Avoid double counting if using same logic? Plan says "MA / EMA Cross: 2".
-        // I will treat them as additive context or separate?
-        // Let's count them separately but with same weight class.
         total_w += W_MA
         if ma1_val > ma2_val
             bull_pts += W_MA
@@ -3308,10 +3225,6 @@ if barstate.islast and eff_show_conf_meter
                 bear_pts += W_VOL
 
     // Calc Score 0-100
-    // If total_w is 0, score 50.
-    // Score = 50 + ( (Bull - Bear) / Total ) * 50
-    // Max Bull -> 50 + (Total/Total)*50 = 100. Max Bear -> 50 + (-Total/Total)*50 = 0.
-
     if total_w > 0
         float net_pts = bull_pts - bear_pts
         conf_score := 50 + (net_pts / total_w) * 50
@@ -3320,14 +3233,10 @@ if barstate.islast and eff_show_conf_meter
 
     conf_bias := conf_score > 55 ? "Bull" : conf_score < 45 ? "Bear" : "Neutral"
 
-    // Visualization (Table)
-    if not na(info_panel)
+    // Visualization (Table) - Restricted to Last Bar and Panel Toggle
+    if barstate.islast and eff_show_conf_meter and not na(info_panel)
         color c_conf = conf_score > 55 ? color.green : conf_score < 45 ? color.red : color.new(color.gray, 100) // Transparent Neutral
         table.cell(info_panel, 0, 10, "CONF", text_size=size.small, text_color=color.silver)
-        // Show Net Score or Absolute? "Confluence: +54" or "Bull 72 / Bear 18".
-        // Let's show Net Score relative to 50? Or just the 0-100 value.
-        // Plan: "Confluence: 72 (Bull)" or "Net: +54".
-        // Let's use Score 0-100.
         table.cell(info_panel, 1, 10, str.tostring(math.round(conf_score)), text_size=size.small, text_color=color.white, bgcolor=color.new(c_conf, 30))
         table.merge_cells(info_panel, 1, 10, 2, 10)
 
@@ -3382,13 +3291,26 @@ else if eff_regime_bg_mode == "Trend BG" and regime_state == "TREND"
 else if eff_regime_bg_mode == "Both"
     regime_bg_filtered := regime_bg
 
+// Logic for Confluence BG (New)
+color conf_bg_color = na
+if show_conf_bg
+    if conf_score > 55
+        conf_bg_color := color.new(color.green, transp_bg)
+    else if conf_score < 45
+        conf_bg_color := color.new(color.red, transp_bg)
+    else
+        conf_bg_color := color.new(color.gray, 100) // Transparent Neutral
+
 // Priority 1: Session (Highest)
 if eff_sess_bg_enable and not na(bg_sess_color)
     bg_final := bg_sess_color
-// Priority 2: Regime
+// Priority 2: Confluence BG (New)
+else if show_conf_bg
+    bg_final := conf_bg_color
+// Priority 3: Regime
 else if not na(regime_bg_filtered)
     bg_final := regime_bg_filtered
-// Priority 3: Signal (Background Filter)
+// Priority 4: Signal (Background Filter)
 else if not na(plot_bg_color)
     bg_final := plot_bg_color
 
