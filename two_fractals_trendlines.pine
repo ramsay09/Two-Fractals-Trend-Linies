@@ -19,7 +19,7 @@ int W_FVG   = 1
 int W_L12   = 1
 int W_VOL   = 1
 
-profile_mode    = input.string("Normal", options=["Minimal","Normal","Moderate","Custom"], tooltip="Controls the complexity of the script. \n• Minimal: Core features only (Fastest). \n• Normal: Standard setup. \n• Moderate: Adds Extras like Confluence & Regime (if enabled). \n• Custom: Full manual control of all checkboxes. \nNote: 'Minimal' and 'Normal' enforce hard-gating (disabling heavy features internally).")
+profile_mode    = input.string("Normal", "Profile Mode", options=["Minimal","Normal","Moderate","Custom"], tooltip="Controls the complexity of the script. \n• Minimal: Core features only (Fastest). \n• Normal: Standard setup. \n• Moderate: Adds Extras. \n• Custom: Full manual control of all checkboxes. \nNote: 'Minimal' and 'Normal' enforce hard-gating (disabling heavy features internally).")
 
 // adx, hma and ema1 x ema2 mtf trend info panel
 panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
@@ -27,8 +27,9 @@ panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['N
 
 // Confluence & Regime
 //grp_conf            = "Confluence & Regime"
-show_conf_meter     = input.bool(true, "Confluence Meter", tooltip="Aggregates active signals (Trendlines, MA, etc.) into a 0-100 score. \n• >55: Bullish \n• <45: Bearish \n(Available in Moderate/Custom profiles).")
-show_regime_panel   = input.bool(true, "Squeeze/Trend Panel", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n• Independent Controls: Toggle Panel and Background separately.")
+show_conf_meter     = input.bool(true, "Confluence Meter", tooltip="Aggregates active signals (Trendlines, MA, etc.) into a 0-100 score. \n• >55: Bullish \n• <45: Bearish")
+show_regime_panel   = input.bool(true, "Squeeze/Trend Panel", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. 
+                      \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n• Independent Controls: Toggle Panel and Background separately.")
 regime_bg_mode      = input.string("None", "⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
 
 // fractals input
@@ -241,8 +242,8 @@ sess_line_limit = input.int(150, "Max Session Lines (FIFO)", group=grp_sess, min
 
 // Alerts
 grp_alerts      = "🔔 Alerts"
-alert_profile   = input.string("Normal", options=["Off", "Minimal","Normal","Moderate"], group=grp_alerts, tooltip="Controls which events trigger alerts.")
-alert_cooldown  = input.int(5, "Cooldown (Bars)", minval=1, group=grp_alerts)
+alert_profile   = input.string("Normal", "Alert Profile", options=["Off", "Minimal","Normal","Moderate"], group=grp_alerts, tooltip="Controls the complexity of alert triggers to avoid spam. \n• Off: No alerts. \n• Minimal: Trendline Breakouts only. \n• Normal: Adds Divergences. \n• Moderate: Adds Regime Changes & High Confluence Events.")
+alert_cooldown  = input.int(5, "Cooldown (Bars)", minval=1, group=grp_alerts, tooltip="Wait period (in bars) after an alert is triggered before the same alert type can trigger again. Prevents repetitive alerts during the same market event.")
 use_rt_alert   = input.bool(false, title="Alert on 5th Fractal Candle (Real-time)", group=grp_alerts, tooltip="Triggers an alert signal while the 5th candle of a fractal pattern is forming (Real-time). Select 'Any function call' when creating the alert.")
 
 
@@ -366,13 +367,11 @@ ON_SESS_1ST     = eff_use_sess_1st
 ON_LAST_FR      = eff_show_last_frac
 ON_PS           = eff_ps_mode != "None"
 
-// New Features Flags (Profile Controlled)
-// Minimal: Confluence OFF, Regime OFF
-// Normal: Confluence OFF, Regime OFF
-// Moderate: Confluence ON, Regime ON (User toggleable)
-eff_show_conf_meter = f_profile(show_conf_meter, false, false, show_conf_meter)
-eff_regime_panel    = f_profile(show_regime_panel, false, false, show_regime_panel)
-eff_regime_bg_mode  = f_profile(regime_bg_mode, "None", "None", regime_bg_mode)
+// New Features Flags (Independently Controlled)
+// Confluence & Regime are now strictly controlled by their inputs, ignoring Profile Mode
+eff_show_conf_meter = show_conf_meter
+eff_regime_panel    = show_regime_panel
+eff_regime_bg_mode  = regime_bg_mode
 
 //----------------- Global Signal Registry (For Alerts & Confluence) -----------------
 // These variables are reset to false/na on every bar execution
@@ -3394,7 +3393,7 @@ else if not na(plot_bg_color)
     bg_final := plot_bg_color
 
 // Single Output
-bgcolor(bg_final, title="MCCS Master Background")
+bgcolor(bg_final, title="MCC Master Background")
 
 
 // --- Stage 5: Alerts (Centralized) ---
@@ -3418,23 +3417,23 @@ if alert_profile != "Off"
     // TL Break (Minimal+)
     if (alert_profile == "Minimal" or alert_profile == "Normal" or alert_profile == "Moderate")
         if al_tl_break and (bar_index - last_alert_time_tl > alert_cooldown)
-            alert("MCCS: Trendline Breakout Detected", alert.freq_once_per_bar_close)
+            alert("MCC: Trendline Breakout Detected", alert.freq_once_per_bar_close)
             last_alert_time_tl := bar_index
 
     // Normal + Moderate
     if (alert_profile == "Normal" or alert_profile == "Moderate")
         if al_div and (bar_index - last_alert_time_div > alert_cooldown)
-            alert("MCCS: Divergence Detected", alert.freq_once_per_bar_close)
+            alert("MCC: Divergence Detected", alert.freq_once_per_bar_close)
             last_alert_time_div := bar_index
 
     // Moderate Only
     if alert_profile == "Moderate"
         if al_regime_chg and (bar_index - last_alert_time_reg > alert_cooldown)
-            alert("MCCS: Regime Change to " + regime_state, alert.freq_once_per_bar_close)
+            alert("MCC: Regime Change to " + regime_state, alert.freq_once_per_bar_close)
             last_alert_time_reg := bar_index
 
         if al_conf_cross and (bar_index - last_alert_time_conf > alert_cooldown)
-            alert("MCCS: High Confluence Event (Score: " + str.tostring(conf_score) + ")", alert.freq_once_per_bar_close)
+            alert("MCC: High Confluence Event (Score: " + str.tostring(conf_score) + ")", alert.freq_once_per_bar_close)
             last_alert_time_conf := bar_index
 
 // Alert Conditions (For TradingView Setup)
