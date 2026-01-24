@@ -1,6 +1,6 @@
 //@version=5
 
-indicator('Market Context & Confluence Suite', overlay=true, shorttitle='fr linies', max_bars_back=4000, max_lines_count=500, max_boxes_count=500, dynamic_requests=true)
+indicator('Market Context & Confluence Suite', overlay=true, shorttitle='MCCS', max_bars_back=4000, max_lines_count=500, max_boxes_count=500, dynamic_requests=true)
 
 general_info   = input.bool(title='General Description', defval=false, tooltip='Use the signals in confluence and as an indication of market tension, which will discharged in higher volatility or trend continuation. ... context matters.
                  Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
@@ -148,8 +148,8 @@ en_cloud            = input.bool(false, title='EMA Cloud⠀', inline="ema_c", gr
 sig_plot            = input.bool(true, title='Cloud Color Signal', inline="ema_c", group=grp_ma, tooltip='EMA1 cross EMA2 color signal. 
                       n\This EMA cloud works as dynamic support and resistance and as trend indication. A wide cloud indicates high volatility, a narrow cloud indicates low volatility and breakout potential. Interesting pairs: 8/21, 40/97')
 
-ema_inp1            = input.int(8, title='Cloud EMA1 Length', inline="ema_l", minval=1, group=grp_ma, tooltip="")
-ema_inp2            = input.int(21, title='⠀Cloud EMA2 Length', inline="ema_l", minval=1, group=grp_ma, tooltip="")
+ema_inp1            = input.int(8, title='EMA1 Length', inline="ema_l", minval=1, group=grp_ma, tooltip="")
+ema_inp2            = input.int(21, title='⠀EMA2 Length', inline="ema_l", minval=1, group=grp_ma, tooltip="")
 
 // MA 1 Inputs
 ma1_type            = input.string("EMA", title="MA 1", options=["None", "SMA", "EMA"], inline="ma1", group=grp_ma)
@@ -220,7 +220,7 @@ sess_timezone = input.string("Europe/Berlin", title="Timezone", inline="ses", to
 sess_style    = input.string("Vertical Line", title="⠀Session Style", inline="ses", options=["Vertical Line", "Box", "Background"], group=grp_sess, tooltip="Standard: Europe/Berlin. Change to 'UTC' or 'America/New_York' if needed. \nVisual style for trading sessions: \n• Vertical Line: Start/End lines. \n• Box: High/Low Range. \n• Background: Session Time Window (Highest Priority Layer).")
 
 use_sess_rest   = input.bool(false, title="Session Restriction", inline="ses_rest", group=grp_sess)
-sess_rest_time  = input.int(60, title="⠀⠀⠀⠀Time", inline="ses_rest", tooltip="", group=grp_sess)
+sess_rest_time  = input.int(60, title="⠀⠀⠀⠀Time", inline="ses_rest", tooltip="Rstricts Session Trading Time (Default 1 hour).", group=grp_sess)
 
 // London - ORANGE
 london_show   = input.bool(true, title="London Session ⠀⠀", group=grp_sess, inline="lon")
