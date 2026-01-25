@@ -72,7 +72,7 @@ pch_pcl_tf      = input.timeframe("D", "", group=grp_add, inline="add_1", toolti
 show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀", group=grp_add, inline="l_rf", tooltip="")
 last_frac_tf    = input.timeframe("240", "", group=grp_add, inline="l_rf", tooltip="Draws lines at the last confirmed Up/Down Fractals. Every new trend begins with the breaking of a fractal. (Time Frame dependent). \nSelect the timeframe for the Last Fractal calculation.")
 
-show_vol        = input.bool(true, "High Volume Spikes ⠀", group=grp_add, inline="vol_sp", tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
+show_vol        = input.bool(true, "High Volume Spikes", group=grp_add, inline="vol_sp", tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
 vol_mult        = input.float(2.0, "Threshold (x Avg)", inline="vol_sp", group=grp_add)
 
 // FVG Inputs 
@@ -163,7 +163,7 @@ ma2_slope_c         = input.bool(false, title="Slope Color", inline="ma2", group
 
 // two fractals trendlines inputs
 grp_fr              = 'Trend lines'
-plot_trendline      = input.bool(false, title='Fractal Trend Lines ⠀', inline="fr_tr", group=grp_fr, tooltip='')
+plot_trendline      = input.bool(false, title='Fractal Trend Lines⠀', inline="fr_tr", group=grp_fr, tooltip='')
 fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group=grp_fr, tooltip="The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal. \nNumber of bars to the left and right of the fractal bar for trendlines. Default is 2 (5-bar fractal). 
                      Min=0 (Fractal(2) using anchored linear regression, follow the highs/lows of the subsequent candles to align with the current trend), Max=10 (21 bars).")
 
@@ -172,7 +172,7 @@ grp_div             = 'Divergences'
 plot_div            = input.bool(true, title='Divergence Signal Arrow', group=grp_div, tooltip='These divergences are very early signals and must be used in confluence with other signals. Hidden and classic divergence are used')
 div_indi            = input.string('rsi', title='Divergence Indicator', options=['rsi', 'macd(fast_line)', 'macd(slow_line)'], tooltip='Select an Indicator for divergence calculation.', group=grp_div)
 rsi_length          = input.int(14, title='RSI Length', inline="rsi_p", minval=1, step=2, group=grp_div)
-bar_div_p           = input.int(25, title='⠀Bar Period', inline="rsi_p", minval=1, step=1, tooltip='The number of bars in which divergences are detected.', group=grp_div)
+bar_div_p           = input.int(25, title='⠀Bar Period', inline="rsi_p", minval=1, step=1, tooltip='RSI Length. n\The number of bars in which divergences are detected.', group=grp_div)
 src_div             = input.string('high/low', title='Bar Divergence Source', options=['high/low', 'close'], tooltip='The bar source for divergence calculation.', group=grp_div)
 
 // bar signals inputs
