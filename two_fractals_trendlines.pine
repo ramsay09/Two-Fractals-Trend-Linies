@@ -10,15 +10,17 @@ int PANEL_ROWS = 14
 int PANEL_COLS = 3
 
 // Confluence Weights
-int W_TL    = 3
-int W_SEG   = 2
-int W_MA    = 2
+int W_FR    = 3
+int W_FVG   = 3
+int W_SLOPE = 2
+int W_TL    = 2
+int W_SEG   = 1
+int W_MA    = 1
 int W_DIV   = 2
 int W_PAT   = 2
-int W_FVG   = 1
 int W_L12   = 1
 int W_VOL   = 1
-int W_SLOPE = 1
+int W_BB    = 1
 
 profile_mode    = input.string("Custom", "Profile Mode", options=["Minimal","Normal","Moderate","Custom"], tooltip="Controls the complexity of the script. \n• Minimal: Core features only (Fastest). \n• Normal: Standard setup. \n• Moderate: Adds Extras. \n• Custom: Full manual control of all checkboxes. \nNote: 'Minimal' and 'Normal' enforce hard-gating (disabling heavy features internally).")
 
@@ -2672,6 +2674,34 @@ if eff_calc_conf
                 bull_pts += W_VOL
             else
                 bear_pts += W_VOL
+
+    // 8. Fractal Break (W_FR = 3)
+    if eff_fractals_plot
+        total_w += W_FR
+        if fr_state_inf == 1
+            bull_pts += W_FR
+        else if fr_state_inf == -1
+            bear_pts += W_FR
+
+    // 9. Bollinger Band Touch (W_BB = 1)
+    if eff_BB_plot
+        // Re-calculate touch logic here or reuse variables if scope allows.
+        // Variables 'approach_up' and 'approach_dn' are local to the BB block above.
+        // We need to re-evaluate or check global scope.
+        // Since 'approach_up' was defined in local scope of 'if eff_BB_plot' block above (lines 1730-1755 approx),
+        // we cannot access it here directly if it wasn't declared global.
+        // Checking code... 'approach_up' and 'approach_dn' were initialized to false at line 1736 in global scope.
+        // So we can use them.
+
+        // approach_dn (Low < Lower) -> Long Signal (Bullish)
+        if approach_dn
+            total_w += W_BB
+            bull_pts += W_BB
+
+        // approach_up (High > Upper) -> Short Signal (Bearish)
+        if approach_up
+            total_w += W_BB
+            bear_pts += W_BB
 
     // Calc Score 0-100
     if total_w > 0
