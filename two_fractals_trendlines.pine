@@ -205,7 +205,7 @@ plot_pivots_12m     = input.bool(true, title='12 Month Classic Pivot Points', gr
 // TRADING SESSIONS INPUTS ---
 grp_sess      = "Trading Sessions"
 sess_timezone = input.string("Europe/Berlin", title="Timezone", inline="ses", tooltip="", group=grp_sess)
-sess_style    = input.string("Vertical Line", title="⠀Session Style", inline="ses", options=["Vertical Line", "Box", "Background"], group=grp_sess, tooltip="Standard: Europe/Berlin. Change to 'UTC' or 'America/New_York' if needed. \nVisual style for trading sessions: \n• Vertical Line: Start/End lines. \n• Box: High/Low Range. \n• Background: Session Time Window (Highest Priority Layer).")
+sess_style    = input.string("Vertical Line", title="⠀Session Style", inline="ses", options=["Vertical Line", "Box", "Background", "Inv. Background"], group=grp_sess, tooltip="Standard: Europe/Berlin. Change to 'UTC' or 'America/New_York' if needed. \nVisual style for trading sessions: \n• Vertical Line: Start/End lines. \n• Box: High/Low Range. \n• Background: Session Time Window (Highest Priority Layer). \n• Inv. Background: Unified Color (Blue 50%) during 'Off-Hours'.")
 
 use_sess_rest   = input.bool(false, title="Session Restriction", inline="ses_rest", group=grp_sess)
 sess_rest_time  = input.int(60, title="⠀⠀⠀⠀Time", inline="ses_rest", tooltip="Rstricts Session Trading Time (Default 1 hour).", group=grp_sess)
@@ -1310,40 +1310,40 @@ if panel_pos != "None"
         table.cell(table_id=info_panel, column=1, row=0, text= "FVG", text_size= size.small, text_color=color.silver)
         table.cell(table_id=info_panel, column=2, row=0, text= "FR", text_size= size.small, text_color=color.silver)
 
-        // 5m (Row 1)
-        table.cell(table_id=info_panel, column=0, row=1, text="5m", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=1, row=1, bgcolor=Intra ? fvg_color_5m : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=1, bgcolor=Intra ? fr_color_5m : na, width=2)
+        // 1M (Row 1)
+        table.cell(table_id=info_panel, column=0, row=1, text="1M", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=1, bgcolor=(Intra_D_W_M) ? fvg_color_m : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=1, bgcolor=(Intra_D_W_M) ? fr_color_m : na, width=2)
 
-        // 15m (Row 2)
-        table.cell(table_id=info_panel, column=0, row=2, text="15m", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=1, row=2, bgcolor=Intra ? fvg_color_15m : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=2, bgcolor=Intra ? fr_color_15m : na, width=2)
+        // 1W (Row 2)
+        table.cell(table_id=info_panel, column=0, row=2, text="1W", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=2, bgcolor=(Intra_D_W) ? fvg_color_w : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=2, bgcolor=(Intra_D_W) ? fr_color_w : na, width=2)
 
-        // 1H (Row 3)
-        table.cell(table_id=info_panel, column=0, row=3, text="1H", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=1, row=3, bgcolor=Intra ? fvg_color_1h : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=3, bgcolor=Intra ? fr_color_1h : na, width=2)
+        // 1D (Row 3)
+        table.cell(table_id=info_panel, column=0, row=3, text="1D", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=3, bgcolor=(Intra_D) ? fvg_color_d : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=3, bgcolor=(Intra_D) ? fr_color_d : na, width=2)
 
         // 4H (Row 4)
         table.cell(table_id=info_panel, column=0, row=4, text="4H", text_size= size.small, text_color=color.silver)
         table.cell(table_id=info_panel, column=1, row=4, bgcolor=Intra ? fvg_color_4h : na, width=2)
         table.cell(table_id=info_panel, column=2, row=4, bgcolor=Intra ? fr_color_4h : na, width=2)
 
-        // 1D (Row 5)
-        table.cell(table_id=info_panel, column=0, row=5, text="1D", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=1, row=5, bgcolor=(Intra_D) ? fvg_color_d : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=5, bgcolor=(Intra_D) ? fr_color_d : na, width=2)
+        // 1H (Row 5)
+        table.cell(table_id=info_panel, column=0, row=5, text="1H", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=5, bgcolor=Intra ? fvg_color_1h : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=5, bgcolor=Intra ? fr_color_1h : na, width=2)
 
-        // 1W (Row 6)
-        table.cell(table_id=info_panel, column=0, row=6, text="1W", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=1, row=6, bgcolor=(Intra_D_W) ? fvg_color_w : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=6, bgcolor=(Intra_D_W) ? fr_color_w : na, width=2)
+        // 15m (Row 6)
+        table.cell(table_id=info_panel, column=0, row=6, text="15m", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=6, bgcolor=Intra ? fvg_color_15m : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=6, bgcolor=Intra ? fr_color_15m : na, width=2)
 
-        // 1M (Row 7)
-        table.cell(table_id=info_panel, column=0, row=7, text="1M", text_size= size.small, text_color=color.silver)
-        table.cell(table_id=info_panel, column=1, row=7, bgcolor=(Intra_D_W_M) ? fvg_color_m : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=7, bgcolor=(Intra_D_W_M) ? fr_color_m : na, width=2)
+        // 5m (Row 7)
+        table.cell(table_id=info_panel, column=0, row=7, text="5m", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=7, bgcolor=Intra ? fvg_color_5m : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=7, bgcolor=Intra ? fr_color_5m : na, width=2)
 
         // ATR14 (Row 8)
         table.cell(table_id=info_panel, column=0, row=8, text="ATR14 " + str.tostring(atr14_val, "#.#####"), text_size= size.small, text_color=color.silver)
@@ -1813,11 +1813,18 @@ st_syd := t_st_syd
 
 // Draw Backgrounds - COMBINED
 // Priority: NY > London > Tokyo > Sydney (in case of overlapping times)
-bg_sess_color = sess_style == "Background" ? 
-                 (ny_active ? ny_col : 
-                  lon_active ? london_col : 
-                  tok_active ? tokyo_col : 
-                  syd_active ? sydney_col : na) : na
+// For Inv. Background: Unified Blue 50% if sessions enabled but NOT active.
+bool any_sess_configured = eff_london_show or eff_ny_show or eff_tokyo_show or eff_sydney_show
+bool any_sess_active     = lon_active or ny_active or tok_active or syd_active
+
+color bg_sess_color = na
+
+if show_sess_on_tf
+    if sess_style == "Background"
+        bg_sess_color := ny_active ? ny_col : lon_active ? london_col : tok_active ? tokyo_col : syd_active ? sydney_col : na
+    else if sess_style == "Inv. Background"
+        if any_sess_configured
+            bg_sess_color := any_sess_active ? na : color.new(color.blue, 85)
 
 
 //----------------- MTF Candle Overlay Logic -----------------
@@ -2533,12 +2540,6 @@ else
         table.delete(tbl_dbg)
         tbl_dbg := na
         
-
-
-
-
-
-
 
 //--------------------------------------------------------- STAGE 6: CONFLUENCE METER ---------------------------------------------------------
 
