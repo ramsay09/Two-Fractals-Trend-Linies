@@ -1295,6 +1295,22 @@ if panel_pos != "None"
         fr_color_w    := fr_w == 1 ? color_blue_1 : fr_w == -1 ? color_red_1 : color_gray_1
         fr_color_m    := fr_m == 1 ? color_blue_1 : fr_m == -1 ? color_red_1 : color_gray_1
 
+        // Stage 7: TF Highlight Logic (Optimized with var)
+        var color col_tf_highlight = color.new(color.yellow, 75)
+        var int cur_sec = timeframe.in_seconds(timeframe.period)
+
+        // Exact matches (Cached)
+        var bool is_5m  = cur_sec == timeframe.in_seconds("5")
+        var bool is_15m = cur_sec == timeframe.in_seconds("15")
+        var bool is_1h  = cur_sec == timeframe.in_seconds("60")
+        var bool is_4h  = cur_sec == timeframe.in_seconds("240")
+        var bool is_1d  = cur_sec == timeframe.in_seconds("D")
+        var bool is_1w  = cur_sec == timeframe.in_seconds("W")
+        var bool is_1m  = cur_sec == timeframe.in_seconds("M")
+
+        // If none match, highlight "Current"
+        var bool is_custom_tf = not (is_5m or is_15m or is_1h or is_4h or is_1d or is_1w or is_1m)
+
         if na(info_panel)
             // Map string position to internal constant
             string pos_input = position.bottom_left
@@ -1311,37 +1327,37 @@ if panel_pos != "None"
         table.cell(table_id=info_panel, column=2, row=0, text= "FR", text_size= size.small, text_color=color.silver)
 
         // 1M (Row 1)
-        table.cell(table_id=info_panel, column=0, row=1, text="1M", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=0, row=1, text="1M", text_size= size.small, text_color=color.silver, bgcolor=is_1m ? col_tf_highlight : na)
         table.cell(table_id=info_panel, column=1, row=1, bgcolor=(Intra_D_W_M) ? fvg_color_m : na, width=2)
         table.cell(table_id=info_panel, column=2, row=1, bgcolor=(Intra_D_W_M) ? fr_color_m : na, width=2)
 
         // 1W (Row 2)
-        table.cell(table_id=info_panel, column=0, row=2, text="1W", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=0, row=2, text="1W", text_size= size.small, text_color=color.silver, bgcolor=is_1w ? col_tf_highlight : na)
         table.cell(table_id=info_panel, column=1, row=2, bgcolor=(Intra_D_W) ? fvg_color_w : na, width=2)
         table.cell(table_id=info_panel, column=2, row=2, bgcolor=(Intra_D_W) ? fr_color_w : na, width=2)
 
         // 1D (Row 3)
-        table.cell(table_id=info_panel, column=0, row=3, text="1D", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=0, row=3, text="1D", text_size= size.small, text_color=color.silver, bgcolor=is_1d ? col_tf_highlight : na)
         table.cell(table_id=info_panel, column=1, row=3, bgcolor=(Intra_D) ? fvg_color_d : na, width=2)
         table.cell(table_id=info_panel, column=2, row=3, bgcolor=(Intra_D) ? fr_color_d : na, width=2)
 
         // 4H (Row 4)
-        table.cell(table_id=info_panel, column=0, row=4, text="4H", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=0, row=4, text="4H", text_size= size.small, text_color=color.silver, bgcolor=is_4h ? col_tf_highlight : na)
         table.cell(table_id=info_panel, column=1, row=4, bgcolor=Intra ? fvg_color_4h : na, width=2)
         table.cell(table_id=info_panel, column=2, row=4, bgcolor=Intra ? fr_color_4h : na, width=2)
 
         // 1H (Row 5)
-        table.cell(table_id=info_panel, column=0, row=5, text="1H", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=0, row=5, text="1H", text_size= size.small, text_color=color.silver, bgcolor=is_1h ? col_tf_highlight : na)
         table.cell(table_id=info_panel, column=1, row=5, bgcolor=Intra ? fvg_color_1h : na, width=2)
         table.cell(table_id=info_panel, column=2, row=5, bgcolor=Intra ? fr_color_1h : na, width=2)
 
         // 15m (Row 6)
-        table.cell(table_id=info_panel, column=0, row=6, text="15m", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=0, row=6, text="15m", text_size= size.small, text_color=color.silver, bgcolor=is_15m ? col_tf_highlight : na)
         table.cell(table_id=info_panel, column=1, row=6, bgcolor=Intra ? fvg_color_15m : na, width=2)
         table.cell(table_id=info_panel, column=2, row=6, bgcolor=Intra ? fr_color_15m : na, width=2)
 
         // 5m (Row 7)
-        table.cell(table_id=info_panel, column=0, row=7, text="5m", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=0, row=7, text="5m", text_size= size.small, text_color=color.silver, bgcolor=is_5m ? col_tf_highlight : na)
         table.cell(table_id=info_panel, column=1, row=7, bgcolor=Intra ? fvg_color_5m : na, width=2)
         table.cell(table_id=info_panel, column=2, row=7, bgcolor=Intra ? fr_color_5m : na, width=2)
 
@@ -1350,7 +1366,7 @@ if panel_pos != "None"
         table.merge_cells(info_panel, 0, 8, 2, 8)
 
         // HEADER (Row 9: Current)
-        table.cell(table_id=info_panel, column=0, row=9, text="C", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=0, row=9, text="C", text_size= size.small, text_color=color.silver, bgcolor=is_custom_tf ? col_tf_highlight : na)
         table.cell(table_id=info_panel, column=1, row=9, bgcolor=(Intra_D_W_M) ? fvg_color_c : na, width=2)
         table.cell(table_id=info_panel, column=2, row=9, bgcolor=(Intra_D_W_M) ? fr_color_c : na, width=2)
 else
