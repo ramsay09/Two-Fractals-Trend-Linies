@@ -18,6 +18,7 @@ int W_PAT   = 2
 int W_FVG   = 1
 int W_L12   = 1
 int W_VOL   = 1
+int W_SLOPE = 1
 
 profile_mode    = input.string("Custom", "Profile Mode", options=["Minimal","Normal","Moderate","Custom"], tooltip="Controls the complexity of the script. \n• Minimal: Core features only (Fastest). \n• Normal: Standard setup. \n• Moderate: Adds Extras. \n• Custom: Full manual control of all checkboxes. \nNote: 'Minimal' and 'Normal' enforce hard-gating (disabling heavy features internally).")
 
@@ -2603,6 +2604,34 @@ if eff_calc_conf
             bull_pts += W_MA
         else
             bear_pts += W_MA
+
+    // MA Slope Logic (W_SLOPE = 1)
+    bool active_slope_1 = eff_ma1_type != "None" and ma1_slope_c
+    bool active_slope_2 = eff_ma2_type != "None" and ma2_slope_c
+
+    bool is_bull_1 = ma1_val >= ma1_val[1]
+    bool is_bull_2 = ma2_val >= ma2_val[1]
+
+    if active_slope_1 and active_slope_2
+        // Both active: Must agree to count
+        if is_bull_1 == is_bull_2
+            total_w += W_SLOPE
+            if is_bull_1
+                bull_pts += W_SLOPE
+            else
+                bear_pts += W_SLOPE
+    else if active_slope_1
+        total_w += W_SLOPE
+        if is_bull_1
+            bull_pts += W_SLOPE
+        else
+            bear_pts += W_SLOPE
+    else if active_slope_2
+        total_w += W_SLOPE
+        if is_bull_2
+            bull_pts += W_SLOPE
+        else
+            bear_pts += W_SLOPE
 
     // 4. Divergence (W_DIV = 2)
     if eff_plot_div
