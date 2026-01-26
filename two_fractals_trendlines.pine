@@ -161,8 +161,8 @@ structure_signed = structure_mem * 0.45 // Weight
 bias_signed_raw = (spread_signed * 0.45) + (slope_signed * 0.25) + (structure_signed * 0.30)
 
 // Regime Factor (Pro Bias)
-// TREND -> 1.0, MIXED -> 0.55, RANGE -> 0.15
-regF = reg_state == "TREND" ? 1.0 : reg_state == "MIXED" ? 0.55 : 0.15
+// TREND -> 1.0, MIXED -> 0.25, RANGE -> 0.10
+regF = reg_state == "TREND" ? 1.0 : reg_state == "MIXED" ? 0.25 : 0.10
 bias_signed = bias_signed_raw * regF
 
 // -----------------------------------------------------------------------------
@@ -334,9 +334,9 @@ conf_signed = f_clamp(bias_signed * quality, -1, 1)
 // Map to 0..100
 conf_raw = 50 + 50 * conf_signed
 
-// Guarantee 1: Range Drift to 50
-if reg_state == "RANGE"
-    conf_raw := 50 + (conf_raw - 50) * 0.35
+// Guarantee 1: Non-Trend Drift to 50
+if reg_state != "TREND"
+    conf_raw := 50 + (conf_raw - 50) * 0.25
 
 conf_score_smooth = ta.ema(conf_raw, 7) // EMA 7 per spec
 
@@ -356,7 +356,7 @@ else
 
 // 7.1 Bias BG State Logic
 // Use TS_latched for stable thresholds in Closed Bar mode
-widen = math.round(6 * (1 - (TS_latched / 100.0)))
+widen = f_clamp(math.round(4 * (1 - (TS_latched / 100.0))), 0, 3)
 bull_on  = 60 + widen
 bull_off = 55 + widen
 bear_on  = 40 - widen
@@ -373,7 +373,7 @@ var int state_age = 0
 
 // Range Kill-Switch
 if update_allowed
-    if reg_latched == "RANGE"
+    if reg_latched != "TREND"
         bias_state := 0
         bull_cnt   := 0
         bear_cnt   := 0
@@ -459,13 +459,15 @@ if show_panel and barstate.islast
 plot(debug ? TS_latched : na, "Trend Strength", color=color.yellow, display=display.none)
 plot(debug ? bias_signed : na, "Bias Signed", color=color.blue, display=display.none)
 plot(debug ? conf_latched : na, "CONF Score", color=color.purple, display=display.none)
+plot(debug ? regF : na, "Regime Factor", color=color.white, display=display.none)
+plot(debug ? conf_raw : na, "CONF Raw", color=color.orange, display=display.none)
 
 // -----------------------------------------------------------------------------
 // 9. ALERTS
 // -----------------------------------------------------------------------------
 // Alerts use latched values to ensure they fire only on confirmed logic in Closed Bar mode
-bull_entry = ta.crossover(conf_latched, 70) and TS_latched >= 55
-bear_entry = ta.crossunder(conf_latched, 30) and TS_latched >= 55
+bull_entry = ta.crossover(conf_latched, 70) and reg_latched == "TREND"
+bear_entry = ta.crossunder(conf_latched, 30) and reg_latched == "TREND"
 
 reg_to_trend = reg_latched == "TREND" and reg_latched[1] != "TREND"
 reg_to_range = reg_latched == "RANGE" and reg_latched[1] != "RANGE"
