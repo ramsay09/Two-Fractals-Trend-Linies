@@ -1,480 +1,2842 @@
 //@version=5
-indicator("CONF REG Pro Bias Verifier", shorttitle="CONF/REG", overlay=true, max_bars_back=3000)
 
-// -----------------------------------------------------------------------------
-// 1. UI & INPUTS
-// -----------------------------------------------------------------------------
-grp_ui = "UI Settings"
-show_panel  = input.bool(true, "Show Panel", group=grp_ui)
-show_bg     = input.bool(true, "Show Background Blocks", group=grp_ui)
-calc_mode   = input.string("Closed Bar", "Calculation Mode", options=["Closed Bar", "Realtime (Repainting)"], group=grp_ui)
-profile     = input.string("Auto", "Profile", options=["Auto"], group=grp_ui) // Fixed to Auto
-debug       = input.bool(false, "Debug Info", group=grp_ui)
+indicator('Market Context & Confluence Suite', overlay=true, shorttitle='MCCS', max_bars_back=4000, max_lines_count=500, max_boxes_count=500, dynamic_requests=true)
 
-// -----------------------------------------------------------------------------
-// 2. HELPER FUNCTIONS & SYSTEM
-// -----------------------------------------------------------------------------
-f_clamp(x, lo, hi) => math.max(lo, math.min(x, hi))
-f_safe_div(a, b)   => b != 0 ? a / b : 0
-f_sign0(x)         => x > 0 ? 1 : x < 0 ? -1 : 0
-f_softsat(x, k) =>
-    if k <= 0
-        0.0
+general_info   = input.bool(title='General Description', defval=false, tooltip='Use the signals in confluence and as an indication of market tension, which will discharged in higher volatility or trend continuation. ... context matters.
+                 Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
+
+// Constants for Panel & Weights (Centralized)
+int PANEL_ROWS = 14
+int PANEL_COLS = 3
+
+// Confluence Weights
+int W_FR    = 4
+int W_FVG   = 4
+int W_SLOPE = 1
+int W_TL    = 1
+int W_SEG   = 1
+int W_MA    = 1
+int W_L12   = 1
+int W_DIV   = 1
+int W_PAT   = 1
+int W_VOL   = 1
+int W_BB    = 1
+
+profile_mode    = input.string("Custom", "Profile Mode", options=["Minimal","Normal","Moderate","Custom"], tooltip="Controls the complexity of the script. \n• Minimal: Core features only (Fastest). \n• Normal: Standard setup. \n• Moderate: Adds Extras. \n• Custom: Full manual control of all checkboxes. \nNote: 'Minimal' and 'Normal' enforce hard-gating (disabling heavy features internally).")
+
+// adx, hma and ema1 x ema2 mtf trend info panel
+panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
+                 tooltip='Provides an overview of multi time frame trends: FVG Close state, and Fractal Break state. Displays for 5m, 15m, 1H, 4H, 1D, 1W, 1M. Select position to enable.')
+
+// Confluence & Regime
+//grp_conf            = "Confluence & Regime"
+show_conf_meter     = input.bool(true, "Confluence Meter⠀⠀⠀", inline="conf_ui", tooltip="")
+show_conf_bg        = input.bool(false, "Confluence Meter BG", inline="conf_ui", tooltip="Aggregates active signals (Trendlines, MA, etc.) into a 0-100 score. \n• >55: Bullish \n• <45: Bearish \nPlots the Confluence Signal background color.")
+show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. 
+                      \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n• Independent Controls: Toggle Panel and Background separately.")
+regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
+
+// fractals input
+fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, tooltip='')
+sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, tooltip='Bill Williams Fractals (five Candles): white triangle. Works as support and resistance level. 
+                 \nSub Bill Williams Fractals (four Candles): Lightgray triangle. Works as support and resistance level. These are B. W. Fractals on a Lower Timeframe.')
+
+// Gradient Volume Profile
+//grp_vp = "Gradient Volume Profile"
+vp_enable   = input.bool(false, "Volume Profile ⠀⠀⠀⠀⠀", inline="line4")
+// Smart Contrast
+vp_smart    = input.bool(false, "Contrast Factor", inline="line4", tooltip="")
+vp_clip     = input.float(2.5, "", minval=1.0, step=0.1, inline="line4", tooltip="Visualizes trading volume distribution by price level over the visible chart range. Higher color intensity highlights High Volume Nodes (HVN), representing areas of significant market interest. 
+              Includes 'Smart Contrast' to automatically adjust saturation, ensuring key volume clusters remain visible even when extreme peaks are present.
+              \n⚠ Heavy Calculation: O(Scan Depth * Rows). Use carefully.")
+
+// Performance Pass v3: VP Inputs (Simplified)
+// Fixed, stable parameters for visible range scanning
+int vp_rows     = 120
+int vp_smooth   = 3
+
+// Basic Visuals
+vp_width    = 12
+vp_offset   = 15
+
+// MTF CANDLE OVERLAY INPUTS
+grp_mtf_candle    = "MTF Candle Overlay"
+show_mtf_candles  = input.bool(false, "MTF Candle Overlay ⠀⠀⠀⠀⠀⠀", group=grp_mtf_candle, inline="mtf_ov", tooltip="Two timelines at one glance. It's like looking inside a candle with X-rays.")
+mtf_tf_sel        = input.string("1h", "", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], inline="mtf_ov", group=grp_mtf_candle)
+mtf_opacity       = input.int(15, "Opacity %", minval=0, maxval=100, group=grp_mtf_candle, tooltip="0% = Invisible, 100% = Solid")
+
+// Additional Context Inputs 
+grp_add         = "Additional Context"
+use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", group=grp_add, inline="sess_1st", tooltip="")
+sess_1st_tf     = input.timeframe("5", "", group=grp_add, inline="sess_1st", tooltip="Lines remain at the high and low of the first candle of the running trading session. \nSelect the timeframe for the 1st Session Candle calculation.")
+show_pch_pcl    = input.bool(true, "Previous Candle High/Low", group=grp_add, inline="add_1", tooltip="")
+pch_pcl_tf      = input.timeframe("D", "", group=grp_add, inline="add_1", tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe. \nSelect the timeframe for the Previous Candle High/Low calculation.")
+
+show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀", group=grp_add, inline="l_rf", tooltip="")
+last_frac_tf    = input.timeframe("240", "", group=grp_add, inline="l_rf", tooltip="Draws lines at the last confirmed Up/Down Fractals. Every new trend begins with the breaking of a fractal. (Time Frame dependent). \nSelect the timeframe for the Last Fractal calculation.")
+
+show_vol        = input.bool(true, "High Volume Spikes", group=grp_add, inline="vol_sp", tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
+vol_mult        = input.float(2.0, "Threshold (x Avg)", inline="vol_sp", group=grp_add)
+
+// FVG Inputs 
+grp_fvg1        = "Price Imbalance (Fair Value Gap) 1"
+plot_fvg1       = input.bool(true, title="FVG 1 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg1, inline="f1_1", tooltip="")
+fvg1_tf_sel     = input.timeframe("", title="TF", group=grp_fvg1, inline="f1_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement). Also reveals institutional interest (new trend). \nSelect the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
+fvg1_len        = input.int(1, title="Box Length", minval=1, group=grp_fvg1, inline="f1_2")
+fvg1_limit      = input.int(50, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg1, inline="f1_2")
+col_fvg1_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg1, inline="f1_3")
+col_fvg1_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg1, inline="f1_3")
+
+grp_fvg2        = "Price Imbalance (Fair Value Gap) 2"
+plot_fvg2       = input.bool(false, title="FVG 2 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg2, inline="f2_1", tooltip="")
+fvg2_tf_sel     = input.timeframe("", title="TF", group=grp_fvg2, inline="f2_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement). Also reveals institutional interest (new trend). \nSelect the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
+fvg2_len        = input.int(1, title="Box Length", minval=1, group=grp_fvg2, inline="f2_2")
+fvg2_limit      = input.int(5, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg2, inline="f2_2")
+col_fvg2_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg2, inline="f2_3")
+col_fvg2_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg2, inline="f2_3")
+
+// Smart MTF S&R
+grp_psr             = "Smart S&R (Support & Resistance)"
+ps_mode             = input.string("None", title="Smart S&R", options=["None", "Manuell", "Auto"], group=grp_psr, inline="en_tf", tooltip="")
+ps_tf               = input.timeframe("D", title="⠀Pivot TF", inline="en_tf", group=grp_psr, tooltip="Activates the 'Smart Market Structure' system:
+                      \n• Multi-Timeframe Analysis: Identifies significant Swing Highs/Lows from a higher timeframe (e.g., 4H levels on a 15m chart).
+                      \n• Noise Filtering: Uses adjustable pivot strength to ignore minor price fluctuations.
+                      \n• Smart Zones: Automatically merges levels that are close together into a single 'Zone' (Box) to reduce clutter.
+                      \n• Dynamic State: Tracks confirmed breakouts and can automatically flip Support to Resistance (Role Reversal) or remove broken levels.
+                      \n• Clutter Control: Manages a fixed number of active levels, removing old or irrelevant ones automatically. \nSelect the Higher Timeframe to scan for significant Swing Highs/Lows. \nSmart S&R 'Auto' affects 'Pivot TF' only.")
+ps_left             = input.int(2, title="Pivot Strength (Left) ⠀⠀⠀⠀⠀⠀⠀⠀", minval=1, group=grp_psr, tooltip="Higher values filter out minor market noise. Left Standard=2 (Bill Williams Fractal).")
+ps_right            = input.int(2, title="Pivot Strength (Right) ⠀⠀⠀⠀⠀⠀⠀", minval=1, group=grp_psr, tooltip="Higher values filter out minor market noise. Right Standard=2 (Bill Williams Fractal).")
+ps_max              = input.int(20, title="Max Active Levels ⠀", minval=1, maxval=50, group=grp_psr, tooltip="Limits the number of visible lines to prevent chart clutter. FIFO (First In, First Out).")
+ps_break_act        = input.string("Role Reversal", title="On Break Action ", options=["Keep", "Delete", "Role Reversal"], group=grp_psr, tooltip="How the script handles a level when price crosses it. \nKeep: Do nothing. \nDelete: Remove line. \nRole Reversal: Support becomes Resistance (Color change).")
+ps_merge_en         = input.bool(true, title="Merge Nearby Levels (Zones) ", group=grp_psr, inline="ps_m")
+ps_merge_pct        = input.float(0.1, title="Threshold %", minval=0.01, step=0.05, group=grp_psr, inline="ps_m", tooltip="If a new level appears within X% of an existing level, they are merged into a Zone.")
+ps_col_res          = input.color(color.new(color.red, 30), title="Res Color", group=grp_psr, inline="ps_c")
+ps_col_sup          = input.color(color.new(color.green, 30), title="⠀Sup Color", group=grp_psr, inline="ps_c")
+ps_col_zone         = input.color(color.new(color.blue, 85), title="⠀Zone Fill", group=grp_psr, inline="ps_c") 
+
+// UDT for S&R Management
+type SRLevel
+    float price
+    bool  is_res      // True=Resistance, False=Support
+    bool  is_broken
+    int   start_time
+    line  id_line
+    box   id_box      // Used if merged into a zone
+    bool  is_zone
+
+type ActiveSD
+    box   id_box
+    float top
+    float bottom
+    bool  is_bull
+    bool  mitigated
+    int   start_time
+
+// Bollinger Bands
+grp_bb              = 'Bollinger Bands'
+BB_plot             = input.bool(true, title='Bollinger Bands⠀', inline="bb_t", group=grp_bb, tooltip='')
+near_bb             = input.bool(true, title='Touched BBs only', inline="bb_t", group=grp_bb, tooltip='This maintains a better chart overview and works as reversal zone indicator. 
+                      n\Works as support and resistence, as reversal zone and as squeeze indicator.')
+BB_calc_tog         = input.bool(true, title='Toggle BB Calculation (Standard/Exponential)', group=grp_bb, tooltip='Works as support and resistence, as reversal zone and as squeeze indicator. Standard -> checked')
+BB_length_1         = input.int(20, minval=1, title='BB Length', inline="bb_i", group=grp_bb, tooltip='')
+BB_sdev_1           = input.float(2.0, minval=0.001, maxval=3.8, step= 0.2, title='⠀BB 1 StdDev', inline="bb_i", group=grp_bb, tooltip='')
+BB_sdev_2           = 3//input.float(3.0, minval=0.001, title='BB 2 StdDev', group=grp_bb, tooltip='')
+BB_sdev_3           = 4//input.float(4.0, minval=0.001, title='BB 3 StdDev', group=grp_bb, tooltip='')
+BB_sdev_4           = 5//input.float(5.0, minval=0.001, title='BB 4 StdDev', group=grp_bb, tooltip='')
+
+
+// ema cloud and ma inputs
+grp_ma              = 'EMA cloud and MA'
+en_cloud            = input.bool(false, title='EMA Cloud⠀', inline="ema_c", group=grp_ma, tooltip='')
+sig_plot            = input.bool(true, title='Cloud Color Signal', inline="ema_c", group=grp_ma, tooltip='EMA1 cross EMA2 color signal. 
+                      n\This EMA cloud works as dynamic support and resistance and as trend indication. A wide cloud indicates high volatility, a narrow cloud indicates low volatility and breakout potential. Interesting pairs: 8/21, 40/97')
+
+ema_inp1            = input.int(8, title='EMA1 Length', inline="ema_l", minval=1, group=grp_ma, tooltip="")
+ema_inp2            = input.int(21, title='⠀EMA2 Length', inline="ema_l", minval=1, group=grp_ma, tooltip="")
+
+// MA 1 Inputs
+ma1_type            = input.string("EMA", title="MA 1", options=["None", "SMA", "EMA"], inline="ma1", group=grp_ma)
+ma1_len             = input.int(200, title="", minval=1, inline="ma1", group=grp_ma)
+ma1_slope_c         = input.bool(false, title="Slope Color", inline="ma1", group=grp_ma)
+
+// MA 2 Inputs
+ma2_type            = input.string("SMA", title="MA 2", options=["None", "SMA", "EMA"], inline="ma2", group=grp_ma)
+ma2_len             = input.int(200, title="", minval=1, inline="ma2", group=grp_ma)
+ma2_slope_c         = input.bool(false, title="Slope Color", inline="ma2", group=grp_ma)
+
+// two fractals trendlines inputs
+grp_fr              = 'Trend lines'
+plot_trendline      = input.bool(false, title='Fractal Trend Lines⠀', inline="fr_tr", group=grp_fr, tooltip='')
+fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group=grp_fr, tooltip="The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal. \nNumber of bars to the left and right of the fractal bar for trendlines. Default is 2 (5-bar fractal). 
+                     Min=0 (Fractal(2) using anchored linear regression, follow the highs/lows of the subsequent candles to align with the current trend), Max=10 (21 bars).")
+
+// divergence signal inputs
+grp_div             = 'Divergences'
+plot_div            = input.bool(true, title='Divergence Signal Arrow', group=grp_div, tooltip='These divergences are very early signals and must be used in confluence with other signals. Hidden and classic divergence are used')
+div_indi            = input.string('rsi', title='Divergence Indicator', options=['rsi', 'macd(fast_line)', 'macd(slow_line)'], tooltip='Select an Indicator for divergence calculation.', group=grp_div)
+rsi_length          = input.int(14, title='RSI Length', inline="rsi_p", minval=1, step=2, group=grp_div)
+bar_div_p           = input.int(25, title='⠀Bar Period', inline="rsi_p", minval=1, step=1, tooltip='RSI Length. n\The number of bars in which divergences are detected.', group=grp_div)
+src_div             = input.string('high/low', title='Bar Divergence Source', options=['high/low', 'close'], tooltip='The bar source for divergence calculation.', group=grp_div)
+
+// bar signals inputs
+grp_bar             = 'Bar signals'
+plot_l12_bar        = input.bool(true, title='Last 12 Bar (L12) ⠀', inline="l12", tooltip='', group=grp_bar)
+L12_input           = input.int(12, minval=1, title='Bar count', inline="l12", group=grp_bar, tooltip='"Letter: L, L12 => highest low of last 12 bars -> long. Lowest high of last 12 bars -> short. Indicates a new trend. \nLast 12 Bar" Bar count.')
+plot_nr_bar         = input.bool(true, title='Narrow Range Bar (NR7)', tooltip='Letter: n, NR7 = narrowest range of a bar of the last seven bars. Indicates market tension.', group=grp_bar)
+plot_i_bar          = input.bool(true, title='Inside Bar', tooltip='Letter: i. An inside bar is a triangle formation on smaller time frame.', group=grp_bar)
+plot_o_bar          = input.bool(true, title='Outside Bar', tooltip='Letter: o. An outside bar is an opening funnel formation on smaller time frames. gray-> normal outside bar, valid at least for the next bar: red-> short, green-> long', group=grp_bar)
+plot_s_bar          = input.bool(true, title='Sandwich Bar', tooltip='Letter: s. Indicates market tension.', group=grp_bar)
+plot_f_bar          = input.bool(true, title='Fakey', tooltip='Letter: F. An inside bar false breakout.', group=grp_bar)
+
+// segments inputs
+grp_seg             = 'Segment signal'
+plot_segments       = input.bool(false, title='Segments ⠀', inline="seg", tooltip='', group=grp_seg)
+sb                  = input.int(10 ,title='Max Bars', inline="seg", minval=0, step=1, tooltip='Gray lines that follow the highest highs and lowest lows. This is a subtle way to detect a new trend. The higher the timeframe the more reliable the signal. 
+                      \nMax bars between two segment highs or segment lows.', group=grp_seg)
+
+
+// pivot points inputs
+grp_pi              = 'Pivot points'
+plot_pivots_h1      = input.bool(false, title= "1 Hour Classic Pivot Points", group=grp_pi, tooltip= "1 Hour Pivot points (P, R1-R4, S1-S4). Only visible on charts < 1H.")
+plot_pivots_h4      = input.bool(true, title= "4 Hour Classic Pivot Points", group=grp_pi, tooltip= "4 Hour Pivot points (P, R1-R4, S1-S4). Only visible on charts < 4H.")
+plot_pivots_d       = input.bool(true, title= "1 Day Classic Pivot Points", group=grp_pi, tooltip= "Daily Pivot points (P, R1-R4, S1-S4). Only visible on intraday charts.")
+plot_pivots_w       = input.bool(true, title= "1 Week Classic Pivot Points", group=grp_pi, tooltip= "1 week classic Pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.")
+plot_pivots_m       = input.bool(true, title='1 Month Classic Pivot Points', group=grp_pi, tooltip='1 month classic pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.')
+plot_pivots_3m      = input.bool(true, title='3 Month Classic Pivot Points', group=grp_pi, tooltip='3 month classic pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.')
+plot_pivots_12m     = input.bool(true, title='12 Month Classic Pivot Points', group=grp_pi, tooltip='12 month classic pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.')
+
+// TRADING SESSIONS INPUTS ---
+grp_sess      = "Trading Sessions"
+sess_timezone = input.string("Europe/Berlin", title="Timezone", inline="ses", tooltip="", group=grp_sess)
+sess_style    = input.string("Vertical Line", title="⠀Session Style", inline="ses", options=["Vertical Line", "Box", "Background", "Inv. Background"], group=grp_sess, tooltip="Standard: Europe/Berlin. Change to 'UTC' or 'America/New_York' if needed. \nVisual style for trading sessions: \n• Vertical Line: Start/End lines. \n• Box: High/Low Range. \n• Background: Session Time Window (Highest Priority Layer). \n• Inv. Background: Unified Color (Blue 50%) during 'Off-Hours'.")
+
+use_sess_rest   = input.bool(false, title="Session Restriction", inline="ses_rest", group=grp_sess)
+sess_rest_time  = input.int(60, title="⠀⠀⠀⠀Time", inline="ses_rest", tooltip="Rstricts Session Trading Time (Default 1 hour).", group=grp_sess)
+
+// London - ORANGE
+london_show   = input.bool(true, title="London Session ⠀⠀", group=grp_sess, inline="lon")
+london_sess   = input.session("0900-1730", title="", group=grp_sess, inline="lon")
+london_col    = input.color(color.new(color.orange, 90), title="", group=grp_sess, inline="lon")
+
+// New York - BLUE
+ny_show       = input.bool(true, title="New York Session⠀", group=grp_sess, inline="ny")
+ny_sess       = input.session("1530-2200", title="", group=grp_sess, inline="ny")
+ny_col        = input.color(color.new(color.blue, 90), title="", group=grp_sess, inline="ny")
+
+// Tokyo - YELLOW
+tokyo_show    = input.bool(false, title="Tokyo Session ⠀⠀⠀", group=grp_sess, inline="tok")
+tokyo_sess    = input.session("0100-0900", title="", group=grp_sess, inline="tok")
+tokyo_col     = input.color(color.new(color.yellow, 90), title="", group=grp_sess, inline="tok")
+
+// Sydney - RED
+sydney_show     = input.bool(false, title="Sydney Session ⠀⠀", group=grp_sess, inline="syd")
+sydney_sess     = input.session("2200-0700", title="", group=grp_sess, inline="syd")
+sydney_col      = input.color(color.new(color.red, 90), title="", group=grp_sess, inline="syd")
+sess_line_limit = input.int(150, "Max Session Lines (FIFO)", group=grp_sess, minval=20, tooltip="Limits total number of vertical session lines to prevent 'Max lines' error.")
+
+// Alerts
+grp_alerts      = "🔔 Alerts"
+alert_profile   = input.string("Normal", "Alert Profile", options=["Off", "Minimal","Normal","Moderate"], group=grp_alerts, tooltip="Controls the complexity of alert triggers to avoid spam. \n• Off: No alerts. \n• Minimal: Trendline Breakouts only. \n• Normal: Adds Divergences. \n• Moderate: Adds Regime Changes & High Confluence Events.")
+alert_cooldown  = input.int(5, "Cooldown (Bars)", minval=1, group=grp_alerts, tooltip="Wait period (in bars) after an alert is triggered before the same alert type can trigger again. Prevents repetitive alerts during the same market event.")
+use_rt_alert   = input.bool(false, title="Alert on 5th Fractal Candle (Real-time)", group=grp_alerts, tooltip="Triggers an alert signal while the 5th candle of a fractal pattern is forming (Real-time). Select 'Any function call' when creating the alert.")
+
+
+// Debug (Performance)
+debug_on       = input.bool(false, "Debug (Perf)", group="Debug")
+
+// attributes inputs
+grp_atri            = "Attributes of drawn objects"
+vp_color            = input.color(color.new(color.red, 0), "Volume Profile Color", group=grp_atri)
+
+color_fr            = input.color(color.white, "Fractal Color", group=grp_atri)
+transp_fr           = input.int(40, "Fractal Transparency", minval=1, maxval= 100, group=grp_atri)
+
+color_ema_c         = input.color(color.blue, 'EMA Cloud Color', group=grp_atri)
+color_ema_sig_up    = input.color(color.green, 'EMA Signal Up Cloud Color', group=grp_atri)
+color_ema_sig_dn    = input.color(color.red, 'EMA Signal Down Cloud Color', group=grp_atri)
+transp_ema_c        = input.int(65, 'EMA Cloud Transparency', minval=1, maxval= 100, group=grp_atri)
+
+color_tr            = input.color(color.blue, 'Trend Line Color', group=grp_atri)
+width_tr            = input.int(2, 'Trend Line Width', minval=1, group=grp_atri)
+transp_tr           = input.int(50, 'Trend Line Transparency', minval=1, maxval= 100, group=grp_atri)
+
+color_seg           = input.color(color.white, 'Segment Line Color', group=grp_atri)
+transp_seg          = input.int(65, 'Segment Line Transparency', minval=1, maxval= 100, group=grp_atri)
+
+transp_bg           = input.int(85, 'Background Color Transparency', minval=1, maxval= 100, group=grp_atri)
+
+
+//-------------------------------------------------------- GLOBAL ON-FLAGS (Performance / Gating) --------------------------------------------------------
+// Stage 0: Centralized Gating Flags as aliases for inputs
+
+// Profile Helper
+f_profile(_custom, _min, _norm, _mod) =>
+    result = _custom
+    if profile_mode == "Minimal"
+        result := _min
+    else if profile_mode == "Normal"
+        result := _norm
+    else if profile_mode == "Moderate"
+        result := _mod
+    result
+
+// Effective Feature Flags
+eff_fractals_plot   = f_profile(fractals_plot, fractals_plot, fractals_plot, fractals_plot)
+eff_sub_fractals    = f_profile(sub_fractals, sub_fractals, sub_fractals, sub_fractals)
+eff_plot_trendline  = f_profile(plot_trendline, plot_trendline, plot_trendline, plot_trendline)
+
+eff_vp_enable       = f_profile(vp_enable, false, false, vp_enable) // VP: Custom/Mod
+eff_vp_smart        = f_profile(vp_smart, vp_smart, vp_smart, vp_smart)
+
+eff_show_mtf_candles= f_profile(show_mtf_candles, false, false, show_mtf_candles) // MTF: Custom/Mod
+
+eff_use_sess_1st    = f_profile(use_sess_1st, false, use_sess_1st, use_sess_1st) // Sess 1st: Norm/Mod
+eff_show_pch_pcl    = f_profile(show_pch_pcl, false, show_pch_pcl, show_pch_pcl)
+eff_show_last_frac  = f_profile(show_last_frac, false, show_last_frac, show_last_frac)
+eff_show_vol        = f_profile(show_vol, false, show_vol, show_vol)
+
+eff_plot_fvg1       = f_profile(plot_fvg1, false, plot_fvg1, plot_fvg1)
+eff_plot_fvg2       = f_profile(plot_fvg2, false, plot_fvg2, plot_fvg2) // FVG2: Norm/Mod
+
+eff_ps_mode         = f_profile(ps_mode, "None", "None", ps_mode) // Smart S/R: Mod/Custom only
+
+eff_BB_plot         = f_profile(BB_plot, BB_plot, BB_plot, BB_plot) // Minimal allows BB if checked
+
+eff_en_cloud        = f_profile(en_cloud, en_cloud, en_cloud, en_cloud)
+eff_sig_plot        = f_profile(sig_plot, sig_plot, sig_plot, sig_plot)
+eff_ma1_type        = f_profile(ma1_type, ma1_type, ma1_type, ma1_type)
+eff_ma2_type        = f_profile(ma2_type, ma2_type, ma2_type, ma2_type)
+
+eff_plot_div        = f_profile(plot_div, false, plot_div, plot_div) // Div: Norm/Mod
+
+// Bar Patterns
+eff_plot_l12_bar    = f_profile(plot_l12_bar, false, plot_l12_bar, plot_l12_bar)
+eff_plot_nr_bar     = f_profile(plot_nr_bar, false, plot_nr_bar, plot_nr_bar)
+eff_plot_i_bar      = f_profile(plot_i_bar, false, plot_i_bar, plot_i_bar)
+eff_plot_o_bar      = f_profile(plot_o_bar, false, plot_o_bar, plot_o_bar)
+eff_plot_s_bar      = f_profile(plot_s_bar, false, plot_s_bar, plot_s_bar)
+eff_plot_f_bar      = f_profile(plot_f_bar, false, plot_f_bar, plot_f_bar)
+
+eff_plot_segments   = f_profile(plot_segments, plot_segments, plot_segments, plot_segments)
+
+// Pivots (Classic) - Min: Off
+eff_plot_pivots_h1  = f_profile(plot_pivots_h1, false, plot_pivots_h1, plot_pivots_h1)
+eff_plot_pivots_h4  = f_profile(plot_pivots_h4, false, plot_pivots_h4, plot_pivots_h4)
+eff_plot_pivots_d   = f_profile(plot_pivots_d, false, plot_pivots_d, plot_pivots_d)
+eff_plot_pivots_w   = f_profile(plot_pivots_w, false, plot_pivots_w, plot_pivots_w)
+eff_plot_pivots_m   = f_profile(plot_pivots_m, false, plot_pivots_m, plot_pivots_m)
+eff_plot_pivots_3m  = f_profile(plot_pivots_3m, false, plot_pivots_3m, plot_pivots_3m)
+eff_plot_pivots_12m = f_profile(plot_pivots_12m, false, plot_pivots_12m, plot_pivots_12m)
+
+// Sessions - Min: Off
+eff_london_show     = f_profile(london_show, false, london_show, london_show)
+eff_ny_show         = f_profile(ny_show, false, ny_show, ny_show)
+eff_tokyo_show      = f_profile(tokyo_show, false, tokyo_show, tokyo_show)
+eff_sydney_show     = f_profile(sydney_show, false, sydney_show, sydney_show)
+
+// Session BG Flag (Minimal = OFF)
+eff_sess_bg_enable  = f_profile(true, false, true, true)
+
+int active_sec_calls = 0
+// Performance Counters (Per Bar)
+int ops_trend = 0
+int ops_pch = 0
+int ops_vp_scan = 0
+int ops_vp_draw = 0
+int ops_div = 0
+int ops_bb = 0
+
+// Peak Trackers
+var int peak_ops_trend = 0
+var int peak_ops_vp = 0
+
+var table tbl_dbg = na
+
+ON_PCH          = eff_show_pch_pcl
+ON_FVG1         = eff_plot_fvg1
+ON_FVG2         = eff_plot_fvg2
+ON_MTF_OV       = eff_show_mtf_candles
+ON_SESS_1ST     = eff_use_sess_1st
+ON_LAST_FR      = eff_show_last_frac
+ON_PS           = eff_ps_mode != "None"
+
+// New Features Flags (Independently Controlled)
+// Confluence & Regime are now strictly controlled by their inputs, ignoring Profile Mode
+eff_show_conf_meter = show_conf_meter
+eff_regime_panel    = show_regime_panel
+eff_regime_bg_mode  = regime_bg_mode
+
+//----------------- Global Signal Registry (For Alerts & Confluence) -----------------
+// These variables are reset to false/na on every bar execution
+// We populate them inside the respective feature blocks
+bool sig_tl_bull        = false
+bool sig_tl_bear        = false
+bool sig_div_bull       = false
+bool sig_div_bear       = false
+bool sig_ema_bull       = false
+bool sig_ema_bear       = false
+bool sig_ma_bull        = false
+bool sig_ma_bear        = false
+bool sig_seg_bull       = false
+bool sig_seg_bear       = false
+bool sig_l12_bull       = false
+bool sig_l12_bear       = false
+bool sig_pat_bull       = false
+bool sig_pat_bear       = false // General pattern
+bool sig_fvg_bull       = false
+bool sig_fvg_bear       = false
+bool sig_vol_spike      = false
+
+
+// Helper Functions for Object Reuse (Unified)
+f_line_get_or_create(_l, _x1, _y1, _x2, _y2, _col, _style, _xloc=xloc.bar_index) =>
+    line ret = _l
+    if na(ret)
+        ret := line.new(_x1, _y1, _x2, _y2, extend=extend.right, color=_col, style=_style, width=1, xloc=_xloc)
     else
-        float u = x / k
-        if u > 10
-            1.0
+        line.set_xy1(ret, _x1, _y1)
+        line.set_xy2(ret, _x2, _y2)
+        line.set_color(ret, _col)
+        line.set_style(ret, _style)
+    ret
+
+f_label_get_or_create(_lb, _x, _y, _txt, _col) =>
+    label ret = _lb
+    if na(ret)
+        ret := label.new(_x, _y, _txt, xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=_col, size=size.small, textalign=text.align_left)
+    else
+        label.set_xy(ret, _x, _y)
+        label.set_text(ret, _txt)
+        label.set_textcolor(ret, _col)
+    ret
+
+
+//-------------------------------------------------------- williams fractals (Visuals for Chart) --------------------------------------------------------------
+
+up_fr               = ta.pivothigh(2, 2)
+dn_fr               = ta.pivotlow(2, 2)
+
+last_up_fr_level    = ta.valuewhen(up_fr, high[2], 0)
+last_dn_fr_level    = ta.valuewhen(dn_fr, low[2], 0)
+
+// Plot fractals
+plotshape(eff_fractals_plot ? up_fr : na, style=shape.triangleup, location=location.abovebar, offset=-2, color=color.new(color_fr, transp_fr), title='Fractal up')
+plotshape(eff_fractals_plot ? dn_fr : na, style=shape.triangledown, location=location.belowbar, offset=-2, color=color.new(color_fr, transp_fr), title='Fractal down')
+
+// Sub Fractals Logic
+// Up Sub Fractals
+// Pattern A: Peak at [2] (1 Left, 2 Right). Strict check (left 2nd bar must be higher to NOT be a standard fractal) to avoid overlap.
+up_sub_a = high[2] > high[3] and high[2] > high[1] and high[2] > high[0]
+up_sub_a_strict = up_sub_a and high[2] <= high[4]
+
+// Pattern B: Peak at [2] (2 Left, 1 Right) - Strict: Must NOT be 2 Right (high[2] <= high[0])
+up_sub_b = high[2] > high[4] and high[2] > high[3] and high[2] > high[1] and high[2] <= high[0]
+
+// Down Sub Fractals
+// Pattern A: Peak at [2] (1 Left, 2 Right)
+dn_sub_a = low[2] < low[3] and low[2] < low[1] and low[2] < low[0]
+dn_sub_a_strict = dn_sub_a and low[2] >= low[4]
+
+// Pattern B: Peak at [2] (2 Left, 1 Right) - Strict: Must NOT be 2 Right (low[2] >= low[0])
+dn_sub_b = low[2] < low[4] and low[2] < low[3] and low[2] < low[1] and low[2] >= low[0]
+
+// Plot Sub Fractals
+col_sub_fr = color.new(color.gray, 30)
+
+plotshape(eff_sub_fractals and up_sub_a_strict ? high[2] : na, style=shape.triangleup, location=location.abovebar, offset=-2, color=col_sub_fr, title='Sub Fractal Up A')
+plotshape(eff_sub_fractals and up_sub_b ? high[2] : na, style=shape.triangleup, location=location.abovebar, offset=-2, color=col_sub_fr, title='Sub Fractal Up B')
+
+plotshape(eff_sub_fractals and dn_sub_a_strict ? low[2] : na, style=shape.triangledown, location=location.belowbar, offset=-2, color=col_sub_fr, title='Sub Fractal Down A')
+plotshape(eff_sub_fractals and dn_sub_b ? low[2] : na, style=shape.triangledown, location=location.belowbar, offset=-2, color=col_sub_fr, title='Sub Fractal Down B')
+
+
+//------------------------------------------------------- Pro Smart S&R Logic -----------------------------------------------------
+
+// --- 1. Data Fetching (MTF) ---
+// Function to get Raw Pivot Data from HTF
+// We need to return specific values when a pivot is confirmed
+f_get_mtf_pivots(_src_h, _src_l, _l, _r) =>
+    _ph = ta.pivothigh(_src_h, _l, _r)
+    _pl = ta.pivotlow(_src_l, _l, _r)
+
+    // Values are confirmed at the close of the bar _r bars after the peak
+    // We return the Price and the Time of the peak
+    // Note: Pivot High was at offset _r
+    _ph_val = not na(_ph) ? _ph : na
+    _ph_time = not na(_ph) ? time[_r] : na
+
+    _pl_val = not na(_pl) ? _pl : na
+    _pl_time = not na(_pl) ? time[_r] : na
+
+    [_ph_val, _ph_time, _pl_val, _pl_time]
+
+// Helper to calculate Auto Timeframe
+f_calc_auto_tf() =>
+    if timeframe.isseconds
+        "60" // Fallback
+    else if timeframe.isintraday
+        if timeframe.multiplier <= 15
+            "240"
+        else if timeframe.multiplier <= 240
+            "D"
         else
-            float e2u = math.exp(2 * u)
-            (e2u - 1) / (e2u + 1)
-
-// Update Gating
-// "Closed Bar": updates strictly on confirmed bar.
-// "Realtime": updates intrabar.
-// NOTE: ta.* functions must run GLOBALLY (outside this check).
-bool update_allowed = (calc_mode == "Realtime (Repainting)") ? true : barstate.isconfirmed
-
-// -----------------------------------------------------------------------------
-// 3. GLOBAL INDICATORS (Always calculated to maintain ta.* consistency)
-// -----------------------------------------------------------------------------
-// 3.1 Efficiency Ratio (ER)
-len_er = 20
-er_change = math.abs(close - close[len_er])
-er_vol    = math.sum(math.abs(close - close[1]), len_er)
-er_val    = f_safe_div(er_change, er_vol)
-
-// 3.2 ADX
-adx_len = 14
-dirmov_len = 14
-[di_plus, di_minus, adx_val] = ta.dmi(dirmov_len, adx_len)
-
-// 3.3 BB Width
-bb_len  = 20
-bb_mult = 2.0
-bb_basis = ta.sma(close, bb_len)
-bb_dev   = bb_mult * ta.stdev(close, bb_len)
-bb_upper = bb_basis + bb_dev
-bb_lower = bb_basis - bb_dev
-bbw_raw  = f_safe_div(bb_upper - bb_lower, bb_basis)
-bbw_sma  = ta.sma(bbw_raw, bb_len)
-
-// 3.4 Trend EMAs
-ema_fast = ta.ema(close, 50)
-ema_slow = ta.ema(close, 200)
-
-// 3.5 ATR (Safe)
-atr_len = 14
-atr_val = ta.atr(atr_len)
-atr_safe = math.max(atr_val, syminfo.mintick)
-
-// 3.6 Pivots (for Structure & Divergence)
-piv_l_len = 2
-piv_r_len = 2
-ph = ta.pivothigh(piv_l_len, piv_r_len)
-pl = ta.pivotlow(piv_l_len, piv_r_len)
-// Note: ph/pl are non-na only on the offset bar (index 2).
-// To use them in real-time logic, we must track them.
-
-// 3.7 RSI (for Divergence)
-rsi_val = ta.rsi(close, 14)
-
-// 3.8 Pre-Calc Bias Components (Global for Scaling)
-// Spread
-spread_norm_raw = (ema_fast - ema_slow) / atr_safe
-spread_abs_raw  = math.abs(spread_norm_raw)
-spread_k        = ta.ema(spread_abs_raw, 100) // Auto-scaling factor
-
-// Slope
-slope_len_bi    = 8
-slope_norm_raw  = (ema_fast - ema_fast[slope_len_bi]) / (atr_safe * slope_len_bi)
-slope_abs_raw   = math.abs(slope_norm_raw)
-slope_k         = ta.ema(slope_abs_raw, 100) // Auto-scaling factor
-
-// -----------------------------------------------------------------------------
-// 4. REGIME / Trendiness Engine
-// -----------------------------------------------------------------------------
-// Normalize Components
-trend_er  = f_clamp(er_val, 0, 1)
-trend_adx = f_clamp((adx_val - 15) / (30 - 15), 0, 1)
-trend_bbw = f_clamp(f_safe_div(bbw_raw - bbw_sma, bbw_sma), 0, 1) // Expansion relative to SMA
-
-// Combine
-trendiness_raw = 0.55 * trend_er + 0.35 * trend_adx + 0.10 * trend_bbw
-trendiness_s   = ta.ema(f_clamp(trendiness_raw, 0, 1), 8) // Smoothed per spec
-trendiness     = trendiness_s // Use smoothed globally
-TS             = math.round(100 * trendiness_s)
-
-// State Machine (Hysteresis / Ternary)
-var string reg_state = "RANGE" // Init
-if update_allowed
-    if TS >= 55
-        reg_state := "TREND"
-    else if TS <= 45
-        reg_state := "RANGE"
+            "W"
+    else if timeframe.isdaily
+        "W"
+    else if timeframe.isweekly
+        "3M"
+    else if timeframe.ismonthly
+        if timeframe.multiplier <= 3
+            "12M"
+        else
+            "12M"
     else
-        reg_state := "MIXED"
+        "12M"
 
-// -----------------------------------------------------------------------------
-// 5. BIAS ENGINE
-// -----------------------------------------------------------------------------
-// 5.1 Auto Tuning & Deadzones
-atrp = f_safe_div(atr_safe, close)
-volF = f_clamp((atrp - 0.002) / (0.01 - 0.002), 0, 1)
+// Determine Effective TF
+ps_tf_final = eff_ps_mode == "Auto" ? f_calc_auto_tf() : ps_tf
 
-// Deadzones (Keep existing logic but remove hard scales)
-dz_spread = 0.15 + 0.08 * (1 - trendiness) + 0.05 * volF
-dz_slope  = 0.03 + 0.02 * (1 - trendiness) + 0.01 * volF
+// Security call to get the data from the selected timeframe
+float s_ph_val = na
+int s_ph_time = na
+float s_pl_val = na
+int s_pl_time = na
 
-// 5.2 Spread Strength (Soft Saturation)
-spread_strength = spread_abs_raw < dz_spread ? 0 : f_softsat(spread_abs_raw - dz_spread, spread_k)
-spread_signed   = f_sign0(spread_norm_raw) * spread_strength
+if ON_PS
+    [t_ph, t_pht, t_pl, t_plt] = request.security(syminfo.tickerid, ps_tf_final, f_get_mtf_pivots(high, low, ps_left, ps_right))
+    s_ph_val := t_ph
+    s_ph_time := t_pht
+    s_pl_val := t_pl
+    s_pl_time := t_plt
+    active_sec_calls += 1
 
-// 5.3 Slope Strength (Soft Saturation)
-slope_strength = slope_abs_raw < dz_slope ? 0 : f_softsat(slope_abs_raw - dz_slope, slope_k)
-slope_signed   = f_sign0(slope_norm_raw) * slope_strength
+// --- 2. State Management (Arrays) ---
+var sr_levels = array.new<SRLevel>()
+var int last_ph_t = 0
+var int last_pl_t = 0
 
-// 5.4 Structure State (Float Memory + Decay)
-var float last_swing_high = na
-var float last_swing_low  = na
-var float structure_mem   = 0.0
+// Helper to check proximity for Merging
+f_is_near(_p1, _p2, _pct) =>
+    math.abs(_p1 - _p2) <= (_p1 * (_pct / 100))
 
-if not na(ph)
-    last_swing_high := ph
-if not na(pl)
-    last_swing_low := pl
+// Main Logic Loop (Runs on every bar, but updates state only on new pivots or close)
+if ON_PS
+    // A. Ingest New High Pivot
+    if not na(s_ph_val) and s_ph_time != last_ph_t
+        last_ph_t := s_ph_time
+        // Check for merge candidate (Iterate backwards to find newest nearby)
+        bool merged = false
+        if ps_merge_en and array.size(sr_levels) > 0
+            for i = array.size(sr_levels) - 1 to 0
+                SRLevel lvl = array.get(sr_levels, i)
+                // Only merge with same type (Resistance) and active lines
+                if lvl.is_res and not lvl.is_broken and f_is_near(lvl.price, s_ph_val, ps_merge_pct)
+                    // CONVERT TO ZONE
+                    if not lvl.is_zone
+                        // Create Box
+                        float top = math.max(lvl.price, s_ph_val)
+                        float bot = math.min(lvl.price, s_ph_val)
+                        lvl.id_box := box.new(lvl.start_time, top, time, bot, xloc=xloc.bar_time, border_color=na, bgcolor=ps_col_zone)
+                        lvl.is_zone := true
+                        // Delete the old line
+                        line.delete(lvl.id_line)
+                    else
+                        // Extend Zone Price Range
+                        float cur_top = box.get_top(lvl.id_box)
+                        float cur_bot = box.get_bottom(lvl.id_box)
+                        box.set_top(lvl.id_box, math.max(cur_top, s_ph_val))
+                        box.set_bottom(lvl.id_box, math.min(cur_bot, s_ph_val))
 
-if update_allowed
-    // Breakout with ATR Buffer
-    if not na(last_swing_high) and close > (last_swing_high + 0.15 * atr_safe)
-        structure_mem := 1.0
-    else if not na(last_swing_low) and close < (last_swing_low - 0.15 * atr_safe)
-        structure_mem := -1.0
+                    array.set(sr_levels, i, lvl)
+                    merged := true
+                    break
 
-    // Decay in Non-Trend Regimes (Range/Mixed)
-    if reg_state != "TREND"
-        structure_mem := structure_mem * 0.90
+        if not merged
+            // Add New Resistance Line
+            line new_l = line.new(s_ph_time, s_ph_val, time, s_ph_val, xloc=xloc.bar_time, color=ps_col_res, style=line.style_solid, width=1)
+            SRLevel new_lvl = SRLevel.new(s_ph_val, true, false, s_ph_time, new_l, na, false)
+            array.push(sr_levels, new_lvl)
 
-structure_signed = structure_mem * 0.45 // Weight
+    // B. Ingest New Low Pivot
+    if not na(s_pl_val) and s_pl_time != last_pl_t
+        last_pl_t := s_pl_time
+        // Check for merge candidate
+        bool merged = false
+        if ps_merge_en and array.size(sr_levels) > 0
+            for i = array.size(sr_levels) - 1 to 0
+                SRLevel lvl = array.get(sr_levels, i)
+                if not lvl.is_res and not lvl.is_broken and f_is_near(lvl.price, s_pl_val, ps_merge_pct)
+                    // CONVERT TO ZONE
+                    if not lvl.is_zone
+                        float top = math.max(lvl.price, s_pl_val)
+                        float bot = math.min(lvl.price, s_pl_val)
+                        lvl.id_box := box.new(lvl.start_time, top, time, bot, xloc=xloc.bar_time, border_color=na, bgcolor=ps_col_zone)
+                        lvl.is_zone := true
+                        line.delete(lvl.id_line)
+                    else
+                        float cur_top = box.get_top(lvl.id_box)
+                        float cur_bot = box.get_bottom(lvl.id_box)
+                        box.set_top(lvl.id_box, math.max(cur_top, s_pl_val))
+                        box.set_bottom(lvl.id_box, math.min(cur_bot, s_pl_val))
 
-// 5.5 Bias Combine
-// Weights: Spread 0.45, Slope 0.25, Structure 0.30
-bias_signed_raw = (spread_signed * 0.45) + (slope_signed * 0.25) + (structure_signed * 0.30)
+                    array.set(sr_levels, i, lvl)
+                    merged := true
+                    break
 
-// Regime Factor (Pro Bias)
-// TREND -> 1.0, MIXED -> 0.25, RANGE -> 0.10
-regF = reg_state == "TREND" ? 1.0 : reg_state == "MIXED" ? 0.25 : 0.10
-bias_signed = bias_signed_raw * regF
+        if not merged
+            line new_l = line.new(s_pl_time, s_pl_val, time, s_pl_val, xloc=xloc.bar_time, color=ps_col_sup, style=line.style_solid, width=1)
+            SRLevel new_lvl = SRLevel.new(s_pl_val, false, false, s_pl_time, new_l, na, false)
+            array.push(sr_levels, new_lvl)
 
-// -----------------------------------------------------------------------------
-// 6. EVENT / QUALITY ENGINE
-// -----------------------------------------------------------------------------
-// 6.1 Event Detection
+    // C. Pruning (FIFO)
+    while array.size(sr_levels) > ps_max
+        // Remove oldest (Index 0)
+        SRLevel old = array.shift(sr_levels)
+        line.delete(old.id_line)
+        box.delete(old.id_box)
 
-// A. Fakey (Simplified & Hardcoded per user spec)
-// Inside Bar at [1]
-ib_cond = high[1] < high[2] and low[1] > low[2]
-// False Breakout at [0] & Close inside
-// Bull Fakey: trap down -> Low[0] < Low[1] but Close[0] > Low[1]. Body confirm: Close > Open.
-fakey_bull = ib_cond and low < low[1] and close > low[1] and close > open
-// Bear Fakey: trap up -> High[0] > High[1] but Close[0] < High[1]. Body confirm: Close < Open.
-fakey_bear = ib_cond and high > high[1] and close < high[1] and close < open
+    // D. Update & Break Handling (Loop all active levels)
+    // We loop backwards to allow safe removal if "Delete" action is selected
+    if array.size(sr_levels) > 0
+        for i = array.size(sr_levels) - 1 to 0
+            SRLevel lvl = array.get(sr_levels, i)
 
-float imp_fakey = 0.0
-if fakey_bull
-    imp_fakey := 1.0
-else if fakey_bear
-    imp_fakey := -1.0
+            // 1. Check Break
+            // Use current close to detect break.
+            // Resistance Broken: Close > Price
+            // Support Broken: Close < Price
+            // For Zones: Check against Top/Bottom
+            bool broken_now = false
 
-// B. Outside Bar
-// Enulfing range of previous bar.
-outside_bull = high > high[1] and low < low[1] and close > open // directional
-outside_bear = high > high[1] and low < low[1] and close < open
-float imp_outside = 0.0
-if outside_bull
-    imp_outside := 1.0
-else if outside_bear
-    imp_outside := -1.0
+            if not lvl.is_broken
+                // Stage 6: Getter Caching (Micro-Opt)
+                // Cache top/bottom to avoid double calling get_top/get_bottom in expressions
+                float zone_top = na
+                float zone_bot = na
+                if lvl.is_zone
+                    zone_top := box.get_top(lvl.id_box)
+                    zone_bot := box.get_bottom(lvl.id_box)
 
-// C. BB Touch (Regime Aware)
-// RANGE: Upper -> Bear, Lower -> Bull
-// TREND: Upper -> Bull, Lower -> Bear
-// MIXED: Neutral/Weak (Treat like Range or ignore)
-touch_upper = high >= bb_upper
-touch_lower = low <= bb_lower
-float imp_bb = 0.0
+                float check_price = lvl.is_zone ? (lvl.is_res ? zone_top : zone_bot) : lvl.price
 
-if touch_upper
-    if reg_state == "TREND"
-        imp_bb := 1.0  // Continuation
-    else
-        imp_bb := -1.0 // Reversion (Range/Mixed)
-if touch_lower
-    if reg_state == "TREND"
-        imp_bb := -1.0 // Continuation
-    else
-        imp_bb := 1.0  // Reversion
+                if lvl.is_res and close > check_price
+                    broken_now := true
+                else if not lvl.is_res and close < check_price
+                    broken_now := true
 
-// D. Divergence (Confirmed pivots)
-// We need to store RSI at the time of pivot.
-var float last_piv_rsi_high = na
-var float last_piv_rsi_low  = na
-// When PH confirmed, store RSI at that index
-if not na(ph)
-    last_piv_rsi_high := rsi_val[piv_r_len]
-if not na(pl)
-    last_piv_rsi_low  := rsi_val[piv_r_len]
+            if broken_now
+                lvl.is_broken := true
+                if ps_break_act == "Delete"
+                    line.delete(lvl.id_line)
+                    box.delete(lvl.id_box)
+                    array.remove(sr_levels, i)
+                    continue // Skip to next iteration
 
-// Check Div on Pivot Confirmation
-float imp_div = 0.0
-// Bull Div: Price Low < Last Pivot Low, but RSI Low > Last Pivot RSI Low
-// Trigger ONLY on the bar the pivot confirms (not na(pl))
-// Note: We need the PREVIOUS pivot to compare against.
-// Standard logic: Current Pivot vs Previous Pivot.
-// Implementing a simple queue for last 2 pivots would be best, but trying to keep minimal.
-// Let's rely on looking back.
-// Since this is a verifier, we compare:
-//  Current confirmed pivot (pl) vs the one BEFORE it.
-//  We need variables to store the *previous* pivot data.
-var float prev_swing_low_price = na
-var float prev_swing_low_rsi   = na
-var float prev_swing_high_price = na
-var float prev_swing_high_rsi   = na
+                if ps_break_act == "Role Reversal"
+                    // Reset broken status for the new role
+                    lvl.is_broken := false
+                    // Flip Type
+                    lvl.is_res := not lvl.is_res
+                    // Update Color
+                    color new_c = lvl.is_res ? ps_col_res : ps_col_sup
+                    if not lvl.is_zone
+                        line.set_color(lvl.id_line, new_c)
+                        line.set_style(lvl.id_line, line.style_dashed)
 
-if not na(pl)
-    // Check Bull Div
-    // Current PL is 'pl', RSI at that PL is 'rsi_val[piv_r_len]'
-    curr_rsi_l = rsi_val[piv_r_len]
-    if not na(prev_swing_low_price)
-        if pl < prev_swing_low_price and curr_rsi_l > prev_swing_low_rsi
-            imp_div := 1.0
-    // Update Prev
-    prev_swing_low_price := pl
-    prev_swing_low_rsi   := curr_rsi_l
-
-if not na(ph)
-    // Check Bear Div
-    curr_rsi_h = rsi_val[piv_r_len]
-    if not na(prev_swing_high_price)
-        if ph > prev_swing_high_price and curr_rsi_h < prev_swing_high_rsi
-            imp_div := -1.0
-    // Update Prev
-    prev_swing_high_price := ph
-    prev_swing_high_rsi   := curr_rsi_h
-
-
-// 6.2 Trace Engine (Decay & Cooldown)
-// Constants
-decay_f = 0.65, cap_f = 1.0
-decay_o = 0.65, cap_o = 1.0, cd_o = 1
-decay_bb = 0.75, cap_bb = 2.0, cd_bb = 3
-decay_div = 0.88, cap_div = 2.5, cd_div = 5
-
-// State Vars
-var float tr_f = 0.0
-var float tr_o = 0.0
-var float tr_bb = 0.0
-var float tr_div = 0.0
-
-var int last_idx_o   = 0
-var int last_idx_bb  = 0
-var int last_idx_div = 0
-
-if update_allowed
-    // F (No Cooldown mentioned, but decay)
-    tr_f := f_clamp(tr_f * decay_f + imp_fakey, -cap_f, cap_f)
-
-    // O (Cooldown 1)
-    if imp_outside != 0 and (bar_index - last_idx_o) > cd_o
-        tr_o := f_clamp(tr_o * decay_o + imp_outside, -cap_o, cap_o)
-        last_idx_o := bar_index
-    else
-        tr_o := f_clamp(tr_o * decay_o, -cap_o, cap_o) // Decay only
-
-    // BB (Cooldown 3)
-    if imp_bb != 0 and (bar_index - last_idx_bb) > cd_bb
-        tr_bb := f_clamp(tr_bb * decay_bb + imp_bb, -cap_bb, cap_bb)
-        last_idx_bb := bar_index
-    else
-        tr_bb := f_clamp(tr_bb * decay_bb, -cap_bb, cap_bb)
-
-    // DIV (Cooldown 5)
-    if imp_div != 0 and (bar_index - last_idx_div) > cd_div
-        tr_div := f_clamp(tr_div * decay_div + imp_div, -cap_div, cap_div)
-        last_idx_div := bar_index
-    else
-        tr_div := f_clamp(tr_div * decay_div, -cap_div, cap_div)
-
-// 6.3 Trigger Score & Quality
-trigger_signed = (tr_f/cap_f * 0.25) + (tr_o/cap_o * 0.25) + (tr_bb/cap_bb * 0.25) + (tr_div/cap_div * 0.25)
-// Note: User said "weighted_avg", but didn't specify weights for trigger, assuming equal or standard.
-// "weighted_avg( (trF/capF), ... )" -> Usually implies equal weight if not specified.
-// Let's stick to equal 0.25 for simplicity unless strictly specified otherwise.
-// Re-reading spec: "trigger_signed = weighted_avg( ... )". No weights listed. Equal is safe.
-
-trigger_mag = math.abs(trigger_signed)
-
-aligned = f_sign0(trigger_signed) == f_sign0(bias_signed)
-misaligned = f_sign0(trigger_signed) != f_sign0(bias_signed)
-
-quality_boost = 0.10 + 0.05 * trendiness
-quality = 1.0
-if aligned
-    quality := quality + (quality_boost * trigger_mag)
-if misaligned
-    quality := quality - (quality_boost * trigger_mag)
-
-quality := f_clamp(quality, 0.85, 1.15)
-
-
-// -----------------------------------------------------------------------------
-// 7. CONF SCORE ENGINE
-// -----------------------------------------------------------------------------
-conf_signed = f_clamp(bias_signed * quality, -1, 1)
-
-// Map to 0..100
-conf_raw = 50 + 50 * conf_signed
-
-// Guarantee 1: Non-Trend Drift to 50
-if reg_state != "TREND"
-    conf_raw := 50 + (conf_raw - 50) * 0.25
-
-conf_score_smooth = ta.ema(conf_raw, 7) // EMA 7 per spec
-
-// Output Latch (Fix for Closed Bar Repainting)
-var float conf_latched = na
-var string reg_latched = "RANGE"
-var int   TS_latched   = 0
-
-if calc_mode == "Realtime (Repainting)" or barstate.isconfirmed
-    conf_latched := conf_score_smooth
-    reg_latched  := reg_state
-    TS_latched   := TS
+            // 2. Extend visual to current time (Stage 6: Micro-Opt)
+            if barstate.islast
+                if not lvl.is_zone
+                    line.set_x2(lvl.id_line, time)
+                else
+                    box.set_right(lvl.id_box, time)
 else
-    conf_latched := nz(conf_latched[1], conf_score_smooth)
-    reg_latched  := reg_latched[1]
-    TS_latched   := nz(TS_latched[1], TS)
+    // Cleanup when disabled
+    if array.size(sr_levels) > 0
+        for i = 0 to array.size(sr_levels) - 1
+            SRLevel lvl = array.get(sr_levels, i)
+            line.delete(lvl.id_line)
+            box.delete(lvl.id_box)
+        array.clear(sr_levels)
 
-// 7.1 Bias BG State Logic
-// Use TS_latched for stable thresholds in Closed Bar mode
-widen = f_clamp(math.round(4 * (1 - (TS_latched / 100.0))), 0, 3)
-bull_on  = 60 + widen
-bull_off = 55 + widen
-bear_on  = 40 - widen
-bear_off = 45 - widen
 
-base_bars = timeframe.isintraday ? 2 : 3
-confirm_bars = f_clamp(base_bars + (TS_latched < 35 ? 1 : 0), 1, 4)
+//---------------------------------------------------- macd and rsi divergences (Visuals for Chart) -------------------------------------------------------------
 
-var int bias_state = 0
-var int bull_cnt = 0
-var int bear_cnt = 0
-var int exit_cnt = 0
-var int state_age = 0
+// Stage 3: Divergences Hard-Gating
+ON_DIV = eff_plot_div
 
-// Range Kill-Switch
-if update_allowed
-    if reg_latched != "TREND"
-        bias_state := 0
-        bull_cnt   := 0
-        bear_cnt   := 0
-        exit_cnt   := 0
-        state_age  := 0
+float rsi_d = na
+float macdLine = na
+float signalLine = na
+float histLine = na
+float bar_scr_bear = na
+float bar_scr_bull = na
+float indi_scr = na
+
+bool c_div_bear = false
+bool c_div_bull = false
+bool h_div_bear = false
+bool h_div_bull = false
+
+if ON_DIV
+    ops_div += 1 // Count Ops (at least one block execution)
+
+    rsi_d := ta.rsi(close, rsi_length)
+
+    fast_length     = 12
+    slow_length     = 26
+    signal_length   = 9
+    src             = close
+
+    [t_macd, t_sig, t_hist] = ta.macd(src, fast_length, slow_length, signal_length)
+    macdLine := t_macd
+    signalLine := t_sig
+    histLine := t_hist
+
+    bar_scr_bear := src_div == 'close' ? close : high
+    bar_scr_bull := src_div == 'close' ? close : low
+
+    indi_scr := div_indi == 'rsi' ? rsi_d : div_indi == 'macd(fast_line)' ? macdLine : div_indi == 'macd(slow_line)' ? signalLine : na
+
+    //rsi and macd divergence calc
+    // Check if indi_scr is valid before calculation
+    if not na(indi_scr)
+        c_div_bear := bar_scr_bear > ta.highest(bar_scr_bear, bar_div_p)[1] and indi_scr < ta.highest(indi_scr, bar_div_p)[1]
+        c_div_bull := bar_scr_bull < ta.lowest(bar_scr_bull, bar_div_p)[1] and indi_scr > ta.lowest(indi_scr, bar_div_p)[1]
+
+        h_div_bear := bar_scr_bear < ta.highest(bar_scr_bear, bar_div_p)[1] and indi_scr > ta.highest(indi_scr, bar_div_p)[1]
+        h_div_bull := bar_scr_bull > ta.lowest(bar_scr_bull, bar_div_p)[1] and indi_scr < ta.lowest(indi_scr, bar_div_p)[1]
+
+
+plot_bear_combined = ON_DIV and (c_div_bear or h_div_bear)
+plot_bull_combined = ON_DIV and (c_div_bull or h_div_bull)
+if ON_DIV
+    sig_div_bull := c_div_bull or h_div_bull
+    sig_div_bear := c_div_bear or h_div_bear
+
+plotshape(plot_bear_combined, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,  textcolor=color.new(color.red, 0),  color=color.new(color.red, 0), title='Bear divergence') 
+plotshape(plot_bull_combined, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,  textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Bull divergence')
+
+
+
+
+//----------------------------------------------------------------- ema cloud / hma slope / dmi adx (Visuals for Chart) -------------------------------------------------------------------
+
+ema1                = ta.ema(close, ema_inp1)
+ema2                = ta.ema(close, ema_inp2)
+
+// MA 1 Calculation & Logic
+ma1_val = switch eff_ma1_type
+    "SMA" => ta.sma(close, ma1_len)
+    "EMA" => ta.ema(close, ma1_len)
+    => na
+// MA 1 Color Logic: Checked=Slope(Lime/Red), Unchecked=Red
+ma1_col = ma1_slope_c ? (ma1_val >= ma1_val[1] ? color.lime : color.rgb(255, 20, 20)) : color.green
+plot(eff_ma1_type != "None" ? ma1_val : na, color=ma1_col, linewidth=1, title="MA 1")
+
+// MA 2 Calculation & Logic
+ma2_val = switch eff_ma2_type
+    "SMA" => ta.sma(close, ma2_len)
+    "EMA" => ta.ema(close, ma2_len)
+    => na
+// MA 2 Color Logic: Checked=Slope(Lime/Red), Unchecked=Green
+ma2_col = ma2_slope_c ? (ma2_val >= ma2_val[1] ? color.lime : color.rgb(255, 20, 20)) : color.red
+plot(eff_ma2_type != "None" ? ma2_val : na, color=ma2_col, linewidth=1, title="MA 2")
+
+
+ema_buy             = eff_en_cloud ? ema1 > ema2 : na
+ema_sell            = eff_en_cloud ? ema1 < ema2 : na
+
+if eff_en_cloud
+    sig_ema_bull := ema_buy
+    sig_ema_bear := ema_sell
+
+ema1_pl             = plot(eff_en_cloud ? ema1 : na, color=color.new(color.blue, 100), title='EMA 1')
+ema2_pl             = plot(eff_en_cloud ? ema2 : na, color=color.new(color.blue, 100), title='EMA 2')
+
+fill(ema1_pl, ema2_pl, color=color.new(eff_sig_plot and not ema_buy[1] ? color_ema_sig_dn : eff_sig_plot and not ema_sell[1] ? color_ema_sig_up : color_ema_c, transp_ema_c))
+
+
+//------------------------------------------------------------ trend lines (Visuals for Chart) ----------------------------------------------------------------
+
+// Determine logic based on input
+use_special_trend = fractalBarsPerSide == 0
+// Force 2 (5-bar fractal) for special mode to ensure stability
+n_tl = use_special_trend ? 2 : fractalBarsPerSide 
+
+// --- Detection using Pivot Functions ---
+ph_val = ta.pivothigh(high, n_tl, n_tl)
+pl_val = ta.pivotlow(low, n_tl, n_tl)
+
+// --- State Variables (Pivot 0 = Newest, Pivot 1 = Old) ---
+var float y0_up = na
+var int x0_up = na
+var float y1_up = na
+var int x1_up = na
+
+if not na(ph_val)
+    y1_up := y0_up
+    x1_up := x0_up
+    y0_up := ph_val
+    x0_up := bar_index - n_tl
+
+var float y0_dn = na
+var int x0_dn = na
+var float y1_dn = na
+var int x1_dn = na
+
+if not na(pl_val)
+    y1_dn := y0_dn
+    x1_dn := x0_dn
+    y0_dn := pl_val
+    x0_dn := bar_index - n_tl
+
+// --- Optimized Anchored Regression (O(1) Running Sums) ---
+
+// Globale Running Sums for Up-Trend
+var float sum_xy_up_run = 0.0
+var float sum_x2_up_run = 0.0
+
+// Globale Running Sums for Down-Trend
+var float sum_xy_dn_run = 0.0
+var float sum_x2_dn_run = 0.0
+
+// Variables to track changes in pivots for reset logic
+var int last_x0_up = na
+var int last_x0_dn = na
+
+// Drawing Objects
+var line upper_line = na
+var line lower_line = na
+
+// STAGE 1: HYBRID HARD GATING
+// We only run the heavy regression and drawing logic if enabled.
+if eff_plot_trendline
+    // LOGIC for Up-Trend Regression
+    if use_special_trend
+        // Check if new pivot detected (x0_up changed)
+        if x0_up != last_x0_up
+            // Reset sums
+            sum_xy_up_run := 0.0
+            sum_x2_up_run := 0.0
+
+            // Backfill loop (Only runs once per new pivot, for n_tl bars)
+            if not na(x0_up) and not na(y0_up)
+                int start_idx = x0_up + 1
+                int end_idx = bar_index - 1
+                if end_idx >= start_idx
+                    // Just loop forward conceptually using offset j from current bar
+                    int j_max = bar_index - start_idx
+                    for j = 1 to j_max
+                        ops_trend += 1 // Count Ops
+                        // Calculate terms
+                        // Real Index: bar_index - j
+                        int dx = (bar_index - j) - x0_up
+                        float dy = high[j] - y0_up
+
+                        sum_xy_up_run += (dx * dy)
+                        sum_x2_up_run += (float(dx) * float(dx))
+
+            last_x0_up := x0_up
+
+        else
+            // Incremental Update (Every bar)
+            if not na(x0_up) and not na(y0_up)
+                int dx = (bar_index - 1) - x0_up
+                if dx > 0
+                    float dy = high[1] - y0_up
+                    sum_xy_up_run += (dx * dy)
+                    sum_x2_up_run += (float(dx) * float(dx))
+
+    // Calculate Slope Up
+    slope_up = (use_special_trend and sum_x2_up_run != 0) ? sum_xy_up_run / sum_x2_up_run : na
+
+
+    // LOGIC for Down-Trend Regression
+    if use_special_trend
+        if x0_dn != last_x0_dn
+            // Reset
+            sum_xy_dn_run := 0.0
+            sum_x2_dn_run := 0.0
+            last_x0_dn := x0_dn
+
+            // Backfill
+            if not na(x0_dn) and not na(y0_dn)
+                int start_idx = x0_dn + 1
+                int end_idx = bar_index - 1
+                if end_idx >= start_idx
+                    int j_max = bar_index - start_idx
+                    for j = 1 to j_max
+                        ops_trend += 1 // Count Ops
+                        int dx = (bar_index - j) - x0_dn
+                        float dy = low[j] - y0_dn
+                        sum_xy_dn_run += (dx * dy)
+                        sum_x2_dn_run += (float(dx) * float(dx))
+        else
+            // Incremental
+            if not na(x0_dn) and not na(y0_dn)
+                int dx = (bar_index - 1) - x0_dn
+                if dx > 0
+                    float dy = low[1] - y0_dn
+                    sum_xy_dn_run += (dx * dy)
+                    sum_x2_dn_run += (float(dx) * float(dx))
+
+    // Calculate Slope Down
+    slope_dn = (use_special_trend and sum_x2_dn_run != 0) ? sum_xy_dn_run / sum_x2_dn_run : na
+
+    // --- Draw Trendlines ---
+    // --- UPPER LINE ---
+    // Mode 0: Start=Newest(x0), Slope based calculation
+    // Mode >0: Start=Old(x1), End=Newest(x0)
+    
+    x1_u = use_special_trend ? x0_up : x1_up
+    y1_u = use_special_trend ? y0_up : y1_up
+    
+    x2_u = use_special_trend ? bar_index - 1 : x0_up
+    // Calculate Y2 based on Slope for Mode 0, or plain value for Mode >0
+    float y2_u = na
+    if use_special_trend
+        if not na(slope_up) and not na(x0_up)
+            // y = mx + b -> y2 = slope * distance + start_y
+            y2_u := y0_up + slope_up * (x2_u - x0_up)
     else
-        // Entry Counters
-        if conf_latched > bull_on
-            bull_cnt += 1
+        y2_u := y0_up
+
+    // Draw
+    if not na(x1_u) and not na(x2_u) and x1_u != x2_u and not na(y2_u)
+        if na(upper_line)
+            upper_line := line.new(x1 = x1_u, y1 = y1_u, x2 = x2_u, y2 = y2_u, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
         else
-            bull_cnt := 0
+            line.set_xy1(upper_line, x1_u, y1_u)
+            line.set_xy2(upper_line, x2_u, y2_u)
+            line.set_color(upper_line, color.new(color_tr, transp_tr))
+            line.set_width(upper_line, width_tr)
 
-        if conf_latched < bear_on
-            bear_cnt += 1
+    // --- LOWER LINE ---
+    x1_d = use_special_trend ? x0_dn : x1_dn
+    y1_d = use_special_trend ? y0_dn : y1_dn
+    
+    x2_d = use_special_trend ? bar_index - 1 : x0_dn
+    float y2_d = na
+    if use_special_trend
+        if not na(slope_dn) and not na(x0_dn)
+            y2_d := y0_dn + slope_dn * (x2_d - x0_dn)
+    else
+        y2_d := y0_dn
+
+    if not na(x1_d) and not na(x2_d) and x1_d != x2_d and not na(y2_d)
+        if na(lower_line)
+            lower_line := line.new(x1 = x1_d, y1 = y1_d, x2 = x2_d, y2 = y2_d, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
         else
-            bear_cnt := 0
+            line.set_xy1(lower_line, x1_d, y1_d)
+            line.set_xy2(lower_line, x2_d, y2_d)
+            line.set_color(lower_line, color.new(color_tr, transp_tr))
+            line.set_width(lower_line, width_tr)
 
-        // Exit Counters (HoldBars + Confirmation)
-        bool cond_exit_bull = bias_state == 1 and conf_latched < bull_off
-        bool cond_exit_bear = bias_state == -1 and conf_latched > bear_off
+    // --- Signal Logic for Registry (Trendlines) ---
+    // Calculate current projected level
+    float cur_y_up = na
+    float cur_y_dn = na
 
-        if cond_exit_bull or cond_exit_bear
-            exit_cnt += 1
+    if use_special_trend
+        if not na(slope_up) and not na(x0_up)
+            cur_y_up := y0_up + slope_up * (bar_index - x0_up)
+        if not na(slope_dn) and not na(x0_dn)
+            cur_y_dn := y0_dn + slope_dn * (bar_index - x0_dn)
+    else
+        // Classic
+        if not na(x1_u) and not na(x0_up) and x1_u != x0_up
+            m_u = (y0_up - y1_u) / (x0_up - x1_u)
+            cur_y_up := y1_u + m_u * (bar_index - x1_u)
+        if not na(x1_d) and not na(x0_dn) and x1_d != x0_dn
+            m_d = (y0_dn - y1_d) / (x0_dn - x1_d)
+            cur_y_dn := y1_d + m_d * (bar_index - x1_d)
+
+    // Update Registry
+    if not na(cur_y_up) and close > cur_y_up
+        sig_tl_bull := true
+    if not na(cur_y_dn) and close < cur_y_dn
+        sig_tl_bear := true
+
+else
+    // Cleanup & State Reset (Crucial for Resuming)
+    if not na(last_x0_up)
+        last_x0_up := na
+        last_x0_dn := na
+
+    if not na(upper_line)
+        line.delete(upper_line)
+        upper_line := na
+    if not na(lower_line)
+        line.delete(lower_line)
+        lower_line := na
+
+
+//----------------------------------------------------------- last 12 bar (Visuals for Chart) ----------------------------------------------------------
+
+l12_long = ta.highest(low, L12_input)
+l12_short = ta.lowest(high, L12_input)
+
+var bool long_plotted = na
+var bool short_plotted = na
+
+// Determine the actual signal trigger point 
+plot_l12_long = low == l12_long and (na(short_plotted) or short_plotted) 
+plot_l12_short = high == l12_short and (na(long_plotted) or long_plotted) 
+
+if plot_l12_long
+    long_plotted := true
+    short_plotted := false
+
+if plot_l12_short
+    short_plotted := true
+    long_plotted := false
+
+plotchar(eff_plot_l12_bar and plot_l12_long ? l12_long : na, char='L', location=location.belowbar, color=color.new(color.blue, 0), title='L12 long bar')
+plotchar(eff_plot_l12_bar and plot_l12_short ? l12_short : na, char='L', location=location.abovebar, color=color.new(color.red, 0), title='L12 short bar')
+
+
+//----------------------------------------------------------- narrow range bar / anticipated fractal (Visuals for Chart)----------------------------------------------------------
+
+// --- Narrow Range Bar (NR7) ---
+p_nr_bar = high - low
+bar_1 = high[1] - low[1]
+bar_2 = high[2] - low[2]
+bar_3 = high[3] - low[3]
+bar_4 = high[4] - low[4]
+bar_5 = high[5] - low[5]
+bar_6 = high[6] - low[6]
+bar_7 = high[7] - low[7]
+
+nr_bar = p_nr_bar < bar_1 and p_nr_bar < bar_2 and p_nr_bar < bar_3 and p_nr_bar < bar_4 and p_nr_bar < bar_5 and p_nr_bar < bar_6 
+
+plotchar(eff_plot_nr_bar and nr_bar, char='n', location=location.belowbar, color=color.new(color.gray, 0), title='NR bar')
+
+
+// --- Anticipated Fractal Logic ---
+af_up = high > high[1] and high > high[2]
+af_dn = low < low[1] and low < low[2]
+
+var int last_af_state = 0
+
+bool plot_blue_a_now = false
+bool plot_red_a_now = false
+
+
+if af_up and (last_af_state == 0 or last_af_state == -1)
+    plot_blue_a_now := true
+    last_af_state := 1
+        
+else if af_dn and (last_af_state == 0 or last_af_state == 1) 
+    plot_red_a_now := true
+    last_af_state := -1
+
+
+//----------------------------------------------- inside bar / outside bar / sandwich bar / pin bar / fakey ---------------------------------------------
+
+i_bar       = high < high[1] and low > low[1]
+
+o_bar       = high > high[1] and low < low[1]
+
+o_bar_color = close > high[1] ? color.new(color.red, 0) : close < low[1] ? color.new(color.green, 0) :color.new(color.gray, 0)                  
+
+s_bar       = high[1] < high[2] and low[1] > low[2] and high > high[1] and low < low[1]
+
+f_up_e      = i_bar[1] and low < low[1] and close > open[1] and close > open or i_bar[2] and close[1] < low[2] and close > close[1] and high > high[1] or i_bar[1] and low < low[2] and close > close[1] and close > open or i_bar[2] and close[1] < low[3] and close > open and close > open[1]
+f_dn_e      = i_bar[1] and high > high[1] and close < open[1] and close < open or i_bar[2] and close[1] > high[2] and close < close[1] and low < low[1] or i_bar[1] and high > high[2] and close < open and close < close[1] or i_bar[2] and close[1] > high[3] and close < open and close < close[1]
+
+
+i_bar_1 = high[1] < high[2] and low[1] > low[2]
+i_bar_2 = high[2] < high[3] and low[2] > low[3]
+i_bar_3 = high[3] < high[4] and low[3] > low[4]
+i_bar_4 = high[4] < high[5] and low[4] > low[5]
+
+f_up_b = ((i_bar_1 and low < low[1] and close > high[1]) or (i_bar_2 and low < low[2] and close > high[2]) or (i_bar_3 and low < low[3] and close > high[3]) or (i_bar_4 and low < low[4] and close > high[4]))
+f_up = f_up_b and not f_up_b[1]
+
+f_dn_b = ((i_bar_1 and high > high[1] and close < low[1]) or (i_bar_2 and high > high[2] and close < low[2]) or (i_bar_3 and high > high[3] and close < low[3]) or (i_bar_4 and high > high[4] and close < low[4]))
+f_dn = f_dn_b and not f_dn_b[1]
+
+
+plotchar(eff_plot_i_bar ? i_bar : na, char='i', location=location.abovebar, color=color.new(color.gray, 0), title='I bar')
+plotchar(eff_plot_o_bar ? o_bar : na, char='o', location=location.abovebar, color=o_bar_color, title='O bar')
+plotchar(eff_plot_s_bar ? s_bar : na, char='s', location=location.abovebar, color=color.new(color.silver, 0), offset=-1, title='S bar')
+
+plotchar(eff_plot_f_bar ? f_up and (not f_up[1] or not f_up[2] or not f_up[3]) or f_up_e and not f_up : na, char='F', location=location.belowbar, color=color.new(color.blue, 0), title='F bar up')
+plotchar(eff_plot_f_bar ? f_dn and (not f_dn[1] or not f_dn[2] or not f_dn[3]) or f_dn_e and not f_dn : na, char='F', location=location.abovebar, color=color.new(color.red, 0), title='F bar down')
+
+// Registry Updates
+if eff_plot_l12_bar
+    sig_l12_bull := plot_l12_long
+    sig_l12_bear := plot_l12_short
+
+if eff_plot_f_bar
+    sig_pat_bull := f_up
+    sig_pat_bear := f_dn
+
+
+//----------------------------------------------------------------- segments (Visuals for Chart) --------------------------------------------------------------
+
+count1_l                    = 0
+count2_l                    = 0
+segment_1_stat_l            = false
+segment_2_stat_l            = false
+segment_3_stat_l            = false
+
+var line segment_low_1_l    = na
+var line segment_low_2_l    = na
+var line segment_low_3_l    = na
+
+count1_s                    = 0
+count2_s                    = 0
+segment_1_stat_s            = false
+segment_2_stat_s            = false
+segment_3_stat_s            = false
+
+var line segment_high_1     = na
+var line segment_high_2     = na
+var line segment_high_3     = na
+
+// Stage 5: Segments Optimization (Bar Close Only)
+// Only run the heavy loops when the bar is confirmed (historical bars or realtime bar close)
+if eff_plot_segments and barstate.isconfirmed
+    // long segments
+    for i = 0 to sb by 1
+        count1_l := count1_l + 1
+        if low[1] > low[i + 2]
+            segment_low_1_l := line.new(x1=bar_index[2 + i], y1=low[2 + i], x2=bar_index[1], y2=low[1], color=color.new(color_seg, transp_seg), width=3)
+            segment_1_stat_l := true
+            break
+
+    for i = count1_l to sb + count1_l by 1
+        count2_l := count2_l + 1
+        if low[1 + count1_l] > low[i + 2] and segment_1_stat_l
+            segment_low_2_l := line.new(x1=bar_index[2 + i], y1=low[2 + i], x2=bar_index[1 + count1_l], y2=low[1 + count1_l], color=color.new(color_seg, transp_seg), width=2)
+            segment_2_stat_l := true
+            break
+
+    for i = count2_l to sb + count2_l by 1
+        if low[1 + count1_l + count2_l] > low[i + 2 + count1_l] and segment_2_stat_l
+            segment_low_3_l := line.new(x1=bar_index[i + 2 + count1_l], y1=low[i + 2 + count1_l], x2=bar_index[1 + count1_l + count2_l], y2=low[1 + count1_l + count2_l], color=color.new(color_seg, transp_seg), width=1)
+            segment_3_stat_l := true
+            break
+
+    line.delete(segment_low_1_l[1])
+    line.delete(segment_low_2_l[1])
+    line.delete(segment_low_3_l[1])
+
+
+    // short segments
+    for i = 0 to sb by 1
+        count1_s := count1_s + 1
+        if high[1] < high[i + 2]
+            segment_high_1 := line.new(x1=bar_index[2 + i], y1=high[2 + i], x2=bar_index[1], y2=high[1], color=color.new(color_seg, transp_seg), width=3)
+            segment_1_stat_s := true
+            break
+
+    for i = count1_s to sb + count1_s by 1
+        count2_s := count2_s + 1
+        if high[1 + count1_s] < high[i + 2] and segment_1_stat_s
+            segment_high_2 := line.new(x1=bar_index[2 + i], y1=high[2 + i], x2=bar_index[1 + count1_s], y2=high[1 + count1_s], color=color.new(color_seg, transp_seg), width=2)
+            segment_2_stat_s := true
+            break
+
+    for i = count2_s to sb + count2_s by 1
+        if high[1 + count1_s + count2_s] < high[i + 2 + count1_s] and segment_2_stat_s
+            segment_high_3 := line.new(x1=bar_index[i + 2 + count1_s], y1=high[i + 2 + count1_s], x2=bar_index[1 + count1_s + count2_s], y2=high[1 + count1_s + count2_s], color=color.new(color_seg, transp_seg), width=1)
+            segment_3_stat_s := true
+            break
+
+    line.delete(segment_high_1[1])
+    line.delete(segment_high_2[1])
+    line.delete(segment_high_3[1])
+
+    // --- Signal Logic for Registry (Segments) ---
+    // Segments Signal:
+    // Buy: High > High[1] AND 3 Long Segments Active
+    // Sell: Low < Low[1] AND 3 Short Segments Active
+    // Note: segment_*_stat_* variables are local to this block.
+    // We reuse the logic:
+
+    // We need to re-verify state if not already captured.
+    // Actually, segment_3_stat_l is only true if we found 3 segments.
+    // Buy Signal: high > high[1] and segment_1_stat_l and segment_2_stat_l and segment_3_stat_l
+
+    if high > high[1] and segment_3_stat_l
+        sig_seg_bull := true
+
+    if low < low[1] and segment_3_stat_s
+        sig_seg_bear := true
+
+
+
+
+//-------------------------------------------------------------------- info panel -------------------------------------------------------------------------
+
+//indicator funktions for 4h, d, w, m 
+
+// Helper function for Panel State
+f_panel_state() =>
+    // FVG Close State
+    var int fvg_state = 0
+    if low > high[2]
+        fvg_state := 1
+    else if high < low[2]
+        fvg_state := -1
+
+    // Bill Williams Fractals State
+    // Standard 2,2 fractals
+    up_fr = ta.pivothigh(2, 2)
+    dn_fr = ta.pivotlow(2, 2)
+
+    last_up_lvl = ta.valuewhen(not na(up_fr), high[2], 0)
+    last_dn_lvl = ta.valuewhen(not na(dn_fr), low[2], 0)
+
+    var int fr_state = 0
+    // Check breaks
+    if ta.crossover(high, last_up_lvl)
+        fr_state := 1
+    else if ta.crossunder(low, last_dn_lvl)
+        fr_state := -1
+
+    [fvg_state, fr_state]
+
+//colors
+color_blue_1    = color.new(color.blue, 30)
+color_red_1     = color.new(color.red, 30)
+color_gray_1    = color.new(color.gray, 100)
+
+//current tf condition for adx, hama and ema
+// RECALC for info panel table to ensure it matches current chart regardless of bg signal
+
+//mtf time frames
+Intra           = timeframe.isintraday
+Intra_D         = timeframe.isintraday or timeframe.isdaily
+Intra_D_W       = timeframe.isintraday or timeframe.isdaily or timeframe.isweekly
+Intra_D_W_M     = timeframe.isintraday or timeframe.isdaily or timeframe.isweekly or timeframe.ismonthly
+
+// Stage 6: Info Panel Refactoring (Global Current TF + Gated HTF)
+
+// 1. Always Run Current TF (To prevent warm-up issues)
+atr14_val             = ta.atr(14)
+
+// Global Current TF Logic (Additions)
+// FVG
+var int fvg_state_inf = 0
+if low > high[2]
+    fvg_state_inf := 1
+else if high < low[2]
+    fvg_state_inf := -1
+
+// Fractals
+up_fr_inf = ta.pivothigh(2, 2)
+dn_fr_inf = ta.pivotlow(2, 2)
+last_up_lvl_inf = ta.valuewhen(not na(up_fr_inf), high[2], 0)
+last_dn_lvl_inf = ta.valuewhen(not na(dn_fr_inf), low[2], 0)
+var int fr_state_inf = 0
+if ta.crossover(high, last_up_lvl_inf)
+    fr_state_inf := 1
+else if ta.crossunder(low, last_dn_lvl_inf)
+    fr_state_inf := -1
+
+fvg_color_c     = fvg_state_inf == 1 ? color_blue_1 : fvg_state_inf == -1 ? color_red_1 : color_gray_1
+fr_color_c      = fr_state_inf == 1 ? color_blue_1 : fr_state_inf == -1 ? color_red_1 : color_gray_1
+
+// Info Panel Table (Declared global to allow deletion)
+var table info_panel = na
+
+// Define Variables for HTF colors (Init to default)
+// FVG Colors
+color fvg_color_5m  = na
+color fvg_color_15m = na
+color fvg_color_1h  = na
+color fvg_color_4h  = na
+color fvg_color_d   = na
+color fvg_color_w   = na
+color fvg_color_m   = na
+
+// FR Colors
+color fr_color_5m  = na
+color fr_color_15m = na
+color fr_color_1h  = na
+color fr_color_4h  = na
+color fr_color_d   = na
+color fr_color_w   = na
+color fr_color_m   = na
+
+// 2. Gated HTF & Table Update
+if panel_pos != "None"
+    if barstate.islast // Stage 5: Last-Bar Gating for Security & Logic
+        // Optimization: Combine security calls for Info Panel (7 calls)
+        // Using global input parameters for all timeframes as requested
+        [fvg_5m, fr_5m]     = request.security(syminfo.tickerid, '5',   f_panel_state())
+        [fvg_15m, fr_15m]   = request.security(syminfo.tickerid, '15',  f_panel_state())
+        [fvg_1h, fr_1h]     = request.security(syminfo.tickerid, '60',  f_panel_state())
+        [fvg_4h, fr_4h]     = request.security(syminfo.tickerid, '240', f_panel_state())
+        [fvg_d, fr_d]       = request.security(syminfo.tickerid, 'D',   f_panel_state())
+        [fvg_w, fr_w]       = request.security(syminfo.tickerid, 'W',   f_panel_state())
+        [fvg_m, fr_m]       = request.security(syminfo.tickerid, 'M',   f_panel_state())
+
+        // Stage 6: Debug Instrument
+        active_sec_calls += 7
+
+        // --- Color Logic ---
+        // FVG
+        fvg_color_5m  := fvg_5m == 1 ? color_blue_1 : fvg_5m == -1 ? color_red_1 : color_gray_1
+        fvg_color_15m := fvg_15m == 1 ? color_blue_1 : fvg_15m == -1 ? color_red_1 : color_gray_1
+        fvg_color_1h  := fvg_1h == 1 ? color_blue_1 : fvg_1h == -1 ? color_red_1 : color_gray_1
+        fvg_color_4h  := fvg_4h == 1 ? color_blue_1 : fvg_4h == -1 ? color_red_1 : color_gray_1
+        fvg_color_d   := fvg_d == 1 ? color_blue_1 : fvg_d == -1 ? color_red_1 : color_gray_1
+        fvg_color_w   := fvg_w == 1 ? color_blue_1 : fvg_w == -1 ? color_red_1 : color_gray_1
+        fvg_color_m   := fvg_m == 1 ? color_blue_1 : fvg_m == -1 ? color_red_1 : color_gray_1
+
+        // FR (Fractals)
+        fr_color_5m   := fr_5m == 1 ? color_blue_1 : fr_5m == -1 ? color_red_1 : color_gray_1
+        fr_color_15m  := fr_15m == 1 ? color_blue_1 : fr_15m == -1 ? color_red_1 : color_gray_1
+        fr_color_1h   := fr_1h == 1 ? color_blue_1 : fr_1h == -1 ? color_red_1 : color_gray_1
+        fr_color_4h   := fr_4h == 1 ? color_blue_1 : fr_4h == -1 ? color_red_1 : color_gray_1
+        fr_color_d    := fr_d == 1 ? color_blue_1 : fr_d == -1 ? color_red_1 : color_gray_1
+        fr_color_w    := fr_w == 1 ? color_blue_1 : fr_w == -1 ? color_red_1 : color_gray_1
+        fr_color_m    := fr_m == 1 ? color_blue_1 : fr_m == -1 ? color_red_1 : color_gray_1
+
+        // Stage 7: TF Highlight Logic (Optimized with var)
+        var color col_tf_highlight = color.new(color.yellow, 75)
+        var int cur_sec = timeframe.in_seconds(timeframe.period)
+
+        // Exact matches (Cached)
+        var bool is_5m  = cur_sec == timeframe.in_seconds("5")
+        var bool is_15m = cur_sec == timeframe.in_seconds("15")
+        var bool is_1h  = cur_sec == timeframe.in_seconds("60")
+        var bool is_4h  = cur_sec == timeframe.in_seconds("240")
+        var bool is_1d  = cur_sec == timeframe.in_seconds("D")
+        var bool is_1w  = cur_sec == timeframe.in_seconds("W")
+        var bool is_1m  = cur_sec == timeframe.in_seconds("M")
+
+        // If none match, highlight "Current"
+        var bool is_custom_tf = not (is_5m or is_15m or is_1h or is_4h or is_1d or is_1w or is_1m)
+
+        if na(info_panel)
+            // Map string position to internal constant
+            string pos_input = position.bottom_left
+            if panel_pos == "Top Right"
+                pos_input := position.top_right
+            else if panel_pos == "Bottom Right"
+                pos_input := position.bottom_right
+
+            info_panel := table.new(position = pos_input, columns = PANEL_COLS, rows = PANEL_ROWS, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50))
+
+        // HEADER NAMES (Row 0)
+        table.cell(table_id=info_panel, column=0, row=0, text="TF", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=1, row=0, text= "FVG", text_size= size.small, text_color=color.silver)
+        table.cell(table_id=info_panel, column=2, row=0, text= "FR", text_size= size.small, text_color=color.silver)
+
+        // 1M (Row 1)
+        table.cell(table_id=info_panel, column=0, row=1, text="1M", text_size= size.small, text_color=color.silver, bgcolor=is_1m ? col_tf_highlight : na)
+        table.cell(table_id=info_panel, column=1, row=1, bgcolor=(Intra_D_W_M) ? fvg_color_m : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=1, bgcolor=(Intra_D_W_M) ? fr_color_m : na, width=2)
+
+        // 1W (Row 2)
+        table.cell(table_id=info_panel, column=0, row=2, text="1W", text_size= size.small, text_color=color.silver, bgcolor=is_1w ? col_tf_highlight : na)
+        table.cell(table_id=info_panel, column=1, row=2, bgcolor=(Intra_D_W) ? fvg_color_w : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=2, bgcolor=(Intra_D_W) ? fr_color_w : na, width=2)
+
+        // 1D (Row 3)
+        table.cell(table_id=info_panel, column=0, row=3, text="1D", text_size= size.small, text_color=color.silver, bgcolor=is_1d ? col_tf_highlight : na)
+        table.cell(table_id=info_panel, column=1, row=3, bgcolor=(Intra_D) ? fvg_color_d : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=3, bgcolor=(Intra_D) ? fr_color_d : na, width=2)
+
+        // 4H (Row 4)
+        table.cell(table_id=info_panel, column=0, row=4, text="4H", text_size= size.small, text_color=color.silver, bgcolor=is_4h ? col_tf_highlight : na)
+        table.cell(table_id=info_panel, column=1, row=4, bgcolor=Intra ? fvg_color_4h : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=4, bgcolor=Intra ? fr_color_4h : na, width=2)
+
+        // 1H (Row 5)
+        table.cell(table_id=info_panel, column=0, row=5, text="1H", text_size= size.small, text_color=color.silver, bgcolor=is_1h ? col_tf_highlight : na)
+        table.cell(table_id=info_panel, column=1, row=5, bgcolor=Intra ? fvg_color_1h : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=5, bgcolor=Intra ? fr_color_1h : na, width=2)
+
+        // 15m (Row 6)
+        table.cell(table_id=info_panel, column=0, row=6, text="15m", text_size= size.small, text_color=color.silver, bgcolor=is_15m ? col_tf_highlight : na)
+        table.cell(table_id=info_panel, column=1, row=6, bgcolor=Intra ? fvg_color_15m : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=6, bgcolor=Intra ? fr_color_15m : na, width=2)
+
+        // 5m (Row 7)
+        table.cell(table_id=info_panel, column=0, row=7, text="5m", text_size= size.small, text_color=color.silver, bgcolor=is_5m ? col_tf_highlight : na)
+        table.cell(table_id=info_panel, column=1, row=7, bgcolor=Intra ? fvg_color_5m : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=7, bgcolor=Intra ? fr_color_5m : na, width=2)
+
+        // ATR14 (Row 8)
+        table.cell(table_id=info_panel, column=0, row=8, text="ATR14 " + str.tostring(atr14_val, "#.#####"), text_size= size.small, text_color=color.silver)
+        table.merge_cells(info_panel, 0, 8, 2, 8)
+
+        // HEADER (Row 9: Current)
+        table.cell(table_id=info_panel, column=0, row=9, text="C", text_size= size.small, text_color=color.silver, bgcolor=is_custom_tf ? col_tf_highlight : na)
+        table.cell(table_id=info_panel, column=1, row=9, bgcolor=(Intra_D_W_M) ? fvg_color_c : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=9, bgcolor=(Intra_D_W_M) ? fr_color_c : na, width=2)
+else
+    if not na(info_panel)
+        table.delete(info_panel)
+        info_panel := na
+
+
+// ----------------------------------------------------------- pivot points -----------------------------------------------------------------
+
+// Optimierte Datenabfrage (Tuples), um das "Security Limit" von 40 nicht zu sprengen
+// Wir holen High, Low und Close in EINEM Aufruf pro Timeframe statt in drei.
+
+// Stage 1: Pivot Points Optimization
+// Strict Gating: request.security only if input is active AND timeframe is valid
+
+// Conditions (Visibility)
+cond_h1 = timeframe.isintraday and timeframe.multiplier < 60
+cond_h4 = timeframe.isintraday and timeframe.multiplier < 240
+
+
+// Need Flags
+need_h1 = eff_plot_pivots_h1 and cond_h1
+need_h4 = eff_plot_pivots_h4 and cond_h4
+need_d  = eff_plot_pivots_d  and Intra
+need_w  = eff_plot_pivots_w  and Intra_D
+need_m  = eff_plot_pivots_m  and Intra_D_W
+need_3m = eff_plot_pivots_3m and Intra_D_W_M
+need_12m= eff_plot_pivots_12m and Intra_D_W_M
+
+// Data Variables (Initial NA)
+float h1_high = na
+float h1_low = na
+float h1_close = na
+
+float h4_high = na
+float h4_low = na
+float h4_close = na
+
+float d_high = na
+float d_low = na
+float d_close = na
+
+float w_high = na
+float w_low = na
+float w_close = na
+
+float m_high = na
+float m_low = na
+float m_close = na
+
+float m3_high = na
+float m3_low = na
+float m3_close = na
+
+float m12_high = na
+float m12_low = na
+float m12_close = na
+
+// Gated Security Calls - Stage 5: Last Bar Optimization
+if barstate.islast
+    if need_h1
+        [h1_high_t, h1_low_t, h1_close_t] = request.security(syminfo.tickerid, "60", [high[1], low[1], close[1]])
+        h1_high := h1_high_t
+        h1_low := h1_low_t
+        h1_close := h1_close_t
+        active_sec_calls += 1
+
+    if need_h4
+        [h4_high_t, h4_low_t, h4_close_t] = request.security(syminfo.tickerid, "240", [high[1], low[1], close[1]])
+        h4_high := h4_high_t
+        h4_low := h4_low_t
+        h4_close := h4_close_t
+        active_sec_calls += 1
+
+    if need_d
+        [d_high_t, d_low_t, d_close_t] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]])
+        d_high := d_high_t
+        d_low := d_low_t
+        d_close := d_close_t
+        active_sec_calls += 1
+
+    if need_w
+        [w_high_t, w_low_t, w_close_t] = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]])
+        w_high := w_high_t
+        w_low := w_low_t
+        w_close := w_close_t
+        active_sec_calls += 1
+
+    if need_m
+        [m_high_t, m_low_t, m_close_t] = request.security(syminfo.tickerid, "M", [high[1], low[1], close[1]])
+        m_high := m_high_t
+        m_low := m_low_t
+        m_close := m_close_t
+        active_sec_calls += 1
+
+    if need_3m
+        [m3_high_t, m3_low_t, m3_close_t] = request.security(syminfo.tickerid, "3M", [high[1], low[1], close[1]])
+        m3_high := m3_high_t
+        m3_low := m3_low_t
+        m3_close := m3_close_t
+        active_sec_calls += 1
+
+    if need_12m
+        [m12_high_t, m12_low_t, m12_close_t] = request.security(syminfo.tickerid, "12M", [high[1], low[1], close[1]])
+        m12_high := m12_high_t
+        m12_low := m12_low_t
+        m12_close := m12_close_t
+        active_sec_calls += 1
+
+// --- Calculations ---
+
+// H1 pivot points
+h1_PP           = (h1_high + h1_low + h1_close) / 3
+h1_R1           = h1_PP + h1_PP - h1_low
+h1_R2           = h1_PP + h1_high - h1_low
+h1_R3           = h1_high + 2 * (h1_PP - h1_low)
+h1_R4           = h1_PP + 3 * (h1_high - h1_low)
+h1_S1           = h1_PP - (h1_high - h1_PP)
+h1_S2           = h1_PP - (h1_high - h1_low)
+h1_S3           = h1_low - 2 * (h1_high - h1_PP)
+h1_S4           = h1_PP - 3 * (h1_high - h1_low)
+
+// H4 pivot points
+h4_PP           = (h4_high + h4_low + h4_close) / 3
+h4_R1           = h4_PP + h4_PP - h4_low
+h4_R2           = h4_PP + h4_high - h4_low
+h4_R3           = h4_high + 2 * (h4_PP - h4_low)
+h4_R4           = h4_PP + 3 * (h4_high - h4_low)
+h4_S1           = h4_PP - (h4_high - h4_PP)
+h4_S2           = h4_PP - (h4_high - h4_low)
+h4_S3           = h4_low - 2 * (h4_high - h4_PP)
+h4_S4           = h4_PP - 3 * (h4_high - h4_low)
+
+// Daily pivot points
+d_PP            = (d_high + d_low + d_close) / 3
+
+w_PP            = (w_high + w_low + w_close) / 3
+m_PP            = (m_high + m_low + m_close) / 3
+m3_PP           = (m3_high + m3_low + m3_close) / 3
+m12_PP          = (m12_high + m12_low + m12_close) / 3
+
+// Daily R/S (extended to 4)
+d_R1            = d_PP + d_PP - d_low
+d_R2            = d_PP + d_high - d_low
+d_R3            = d_high + 2 * (d_PP - d_low)
+d_R4            = d_PP + 3 * (d_high - d_low)
+
+d_S1            = d_PP - (d_high - d_PP)
+d_S2            = d_PP - (d_high - d_low)
+d_S3            = d_low - 2 * (d_high - d_PP)
+d_S4            = d_PP - 3 * (d_high - d_low)
+
+// weekly R/S pivot points (extended to 4)
+w_R1            = w_PP + w_PP - w_low
+w_R2            = w_PP + w_high - w_low
+w_R3            = w_high + 2 * (w_PP - w_low)
+w_R4            = w_PP + 3 * (w_high - w_low)
+
+w_S1            = w_PP - (w_high - w_PP)
+w_S2            = w_PP - (w_high - w_low)
+w_S3            = w_low - 2 * (w_high - w_PP)
+w_S4            = w_PP - 3 * (w_high - w_low)
+
+// monthly R/S pivot points (extended to 4)
+m_R1            = m_PP + m_PP - m_low
+m_R2            = m_PP + m_high - m_low
+m_R3            = m_high + 2 * (m_PP - m_low)
+m_R4            = m_PP + 3 * (m_high - m_low)
+
+m_S1            = m_PP - (m_high - m_PP)
+m_S2            = m_PP - (m_high - m_low)
+m_S3            = m_low - 2 * (m_high - m_PP)
+m_S4            = m_PP - 3 * (m_high - m_low)
+
+// 3 month R/S pivot points (extended to 4)
+m3_R1           = m3_PP + m3_PP - m3_low
+m3_R2           = m3_PP + m3_high - m3_low
+m3_R3           = m3_high + 2 * (m3_PP - m3_low)
+m3_R4           = m3_PP + 3 * (m3_high - m3_low)
+
+m3_S1           = m3_PP - (m3_high - m3_PP)
+m3_S2           = m3_PP - (m3_high - m3_low)
+m3_S3           = m3_low - 2 * (m3_high - m3_PP)
+m3_S4           = m3_PP - 3 * (m3_high - m3_low)
+
+// 12 month R/S pivot points (extended to 4)
+m12_R1          = m12_PP + m12_PP - m12_low
+m12_R2          = m12_PP + m12_high - m12_low
+m12_R3          = m12_high + 2 * (m12_PP - m12_low)
+m12_R4          = m12_PP + 3 * (m12_high - m12_low)
+
+m12_S1          = m12_PP - (m12_high - m12_PP)
+m12_S2          = m12_PP - (m12_high - m12_low)
+m12_S3          = m12_low - 2 * (m12_high - m12_PP)
+m12_S4          = m12_PP - 3 * (m12_high - m12_low)
+
+
+// --- ALL PIVOTS AS LINES (Visual Update) ---
+
+// 1. Definition of line variables
+var line l_h1_pp = na, var line l_h1_r1 = na, var line l_h1_r2 = na, var line l_h1_r3 = na, var line l_h1_r4 = na, var line l_h1_s1 = na, var line l_h1_s2 = na, var line l_h1_s3 = na, var line l_h1_s4 = na
+var line l_h4_pp = na, var line l_h4_r1 = na, var line l_h4_r2 = na, var line l_h4_r3 = na, var line l_h4_r4 = na, var line l_h4_s1 = na, var line l_h4_s2 = na, var line l_h4_s3 = na, var line l_h4_s4 = na
+var line l_d_pp = na, var line l_d_r1 = na, var line l_d_r2 = na, var line l_d_r3 = na, var line l_d_r4 = na, var line l_d_s1 = na, var line l_d_s2 = na, var line l_d_s3 = na, var line l_d_s4 = na
+var line l_w_pp = na, var line l_w_r1 = na, var line l_w_r2 = na, var line l_w_r3 = na, var line l_w_r4 = na, var line l_w_s1 = na, var line l_w_s2 = na, var line l_w_s3 = na, var line l_w_s4 = na
+var line l_m_pp = na, var line l_m_r1 = na, var line l_m_r2 = na, var line l_m_r3 = na, var line l_m_r4 = na, var line l_m_s1 = na, var line l_m_s2 = na, var line l_m_s3 = na, var line l_m_s4 = na
+var line l_3m_pp = na, var line l_3m_r1 = na, var line l_3m_r2 = na, var line l_3m_r3 = na, var line l_3m_r4 = na, var line l_3m_s1 = na, var line l_3m_s2 = na, var line l_3m_s3 = na, var line l_3m_s4 = na
+var line l_12m_pp = na, var line l_12m_r1 = na, var line l_12m_r2 = na, var line l_12m_r3 = na, var line l_12m_r4 = na, var line l_12m_s1 = na, var line l_12m_s2 = na, var line l_12m_s3 = na, var line l_12m_s4 = na
+
+// 2. Drawing function
+f_draw_pivot(_line, _val, _col, _width, _offset_start, _show_cond, _input_active) =>
+    line ret_line = _line
+    if barstate.islast and _input_active and _show_cond and not na(_val)
+        if na(ret_line)
+            ret_line := line.new(bar_index + _offset_start, _val, bar_index + _offset_start + 1, _val, color=_col, width=_width)
         else
-            exit_cnt := 0
+            line.set_xy1(ret_line, bar_index + _offset_start, _val)
+            line.set_xy2(ret_line, bar_index + _offset_start + 1, _val)
+            line.set_color(ret_line, _col)
+            line.set_width(ret_line, _width)
+    else
+        if not na(ret_line)
+            line.delete(ret_line)
+            ret_line := na
+    ret_line
 
-        // State Age
-        if bias_state != 0
-            state_age += 1
+// 3. Execution (Drawing)
+
+// Bedingungen für Sichtbarkeit
+
+// 1H: Offset 1, Width 1 (Analog zu Daily)
+l_h1_pp := f_draw_pivot(l_h1_pp, h1_PP, color.orange, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_r1 := f_draw_pivot(l_h1_r1, h1_R1, color.red, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_r2 := f_draw_pivot(l_h1_r2, h1_R2, color.red, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_r3 := f_draw_pivot(l_h1_r3, h1_R3, color.red, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_r4 := f_draw_pivot(l_h1_r4, h1_R4, color.red, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_s1 := f_draw_pivot(l_h1_s1, h1_S1, color.green, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_s2 := f_draw_pivot(l_h1_s2, h1_S2, color.green, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_s3 := f_draw_pivot(l_h1_s3, h1_S3, color.green, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_s4 := f_draw_pivot(l_h1_s4, h1_S4, color.green, 1, 1, cond_h1, plot_pivots_h1)
+
+// 4H: Offset 1, Width 1 (Analog zu Daily)
+l_h4_pp := f_draw_pivot(l_h4_pp, h4_PP, color.orange, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_r1 := f_draw_pivot(l_h4_r1, h4_R1, color.red, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_r2 := f_draw_pivot(l_h4_r2, h4_R2, color.red, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_r3 := f_draw_pivot(l_h4_r3, h4_R3, color.red, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_r4 := f_draw_pivot(l_h4_r4, h4_R4, color.red, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_s1 := f_draw_pivot(l_h4_s1, h4_S1, color.green, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_s2 := f_draw_pivot(l_h4_s2, h4_S2, color.green, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_s3 := f_draw_pivot(l_h4_s3, h4_S3, color.green, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_s4 := f_draw_pivot(l_h4_s4, h4_S4, color.green, 1, 1, cond_h4, plot_pivots_h4)
+
+// Daily: Offset 1, Width 1
+l_d_pp := f_draw_pivot(l_d_pp, d_PP, color.orange, 2, 1, Intra, plot_pivots_d)
+l_d_r1 := f_draw_pivot(l_d_r1, d_R1, color.red, 2, 1, Intra, plot_pivots_d)
+l_d_r2 := f_draw_pivot(l_d_r2, d_R2, color.red, 2, 1, Intra, plot_pivots_d)
+l_d_r3 := f_draw_pivot(l_d_r3, d_R3, color.red, 2, 1, Intra, plot_pivots_d)
+l_d_r4 := f_draw_pivot(l_d_r4, d_R4, color.red, 2, 1, Intra, plot_pivots_d)
+l_d_s1 := f_draw_pivot(l_d_s1, d_S1, color.green, 2, 1, Intra, plot_pivots_d)
+l_d_s2 := f_draw_pivot(l_d_s2, d_S2, color.green, 2, 1, Intra, plot_pivots_d)
+l_d_s3 := f_draw_pivot(l_d_s3, d_S3, color.green, 2, 1, Intra, plot_pivots_d)
+l_d_s4 := f_draw_pivot(l_d_s4, d_S4, color.green, 2, 1, Intra, plot_pivots_d)
+
+// Weekly: Offset 3, Width 3
+l_w_pp := f_draw_pivot(l_w_pp, w_PP, color.yellow, 3, 3, Intra_D, plot_pivots_w)
+l_w_r1 := f_draw_pivot(l_w_r1, w_R1, color.red, 3, 3, Intra_D, plot_pivots_w)
+l_w_r2 := f_draw_pivot(l_w_r2, w_R2, color.red, 3, 3, Intra_D, plot_pivots_w)
+l_w_r3 := f_draw_pivot(l_w_r3, w_R3, color.red, 3, 3, Intra_D, plot_pivots_w)
+l_w_r4 := f_draw_pivot(l_w_r4, w_R4, color.red, 3, 3, Intra_D, plot_pivots_w)
+l_w_s1 := f_draw_pivot(l_w_s1, w_S1, color.green, 3, 3, Intra_D, plot_pivots_w)
+l_w_s2 := f_draw_pivot(l_w_s2, w_S2, color.green, 3, 3, Intra_D, plot_pivots_w)
+l_w_s3 := f_draw_pivot(l_w_s3, w_S3, color.green, 3, 3, Intra_D, plot_pivots_w)
+l_w_s4 := f_draw_pivot(l_w_s4, w_S4, color.green, 3, 3, Intra_D, plot_pivots_w)
+
+// Monthly: Offset 5, Width 4
+l_m_pp := f_draw_pivot(l_m_pp, m_PP, color.yellow, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_r1 := f_draw_pivot(l_m_r1, m_R1, color.red, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_r2 := f_draw_pivot(l_m_r2, m_R2, color.red, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_r3 := f_draw_pivot(l_m_r3, m_R3, color.red, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_r4 := f_draw_pivot(l_m_r4, m_R4, color.red, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_s1 := f_draw_pivot(l_m_s1, m_S1, color.green, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_s2 := f_draw_pivot(l_m_s2, m_S2, color.green, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_s3 := f_draw_pivot(l_m_s3, m_S3, color.green, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_s4 := f_draw_pivot(l_m_s4, m_S4, color.green, 4, 5, Intra_D_W, plot_pivots_m)
+
+// 3 Month: Offset 7, Width 5
+l_3m_pp := f_draw_pivot(l_3m_pp, m3_PP, color.yellow, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_r1 := f_draw_pivot(l_3m_r1, m3_R1, color.red, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_r2 := f_draw_pivot(l_3m_r2, m3_R2, color.red, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_r3 := f_draw_pivot(l_3m_r3, m3_R3, color.red, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_r4 := f_draw_pivot(l_3m_r4, m3_R4, color.red, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_s1 := f_draw_pivot(l_3m_s1, m3_S1, color.green, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_s2 := f_draw_pivot(l_3m_s2, m3_S2, color.green, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_s3 := f_draw_pivot(l_3m_s3, m3_S3, color.green, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_s4 := f_draw_pivot(l_3m_s4, m3_S4, color.green, 5, 7, Intra_D_W_M, plot_pivots_3m)
+
+// 12 Month: Offset 9, Width 6
+l_12m_pp := f_draw_pivot(l_12m_pp, m12_PP, color.yellow, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_r1 := f_draw_pivot(l_12m_r1, m12_R1, color.red, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_r2 := f_draw_pivot(l_12m_r2, m12_R2, color.red, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_r3 := f_draw_pivot(l_12m_r3, m12_R3, color.red, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_r4 := f_draw_pivot(l_12m_r4, m12_R4, color.red, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_s1 := f_draw_pivot(l_12m_s1, m12_S1, color.green, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_s2 := f_draw_pivot(l_12m_s2, m12_S2, color.green, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_s3 := f_draw_pivot(l_12m_s3, m12_S3, color.green, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_s4 := f_draw_pivot(l_12m_s4, m12_S4, color.green, 6, 9, Intra_D_W_M, plot_pivots_12m)
+
+
+//----------------------------------- Bollinger Bands ------------------------------------
+
+f_stdev(_bb_len) => ta.stdev(close, _bb_len)
+f_sma(_sma_len) => BB_calc_tog ? ta.sma(close, _sma_len) : ta.ema(close, _sma_len)
+
+f_bb_basis(_sma_len) => BB_calc_tog ? f_sma(_sma_len) : ta.ema((open + high + low + close) / 4, _sma_len)
+
+f_bb_dev(_sma_len) => BB_calc_tog ? f_stdev(_sma_len) : math.sqrt(ta.sma((((open + high + low + close) 
+     / 4 - ta.ema((open + high + low + close) / 4, _sma_len)) * ((open + high + low + close) 
+     / 4 - ta.ema((open + high + low + close) / 4, _sma_len))), _sma_len))
+
+// Stage 4: Bollinger Bands Hard-Gating
+float basis = na
+float dev_1 = na
+float upper_1 = na
+float lower_1 = na
+float dev_3 = na
+float upper_3 = na
+float lower_3 = na
+bool approach_up = false
+bool approach_dn = false
+
+if eff_BB_plot
+    ops_bb += 1 // Count Ops
+
+    //bb1
+    basis := f_bb_basis(BB_length_1)
+    dev_1 := BB_sdev_1 * f_bb_dev(BB_length_1)
+    upper_1 := basis + dev_1
+    lower_1 := basis - dev_1
+
+    //bb3
+    dev_3 := BB_sdev_3 * f_bb_dev(BB_length_1)
+    upper_3 := basis + dev_3
+    lower_3 := basis - dev_3
+
+    approach_up := near_bb ? high > upper_1 : true
+    approach_dn := near_bb ? low < lower_1 : true
+
+bup_1 = plot(eff_BB_plot and approach_up ? upper_1 : na, title='Upper BB1', color=color.new(color.gray, 100), linewidth=1)
+bdn_1 = plot(eff_BB_plot and approach_dn ? lower_1 : na, title='Lower BB1', color=color.new(color.gray, 100), linewidth=1)
+
+bup_3 = plot(eff_BB_plot and approach_up ? upper_3 : na, title='Upper BB3', color=color.new(color.gray, 100), linewidth=1)
+bdn_3 = plot(eff_BB_plot and approach_dn ? lower_3 : na, title='Lower BB3', color=color.new(color.gray, 100), linewidth=1)
+
+fill(bup_1, bup_3, color=color.new(color.red, 80))
+fill(bdn_1, bdn_3, color=color.new(color.green, 80))
+
+
+//----------------- Trading Sessions Logic -----------------
+
+// Global FIFO Array for Session Lines
+var line[] sess_lines = array.new_line()
+
+// Function to calculate state and draw Session Boxes or Lines
+// UPDATED: Added FIFO Logic
+f_draw_session(_show, _sess, _tz, _col, _style, _box, _high, _low, _start_t_state, _restrict, _restrict_time, _lines_array, _limit) =>
+    is_weekend = dayofweek == dayofweek.saturday or dayofweek == dayofweek.sunday
+    
+    // Calculate if session is active (Raw)
+    bool is_sess_raw = _show and not is_weekend and not na(time(timeframe.period, _sess, _tz))
+    bool is_start = is_sess_raw and not is_sess_raw[1]
+
+    // Update Start Time State
+    int start_t_cur = _start_t_state
+    if is_start
+        start_t_cur := time
+
+    // Calculate Restriction (Effective Session)
+    bool is_sess = is_sess_raw
+    if _restrict and is_sess_raw and not na(start_t_cur)
+        // Convert restricted time (minutes) to ms
+        ms_limit = _restrict_time * 60 * 1000
+        if (time - start_t_cur) >= ms_limit
+            is_sess := false
+    
+    // Vertical Line Logic (FIFO)
+    if _style == "Vertical Line" and is_start
+        line new_l = line.new(x1=bar_index, y1=low, x2=bar_index, y2=high, extend=extend.both, color=color.new(_col, 70), style=line.style_solid, width=1)
+        array.push(_lines_array, new_l)
+        if array.size(_lines_array) > _limit
+            line.delete(array.shift(_lines_array))
+
+    // Box Logic
+    box b_cur = _box
+    float h_cur = _high
+    float l_cur = _low
+
+    if _style == "Box" and is_sess
+        if is_start // Session Start
+            h_cur := high
+            l_cur := low
+            b_cur := box.new(left=bar_index, top=h_cur, right=bar_index, bottom=l_cur, border_color=_col, bgcolor=_col)
+        else // Session Ongoing
+            h_cur := math.max(h_cur, high)
+            l_cur := math.min(l_cur, low)
+            box.set_top(b_cur, h_cur)
+            box.set_bottom(b_cur, l_cur)
+            box.set_right(b_cur, bar_index + 1)
+    
+    [is_sess, b_cur, h_cur, l_cur, start_t_cur]
+
+// Check TF Constraint (Visible only if TF <= 1 Hour)
+show_sess_on_tf = timeframe.isintraday and timeframe.multiplier <= 60
+
+// Define Global State Variables for each Session
+var box b_lon = na, var float h_lon = na, var float l_lon = na, var int st_lon = na
+var box b_ny = na, var float h_ny = na, var float l_ny = na, var int st_ny = na
+var box b_tok = na, var float h_tok = na, var float l_tok = na, var int st_tok = na
+var box b_syd = na, var float h_syd = na, var float l_syd = na, var int st_syd = na
+
+// Execute Function
+[lon_active, t_b_lon, t_h_lon, t_l_lon, t_st_lon] = f_draw_session(eff_london_show and show_sess_on_tf, london_sess, sess_timezone, london_col, sess_style, b_lon, h_lon, l_lon, st_lon, use_sess_rest, sess_rest_time, sess_lines, sess_line_limit)
+b_lon := t_b_lon
+h_lon := t_h_lon
+l_lon := t_l_lon
+st_lon := t_st_lon
+
+[ny_active, t_b_ny, t_h_ny, t_l_ny, t_st_ny] = f_draw_session(eff_ny_show and show_sess_on_tf, ny_sess, sess_timezone, ny_col, sess_style, b_ny, h_ny, l_ny, st_ny, use_sess_rest, sess_rest_time, sess_lines, sess_line_limit)
+b_ny := t_b_ny
+h_ny := t_h_ny
+l_ny := t_l_ny
+st_ny := t_st_ny
+
+// --- ZUSATZ: Zweite Linie um 19:30 Uhr für New York (nur bei Vertical Line) ---
+if eff_ny_show and show_sess_on_tf and sess_style == "Vertical Line"
+    // Prüfen, ob wir Wochenende haben (um Linie zu verhindern)
+    is_weekend_ny = dayofweek == dayofweek.saturday or dayofweek == dayofweek.sunday
+    // Wir prüfen auf Startzeit 19:30 in der gewählten Zeitzone
+    // "1930-2359" stellt sicher, dass wir den Beginn auch auf höheren Timeframes (z.B. 1h) erwischen
+    is_1930_sess  = not is_weekend_ny and not na(time(timeframe.period, "1930-2359", sess_timezone))
+    is_1930_start = is_1930_sess and not is_1930_sess[1]
+
+    if is_1930_start
+        line l = line.new(x1=bar_index, y1=low, x2=bar_index, y2=high, extend=extend.both, color=color.new(ny_col, 70), style=line.style_dashed, width=1)
+        array.push(sess_lines, l)
+        if array.size(sess_lines) > sess_line_limit
+            line.delete(array.shift(sess_lines))
+// -------------------------------------------------------------------------------
+
+[tok_active, t_b_tok, t_h_tok, t_l_tok, t_st_tok] = f_draw_session(eff_tokyo_show and show_sess_on_tf, tokyo_sess, sess_timezone, tokyo_col, sess_style, b_tok, h_tok, l_tok, st_tok, use_sess_rest, sess_rest_time, sess_lines, sess_line_limit)
+b_tok := t_b_tok
+h_tok := t_h_tok
+l_tok := t_l_tok
+st_tok := t_st_tok
+
+[syd_active, t_b_syd, t_h_syd, t_l_syd, t_st_syd] = f_draw_session(eff_sydney_show and show_sess_on_tf, sydney_sess, sess_timezone, sydney_col, sess_style, b_syd, h_syd, l_syd, st_syd, use_sess_rest, sess_rest_time, sess_lines, sess_line_limit)
+b_syd := t_b_syd
+h_syd := t_h_syd
+l_syd := t_l_syd
+st_syd := t_st_syd
+
+// Draw Backgrounds - COMBINED
+// Priority: NY > London > Tokyo > Sydney (in case of overlapping times)
+// For Inv. Background: Unified Blue 50% if sessions enabled but NOT active.
+bool any_sess_configured = eff_london_show or eff_ny_show or eff_tokyo_show or eff_sydney_show
+bool any_sess_active     = lon_active or ny_active or tok_active or syd_active
+
+color bg_sess_color = na
+
+if show_sess_on_tf
+    if sess_style == "Background"
+        bg_sess_color := ny_active ? ny_col : lon_active ? london_col : tok_active ? tokyo_col : syd_active ? sydney_col : na
+    else if sess_style == "Inv. Background"
+        if any_sess_configured
+            bg_sess_color := any_sess_active ? na : color.new(color.blue, 85)
+
+
+//----------------- MTF Candle Overlay Logic -----------------
+
+// Map string selection
+mtf_tf = switch mtf_tf_sel
+    "5m" => "5"
+    "15m" => "15"
+    "30m" => "30"
+    "1h" => "60"
+    "2h" => "120"
+    "4h" => "240"
+    "6h" => "360"
+    "12h" => "720"
+    "1d" => "D"
+    "1w" => "W"
+    "1M" => "M"
+    "3M" => "3M"
+    => "240"
+
+// Check logic
+is_higher_tf = timeframe.in_seconds(mtf_tf) > timeframe.in_seconds(timeframe.period)
+
+// Variables (Stage 2: Hard Gating)
+float mtf_o = na
+float mtf_h = na
+float mtf_l = na
+float mtf_c = na
+
+if ON_MTF_OV and is_higher_tf
+    [t_o, t_h, t_l, t_c] = request.security(syminfo.tickerid, mtf_tf, [open, high, low, close], lookahead=barmerge.lookahead_on)
+    mtf_o := t_o
+    mtf_h := t_h
+    mtf_l := t_l
+    mtf_c := t_c
+    active_sec_calls += 1
+
+new_mtf_bar = timeframe.change(mtf_tf)
+
+// Colors
+t_val = 100 - mtf_opacity
+col_bull = color.new(color.green, t_val)
+col_bear = color.new(color.red, t_val)
+col_border_bull = color.new(color.green, 80) 
+col_border_bear = color.new(color.red, 80) 
+
+// Persistent Variables (Stage 4: Array FIFO)
+var box[] mtf_boxes = array.new_box()
+var box mtf_body = na
+
+if ON_MTF_OV and is_higher_tf
+    
+    // Determine Bull/Bear state
+    is_up = mtf_c >= mtf_o
+    cur_fill = is_up ? col_bull : col_bear
+    cur_border = is_up ? col_border_bull : col_border_bear
+
+    // Geometry: Always High to Low
+    float body_top = mtf_h
+    float body_bot = mtf_l
+
+    // --- Logic ---
+    if new_mtf_bar
+        // Create NEW object to avoid overlap
+        mtf_body := box.new(bar_index, body_top, bar_index, body_bot, border_color=cur_border, border_width=1, bgcolor=cur_fill)
+        array.push(mtf_boxes, mtf_body)
+
+        // FIFO Limit (e.g., 50)
+        if array.size(mtf_boxes) > 50
+            box.delete(array.shift(mtf_boxes))
+
+    else
+        // Update Existing Object (Last one created)
+        // If mtf_body is maintained, we can use it directly, but getting from array is safer if logic was complex
+        // Here we just reuse mtf_body var which holds the current active box
+        if not na(mtf_body)
+            box.set_right(mtf_body, bar_index)
+            box.set_top(mtf_body, body_top)
+            box.set_bottom(mtf_body, body_bot)
+            box.set_bgcolor(mtf_body, cur_fill)
+            box.set_border_color(mtf_body, cur_border)
+else
+    // Cleanup if disabled
+    if array.size(mtf_boxes) > 0
+        for i = 0 to array.size(mtf_boxes) - 1
+            box.delete(array.get(mtf_boxes, i))
+        array.clear(mtf_boxes)
+
+
+//--------------------------------------------------------- Fair Value Gaps (FVG) ---------------------------------------------------------
+
+// --- Variables to track boxes for limit ---
+var box[] boxes_fvg1 = array.new_box()
+var box[] boxes_fvg2 = array.new_box()
+
+// --- FVG 1 LOGIC ---
+
+// Helper: Timeframe Duration
+tf_ms1 = (fvg1_tf_sel == "" ? timeframe.in_seconds(timeframe.period) : timeframe.in_seconds(fvg1_tf_sel)) * 1000
+
+// Variable to track the last drawn FVG time
+var int last_fvg_time1 = 0
+
+// Stage 3: Refactored FVG1 (No security if Current TF)
+float h1_mtf1 = na, float l1_mtf1 = na, float h3_mtf1 = na, float l3_mtf1 = na, int t2_mtf1 = na
+
+// Only fetch MTF data if valid TF selection AND enabled
+if ON_FVG1 and fvg1_tf_sel != ""
+    [t_h1, t_l1, t_h3, t_l3, t_t2] = request.security(syminfo.tickerid, fvg1_tf_sel, [high[1], low[1], high[3], low[3], time[2]], lookahead=barmerge.lookahead_off)
+    h1_mtf1 := t_h1, l1_mtf1 := t_l1, h3_mtf1 := t_h3, l3_mtf1 := t_l3, t2_mtf1 := t_t2
+    active_sec_calls += 1
+
+if ON_FVG1
+    box b_new = na
+    // CASE A: Current Timeframe (Direct Source)
+    if fvg1_tf_sel == ""
+        if low > high[2] // Bullish
+            _border_bull = color.new(color.green, 90)
+            b_new := box.new(left=bar_index[2], top=low, right=bar_index + (fvg1_len - 1), bottom=high[2], border_color=_border_bull, bgcolor=col_fvg1_bull)
+
+        if high < low[2] // Bearish
+            _border_bear = color.new(color.red, 90)
+            b_new := box.new(left=bar_index[2], top=low[2], right=bar_index + (fvg1_len - 1), bottom=high, border_color=_border_bear, bgcolor=col_fvg1_bear)
+
+        // Registry
+        sig_fvg_bull := low > high[2]
+        sig_fvg_bear := high < low[2]
+
+    // CASE B: Higher Timeframe (Security Source)
+    else 
+        if t2_mtf1 != last_fvg_time1 and not na(t2_mtf1)
+            t_left = t2_mtf1 - tf_ms1
+            t_right = t2_mtf1 + (tf_ms1 * fvg1_len)
+
+            if l1_mtf1 > h3_mtf1 // Bullish
+                _border_bull = color.new(color.green, 90)
+                b_new := box.new(left=t_left, top=l1_mtf1, right=t_right, bottom=h3_mtf1, xloc=xloc.bar_time, border_color=_border_bull, bgcolor=col_fvg1_bull)
+
+            if h1_mtf1 < l3_mtf1 // Bearish
+                _border_bear = color.new(color.red, 90)
+                b_new := box.new(left=t_left, top=l3_mtf1, right=t_right, bottom=h1_mtf1, xloc=xloc.bar_time, border_color=_border_bear, bgcolor=col_fvg1_bear)
+            
+            last_fvg_time1 := t2_mtf1
+
+    // Manage Box Limit
+    if not na(b_new)
+        array.push(boxes_fvg1, b_new)
+        if array.size(boxes_fvg1) > fvg1_limit
+            box.delete(array.shift(boxes_fvg1))
+else
+    // Cleanup
+    if array.size(boxes_fvg1) > 0
+        for i = 0 to array.size(boxes_fvg1) - 1
+            box.delete(array.get(boxes_fvg1, i))
+        array.clear(boxes_fvg1)
+
+
+// --- FVG 2 LOGIC ---
+
+// Helper: Timeframe Duration
+tf_ms2 = (fvg2_tf_sel == "" ? timeframe.in_seconds(timeframe.period) : timeframe.in_seconds(fvg2_tf_sel)) * 1000
+
+// Variable to track the last drawn FVG time
+var int last_fvg_time2 = 0
+
+// Stage 3: Refactored FVG2 (No security if Current TF)
+float h1_mtf2 = na, float l1_mtf2 = na, float h3_mtf2 = na, float l3_mtf2 = na, int t2_mtf2 = na
+
+if ON_FVG2 and fvg2_tf_sel != ""
+    [t_h1, t_l1, t_h3, t_l3, t_t2] = request.security(syminfo.tickerid, fvg2_tf_sel, [high[1], low[1], high[3], low[3], time[2]], lookahead=barmerge.lookahead_off)
+    h1_mtf2 := t_h1, l1_mtf2 := t_l1, h3_mtf2 := t_h3, l3_mtf2 := t_l3, t2_mtf2 := t_t2
+    active_sec_calls += 1
+
+if ON_FVG2
+    box b_new = na
+    // CASE A: Current Timeframe (Direct Source)
+    if fvg2_tf_sel == ""
+        if low > high[2] // Bullish
+            _border_bull = color.new(color.green, 90)
+            b_new := box.new(left=bar_index[2], top=low, right=bar_index + (fvg2_len - 1), bottom=high[2], border_color=_border_bull, bgcolor=col_fvg2_bull)
+
+        if high < low[2] // Bearish
+            _border_bear = color.new(color.red, 90)
+            b_new := box.new(left=bar_index[2], top=low[2], right=bar_index + (fvg2_len - 1), bottom=high, border_color=_border_bear, bgcolor=col_fvg2_bear)
+
+    // CASE B: Higher Timeframe
+    else
+        if t2_mtf2 != last_fvg_time2 and not na(t2_mtf2)
+            t_left = t2_mtf2 - tf_ms2
+            t_right = t2_mtf2 + (tf_ms2 * fvg2_len)
+
+            if l1_mtf2 > h3_mtf2 // Bullish
+                _border_bull = color.new(color.green, 90)
+                b_new := box.new(left=t_left, top=l1_mtf2, right=t_right, bottom=h3_mtf2, xloc=xloc.bar_time, border_color=_border_bull, bgcolor=col_fvg2_bull)
+
+            if h1_mtf2 < l3_mtf2 // Bearish
+                _border_bear = color.new(color.red, 90)
+                b_new := box.new(left=t_left, top=l3_mtf2, right=t_right, bottom=h1_mtf2, xloc=xloc.bar_time, border_color=_border_bear, bgcolor=col_fvg2_bear)
+            
+            last_fvg_time2 := t2_mtf2
+
+    // Manage Box Limit
+    if not na(b_new)
+        array.push(boxes_fvg2, b_new)
+        if array.size(boxes_fvg2) > fvg2_limit
+            box.delete(array.shift(boxes_fvg2))
+else
+    // Cleanup
+    if array.size(boxes_fvg2) > 0
+        for i = 0 to array.size(boxes_fvg2) - 1
+            box.delete(array.get(boxes_fvg2, i))
+        array.clear(boxes_fvg2)
+
+
+//--------------------------------------------------------- Real-time Fractal Alert ---------------------------------------------------------
+
+// --- Logic Calculation ---
+// We cannot use ta.pivothigh/low for the realtime bar effectively, so we check the structure manually.
+// Structure: [Left2][Left1][Pivot][Right1][Current(Right2)]
+// Indices:    [4]    [3]    [2]     [1]       [0]
+
+// Check if bars 4, 3, 2, and 1 form a valid pre-fractal structure
+valid_up_structure = high[2] > high[3] and high[2] > high[4] and high[2] > high[1]
+valid_dn_structure = low[2] < low[3] and low[2] < low[4] and low[2] < low[1]
+
+// Check if the current running bar (0) respects the fractal rule
+// Up Fractal: Current High must be lower than Pivot High
+rt_up_frac = valid_up_structure and high < high[2]
+
+// Down Fractal: Current Low must be higher than Pivot Low
+rt_dn_frac = valid_dn_structure and low > low[2]
+
+// --- Trigger Alert ---
+// Trigger only if enabled, in realtime, and condition is met. 
+// freq_once_per_bar avoids spamming the sound on every tick.
+if use_rt_alert and barstate.isrealtime and (rt_up_frac or rt_dn_frac)
+    alert("Potential Fractal Forming (5th Candle Running)", alert.freq_once_per_bar)
+
+
+//--------------------------------------------------------- Additional Context (No Plot-Limit Usage) ---------------------------------------------------------
+
+// Helper to check session start (Used by both functionalities)
+f_is_sess_start(_show, _sess) =>
+    _show and not na(time(timeframe.period, _sess, sess_timezone)) and na(time(timeframe.period, _sess, sess_timezone)[1])
+
+/// --- 1. 1st Session Candle (Separate Logic) ---
+// Function to run on the target timeframe
+f_calc_sess_1st() =>
+    // Check all sessions using global inputs
+    bool s_lon_s = f_is_sess_start(london_show, london_sess)
+    bool s_ny_s  = f_is_sess_start(ny_show, ny_sess)
+    bool s_tok_s = f_is_sess_start(tokyo_show, tokyo_sess)
+    bool s_syd_s = f_is_sess_start(sydney_show, sydney_sess)
+    bool s_nypm_s = f_is_sess_start(ny_show, "1930-2359")
+
+    // Store latest session start values
+    var float saved_h = na
+    var float saved_l = na
+    var int saved_t = na
+
+    if s_lon_s or s_ny_s or s_tok_s or s_syd_s or s_nypm_s
+        saved_h := high
+        saved_l := low
+        saved_t := time
+
+    [saved_h, saved_l, saved_t]
+
+// Retrieve from selected timeframe
+float s1_h_val = na
+float s1_l_val = na
+int s1_t_val = na
+
+if ON_SESS_1ST
+    [t_h, t_l, t_t] = request.security(syminfo.tickerid, sess_1st_tf, f_calc_sess_1st(), lookahead=barmerge.lookahead_on)
+    s1_h_val := t_h
+    s1_l_val := t_l
+    s1_t_val := t_t
+    active_sec_calls += 1
+
+// Variables for 1st Session Lines/Labels
+var line l_s1_h = na
+var line l_s1_l = na
+var label lb_s1_h = na
+var label lb_s1_l = na
+
+// Stage 3: 1st Session Candle & Last Fractal S/R (Reuse)
+
+if barstate.islast
+    // Check Visibility
+    is_valid_s1_tf = timeframe.in_seconds(timeframe.period) <= timeframe.in_seconds(sess_1st_tf)
+
+    if ON_SESS_1ST and is_valid_s1_tf
+        if not na(s1_h_val) and not na(s1_t_val)
+            l_s1_h := f_line_get_or_create(l_s1_h, s1_t_val, s1_h_val, time, s1_h_val, color.new(color.gray, 50), line.style_solid, xloc.bar_time)
+            lb_s1_h := f_label_get_or_create(lb_s1_h, bar_index + 4, s1_h_val, "1st High", color.new(color.gray, 30))
+
+        if not na(s1_l_val) and not na(s1_t_val)
+            l_s1_l := f_line_get_or_create(l_s1_l, s1_t_val, s1_l_val, time, s1_l_val, color.new(color.gray, 50), line.style_solid, xloc.bar_time)
+            lb_s1_l := f_label_get_or_create(lb_s1_l, bar_index + 4, s1_l_val, "1st Low", color.new(color.gray, 30))
+
+    else
+        line.delete(l_s1_h)
+        l_s1_h := na
+        line.delete(l_s1_l)
+        l_s1_l := na
+        label.delete(lb_s1_h)
+        lb_s1_h := na
+        label.delete(lb_s1_l)
+        lb_s1_l := na
+else
+    // Cleanup if disabled (Hard Gating)
+    line.delete(l_s1_h)
+    l_s1_h := na
+    line.delete(l_s1_l)
+    l_s1_l := na
+    label.delete(lb_s1_h)
+    lb_s1_h := na
+    label.delete(lb_s1_l)
+    lb_s1_l := na
+
+
+/// --- 2. Previous Candle High/Low (Lines & Labels) ---
+// Fetch High/Low of the previous completed candle + its exact time window (start/end)
+float pc_h_val = na
+float pc_l_val = na
+int pc_start_time = na
+int pc_end_time = na
+
+if ON_PCH
+    [t_h, t_l, t_s, t_e] = request.security(syminfo.tickerid, pch_pcl_tf, [high[1], low[1], time[1], time], lookahead=barmerge.lookahead_on)
+    pc_h_val := t_h
+    pc_l_val := t_l
+    pc_start_time := t_s
+    pc_end_time := t_e
+    active_sec_calls += 1
+
+// Variables for Lines and Labels
+var line  l_pch  = na
+var line  l_pcl  = na
+var label lb_pch = na
+var label lb_pcl = na
+
+// Stage 2: PCH/PCL Object Reuse & Dirty Scan
+
+// State for Dirty Check
+var int last_pc_start = 0
+var int last_pc_end = 0
+
+// Cached Scan Results
+var int   c_pch_idx = na
+var int   c_pcl_idx = na
+var float c_max_h   = na
+var float c_min_l   = na
+
+
+if barstate.islast
+    // Check Visibility & Enable
+    is_valid_pch_tf = timeframe.in_seconds(timeframe.period) <= timeframe.in_seconds(pch_pcl_tf)
+
+    if ON_PCH and is_valid_pch_tf
+        // Dirty Logic
+        bool pch_dirty = (pc_start_time != last_pc_start) or (pc_end_time != last_pc_end)
+
+        if pch_dirty
+            // Heavy Scan Loop (Runs only when HTF candle changes)
+            int lookback_limit = math.min(2000, bar_index) // Adaptive Limit
+            float max_h_scan = na
+            float min_l_scan = na
+            int pch_idx_scan = na
+            int pcl_idx_scan = na
+
+            for i = 0 to lookback_limit
+                ops_pch += 1 // Count Ops
+
+                // Early Break Optimization
+                if time[i] < pc_start_time
+                    break
+
+                if not na(pc_start_time) and not na(pc_end_time) and time[i] >= pc_start_time and time[i] < pc_end_time
+                    if na(max_h_scan) or high[i] > max_h_scan
+                        max_h_scan := high[i]
+                        pch_idx_scan := bar_index - i
+                    if na(min_l_scan) or low[i] < min_l_scan
+                        min_l_scan := low[i]
+                        pcl_idx_scan := bar_index - i
+
+            // Update Cache
+            c_max_h   := max_h_scan
+            c_min_l   := min_l_scan
+            c_pch_idx := pch_idx_scan
+            c_pcl_idx := pcl_idx_scan
+
+            // Update State
+            last_pc_start := pc_start_time
+            last_pc_end   := pc_end_time
+
+        // Determine Y Values (Fallback to cached scan if security returns na)
+        float pch_y = not na(pc_h_val) ? pc_h_val : c_max_h
+        float pcl_y = not na(pc_l_val) ? pc_l_val : c_min_l
+
+        // Use cached indices (ensure not na)
+        int pch_index = na(c_pch_idx) ? bar_index : c_pch_idx
+        int pcl_index = na(c_pcl_idx) ? bar_index : c_pcl_idx
+
+        // Draw/Update Objects (Reuse)
+        if not na(pch_y)
+            l_pch  := f_line_get_or_create(l_pch, pch_index, pch_y, bar_index, pch_y, color.new(color.gray, 50), line.style_dashed)
+            lb_pch := f_label_get_or_create(lb_pch, bar_index + 10, pch_y, "Prev High", color.new(color.gray, 30))
+
+        if not na(pcl_y)
+            l_pcl  := f_line_get_or_create(l_pcl, pcl_index, pcl_y, bar_index, pcl_y, color.new(color.gray, 50), line.style_dashed)
+            lb_pcl := f_label_get_or_create(lb_pcl, bar_index + 10, pcl_y, "Prev Low", color.new(color.gray, 30))
+
+    else
+        // Cleanup if disabled or invalid TF
+        line.delete(l_pch)
+        l_pch := na
+        line.delete(l_pcl)
+        l_pcl := na
+        label.delete(lb_pch)
+        lb_pch := na
+        label.delete(lb_pcl)
+        lb_pcl := na
+else
+    // Cleanup if disabled (Hard Gating)
+    line.delete(l_pch)
+    l_pch := na
+    line.delete(l_pcl)
+    l_pcl := na
+    label.delete(lb_pch)
+    lb_pch := na
+    label.delete(lb_pcl)
+    lb_pcl := na
+
+
+// --- 2. Last Fractal S/R (Lines & Labels) ---
+
+// Function to get last confirmed fractal price and time
+f_get_last_fractal_data() =>
+    ph = ta.pivothigh(high, 2, 2)
+    pl = ta.pivotlow(low, 2, 2)
+    // When ph is detected, the fractal apex is at [2]
+    p_h_val = ta.valuewhen(not na(ph), high[2], 0)
+    p_h_time = ta.valuewhen(not na(ph), time[2], 0)
+    p_l_val = ta.valuewhen(not na(pl), low[2], 0)
+    p_l_time = ta.valuewhen(not na(pl), time[2], 0)
+    [p_h_val, p_h_time, p_l_val, p_l_time]
+
+float frac_h_val = na
+int frac_h_time = na
+float frac_l_val = na
+int frac_l_time = na
+
+if ON_LAST_FR
+    [t_fh, t_fht, t_fl, t_flt] = request.security(syminfo.tickerid, last_frac_tf, f_get_last_fractal_data())
+    frac_h_val := t_fh
+    frac_h_time := t_fht
+    frac_l_val := t_fl
+    frac_l_time := t_flt
+    active_sec_calls += 1
+
+var line l_last_fh = na
+var line l_last_fl = na
+var label lb_last_fh = na
+var label lb_last_fl = na
+
+if barstate.islast
+    // Check Visibility
+    is_valid_frac_tf = timeframe.in_seconds(timeframe.period) <= timeframe.in_seconds(last_frac_tf)
+
+    if ON_LAST_FR and is_valid_frac_tf
+        if not na(frac_h_val)
+            l_last_fh := f_line_get_or_create(l_last_fh, frac_h_time, frac_h_val, time, frac_h_val, color.new(color.gray, 50), line.style_dashed, xloc.bar_time)
+            lb_last_fh := f_label_get_or_create(lb_last_fh, bar_index + 8, frac_h_val, "Frac High", color.new(color.gray, 30))
+
+        if not na(frac_l_val)
+            l_last_fl := f_line_get_or_create(l_last_fl, frac_l_time, frac_l_val, time, frac_l_val, color.new(color.gray, 50), line.style_dashed, xloc.bar_time)
+            lb_last_fl := f_label_get_or_create(lb_last_fl, bar_index + 8, frac_l_val, "Frac Low", color.new(color.gray, 30))
+    else
+        line.delete(l_last_fh)
+        l_last_fh := na
+        line.delete(l_last_fl)
+        l_last_fl := na
+        label.delete(lb_last_fh)
+        lb_last_fh := na
+        label.delete(lb_last_fl)
+        lb_last_fl := na
+else
+    // Cleanup if disabled (Hard Gating)
+    line.delete(l_last_fh)
+    l_last_fh := na
+    line.delete(l_last_fl)
+    l_last_fl := na
+    label.delete(lb_last_fh)
+    lb_last_fh := na
+    label.delete(lb_last_fl)
+    lb_last_fl := na
+
+
+// --- 3. Volume Spikes (Char) ---
+// Calculates if Volume is x-times larger than the SMA(20) of Volume
+avg_vol = ta.sma(volume, 20)
+is_vol_spike = volume > (avg_vol * vol_mult)
+
+// Uses plotchar (Symbol 'V' in bold RED)
+plotchar(eff_show_vol ? is_vol_spike : na, char='v', location=location.bottom, color=color.new(color.red, 30), size=size.tiny, title="High Volume Spike")
+sig_vol_spike := eff_show_vol and is_vol_spike
+
+
+
+// ------------------------------------------- Gradient Volume Profile ----------------------------------------------
+
+var float[] vp_volArray = array.new_float(vp_rows, 0.0)
+var float[] vp_smtArray = array.new_float(vp_rows, 0.0)
+var line[]  vp_lines    = array.new_line()
+
+var int last_left = na
+var int last_right = na
+var bool vp_dirty = true
+
+if barstate.islast
+    // Dirty Flag check
+    if (chart.left_visible_bar_time != last_left) or (chart.right_visible_bar_time != last_right)
+        vp_dirty := true
+
+    // 1. CLEANUP (Only if dirty or disabled)
+    // If disabled, we clear. If dirty, we clear to redraw.
+    if (vp_dirty and eff_vp_enable) or (not eff_vp_enable and array.size(vp_lines) > 0)
+        if array.size(vp_lines) > 0
+            for i = 0 to array.size(vp_lines) - 1
+                line.delete(array.get(vp_lines, i))
+            array.clear(vp_lines)
+
+    // 2. CALCULATION
+    if eff_vp_enable and vp_dirty
+        int vStart = chart.left_visible_bar_time
+        int vEnd   = chart.right_visible_bar_time
+        
+        float hMax = -1.0
+        float lMin = 1000000000.0
+        bool found = false
+
+        // --- REPLAY FIX ---
+        // Always scan visible range, capped by max_bars_back
+        int LOOKBACK_CAP = 3999
+        int loopLimit = math.min(bar_index, LOOKBACK_CAP)
+
+        // SCAN 1: Price Range
+        for i = 0 to loopLimit
+            ops_vp_scan += 1 // Count Ops
+            int t = time[i]
+            if t < vStart
+                break 
+            
+            if t <= vEnd
+                if not found
+                    hMax := high[i]
+                    lMin := low[i]
+                    found := true
+                else
+                    hMax := math.max(hMax, high[i])
+                    lMin := math.min(lMin, low[i])
+
+        if not found
+            hMax := high
+            lMin := low
+
+        float rng = hMax - lMin
+        if rng == 0
+            rng := syminfo.mintick * 100
+        float step = rng / vp_rows
+        
+        array.fill(vp_volArray, 0.0)
+        
+        // SCAN 2: Volume Distribution
+        for i = 0 to loopLimit
+            int t = time[i]
+            if t < vStart
+                break
+            
+            if t <= vEnd
+                float h = high[i]
+                float l = low[i]
+                float v = volume[i]
+                
+                int iH = math.floor((h - lMin) / step)
+                int iL = math.floor((l - lMin) / step)
+                
+                if iH >= vp_rows 
+                    iH := vp_rows - 1
+                if iL < 0 
+                    iL := 0
+                
+                int bins = (iH - iL) + 1
+                if bins > 0
+                    float vBin = v / bins
+                    for k = iL to iH
+                        float cVal = array.get(vp_volArray, k)
+                        array.set(vp_volArray, k, cVal + vBin)
+
+        // 3. Smoothing
+        array.fill(vp_smtArray, 0.0)
+        float maxV = 0.0
+        float sumV = 0.0
+        int actB   = 0
+        
+        for j = 0 to vp_rows - 1
+            float s = 0.0
+            int c = 0
+            for x = -vp_smooth to vp_smooth
+                int idx = j + x
+                if idx >= 0 and idx < vp_rows
+                    s += array.get(vp_volArray, idx)
+                    c += 1
+            
+            float val = (c > 0) ? s / c : 0.0
+            array.set(vp_smtArray, j, val)
+            
+            if val > 0
+                sumV += val
+                actB += 1
+                if val > maxV
+                    maxV := val
+
+        // 4. Threshold
+        float avgV = (actB > 0) ? sumV / actB : 0.0
+        float thres = maxV
+        
+        if eff_vp_smart and avgV > 0
+            thres := avgV * vp_clip
+            if thres == 0
+                thres := maxV
+
+        // 5. Drawing
+        int xLoc = bar_index + vp_offset
+        
+        if maxV > 0
+            for j = 0 to vp_rows - 1
+                float val = array.get(vp_smtArray, j)
+                if val > 0
+                    float y1 = lMin + (j * step)
+                    float y2 = lMin + ((j + 1) * step)
+                    
+                    float intens = val / thres
+                    if intens > 1.0 
+                        intens := 1.0
+                    
+                    if intens > 0.01
+                        ops_vp_draw += 1 // Count Ops
+                        color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
+                        line l = line.new(x1=xLoc, y1=y1, x2=xLoc, y2=y2, xloc=xloc.bar_index, color=col, width=vp_width)
+                        array.push(vp_lines, l)
+
+        // Update Dirty Flag
+        last_left := vStart
+        last_right := vEnd
+        vp_dirty := false
+
+// -------------------------------------------------------------------------
+// DEBUG PANEL (Stage 0)
+// -------------------------------------------------------------------------
+// Update Peaks
+if ops_trend > peak_ops_trend
+    peak_ops_trend := ops_trend
+if (ops_vp_scan + ops_vp_draw) > peak_ops_vp
+    peak_ops_vp := (ops_vp_scan + ops_vp_draw)
+
+if debug_on and barstate.islast
+    if na(tbl_dbg)
+        tbl_dbg := table.new(position.bottom_right, 2, 15, bgcolor=color.new(color.black, 50), frame_width=1, frame_color=color.gray)
+
+    // Header
+    table.cell(tbl_dbg, 0, 0, "Metric", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 0, "Value", text_color=color.white, text_size=size.small)
+
+    // Security Calls
+    table.cell(tbl_dbg, 0, 1, "Sec Calls", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 1, str.tostring(active_sec_calls), text_color=color.yellow, text_size=size.small)
+
+    // Heavy Ops
+    table.cell(tbl_dbg, 0, 2, "Ops Trend (Peak)", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 2, str.tostring(ops_trend) + " (" + str.tostring(peak_ops_trend) + ")", text_color=ops_trend > 0 ? color.orange : color.green, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 3, "Ops PCH", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 3, str.tostring(ops_pch), text_color=ops_pch > 500 ? color.red : color.green, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 4, "Ops VP (Peak)", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 4, str.tostring(ops_vp_scan + ops_vp_draw) + " (" + str.tostring(peak_ops_vp) + ")", text_color=(ops_vp_scan + ops_vp_draw) > 1000 ? color.red : color.green, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 5, "Ops DIV", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 5, str.tostring(ops_div), text_color=ops_div > 0 ? color.orange : color.green, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 6, "Ops BB", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 6, str.tostring(ops_bb), text_color=ops_bb > 0 ? color.orange : color.green, text_size=size.small)
+
+    // Flags Status
+    table.cell(tbl_dbg, 0, 8, "ON_PS", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 8, str.tostring(ON_PS), text_color=ON_PS ? color.green : color.red, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 9, "ON_MTF_OV", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 9, str.tostring(ON_MTF_OV), text_color=ON_MTF_OV ? color.green : color.red, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 10, "ON_FVG1", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 10, str.tostring(ON_FVG1), text_color=ON_FVG1 ? color.green : color.red, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 11, "ON_SESS_1ST", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 11, str.tostring(ON_SESS_1ST), text_color=ON_SESS_1ST ? color.green : color.red, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 12, "ON_PCH", text_color=color.white, text_size=size.small)
+    table.cell(tbl_dbg, 1, 12, str.tostring(ON_PCH), text_color=ON_PCH ? color.green : color.red, text_size=size.small)
+else
+    if not na(tbl_dbg)
+        table.delete(tbl_dbg)
+        tbl_dbg := na
+        
+
+//--------------------------------------------------------- STAGE 6: CONFLUENCE METER ---------------------------------------------------------
+
+// Calculations
+// Changed to Series (removed var) to allow historical background plotting
+float conf_score = 50.0
+string conf_bias = "Neutral"
+
+eff_calc_conf = eff_show_conf_meter or show_conf_bg
+
+if eff_calc_conf
+    float bull_pts = 0.0
+    float bear_pts = 0.0
+    float total_w  = 0.0
+
+    // 1. Trendlines (W_TL = 3)
+    if eff_plot_trendline
+        total_w += W_TL
+        if sig_tl_bull
+            bull_pts += W_TL
+        else if sig_tl_bear
+            bear_pts += W_TL
+
+    // 2. Segments (W_SEG = 2)
+    if eff_plot_segments
+        total_w += W_SEG
+        if sig_seg_bull
+            bull_pts += W_SEG
+        else if sig_seg_bear
+            bear_pts += W_SEG
+
+    // 3. MA / EMA Cross (W_MA = 2)
+    // Cloud
+    if eff_en_cloud
+        total_w += W_MA
+        if sig_ema_bull
+            bull_pts += W_MA
+        else if sig_ema_bear
+            bear_pts += W_MA
+
+    // MA1/MA2
+    if eff_ma1_type != "None" and eff_ma2_type != "None"
+        total_w += W_MA
+        if ma1_val > ma2_val
+            bull_pts += W_MA
         else
-            state_age := 0
+            bear_pts += W_MA
 
-        // State Transitions
-        // Entry
-        if bias_state == 0
-            if bull_cnt >= confirm_bars
-                bias_state := 1
-                state_age := 1
-                exit_cnt := 0
-            else if bear_cnt >= confirm_bars
-                bias_state := -1
-                state_age := 1
-                exit_cnt := 0
+    // MA Slope Logic (W_SLOPE = 1)
+    bool active_slope_1 = eff_ma1_type != "None" and ma1_slope_c
+    bool active_slope_2 = eff_ma2_type != "None" and ma2_slope_c
 
-        // Exit (Must hold 3 bars and confirm exit 2 bars)
-        if bias_state != 0 and state_age >= 3 and exit_cnt >= 2
-            bias_state := 0
-            state_age := 0
-            exit_cnt := 0
+    bool is_bull_1 = ma1_val >= ma1_val[1]
+    bool is_bull_2 = ma2_val >= ma2_val[1]
 
-// -----------------------------------------------------------------------------
-// 8. VISUALIZATION
-// -----------------------------------------------------------------------------
-// 8.1 Background Blocks
-intensity = f_clamp(TS_latched / 100.0, 0, 1)
-alpha_val = 90 - math.round(60 * intensity) // Stronger trend = less transparent
+    if active_slope_1 and active_slope_2
+        // Both active: Must agree to count
+        if is_bull_1 == is_bull_2
+            total_w += W_SLOPE
+            if is_bull_1
+                bull_pts += W_SLOPE
+            else
+                bear_pts += W_SLOPE
+    else if active_slope_1
+        total_w += W_SLOPE
+        if is_bull_1
+            bull_pts += W_SLOPE
+        else
+            bear_pts += W_SLOPE
+    else if active_slope_2
+        total_w += W_SLOPE
+        if is_bull_2
+            bull_pts += W_SLOPE
+        else
+            bear_pts += W_SLOPE
 
-bg_col = color.new(color.gray, 100)
-if show_bg
-    if bias_state == 1
-        bg_col := color.new(color.green, alpha_val)
-    else if bias_state == -1
-        bg_col := color.new(color.red, alpha_val)
+    // 4. Divergence (W_DIV = 2)
+    if eff_plot_div
+        total_w += W_DIV
+        if sig_div_bull
+            bull_pts += W_DIV
+        else if sig_div_bear
+            bear_pts += W_DIV
 
-bgcolor(bg_col, title="Regime Background")
+    // 5. Pattern (W_PAT = 2)
+    if eff_plot_l12_bar // L12 uses W_L12 actually, Plan said "L12: 1", "Pattern: 2". Pattern is likely F-Bar.
+        total_w += W_L12
+        if sig_l12_bull
+            bull_pts += W_L12
+        else if sig_l12_bear
+            bear_pts += W_L12
 
-// 8.2 Info Panel
-// Table logic
-var table panel = table.new(position.bottom_right, 2, 2, bgcolor=color.new(color.black, 50), border_color=color.gray, border_width=1)
+    if eff_plot_f_bar // Fakey/Pin
+        total_w += W_PAT
+        if sig_pat_bull
+            bull_pts += W_PAT
+        else if sig_pat_bear
+            bear_pts += W_PAT
 
-if show_panel and barstate.islast
-    // Row 1: CONF
-    table.cell(panel, 0, 0, "CONF", text_color=color.white, text_size=size.small)
-    conf_col = conf_latched > 55 ? color.green : conf_latched < 45 ? color.red : color.gray
-    table.cell(panel, 1, 0, str.tostring(math.round(conf_latched)), text_color=conf_col, text_size=size.small)
+    // 6. FVG (W_FVG = 1)
+    if eff_plot_fvg1 or eff_plot_fvg2
+        total_w += W_FVG
+        if sig_fvg_bull
+            bull_pts += W_FVG
+        else if sig_fvg_bear
+            bear_pts += W_FVG
 
-    // Row 2: REG
-    table.cell(panel, 0, 1, "REG", text_color=color.white, text_size=size.small)
-    reg_col = reg_latched == "TREND" ? color.orange : color.silver
-    table.cell(panel, 1, 1, reg_latched, text_color=reg_col, text_size=size.small)
+    // 7. Vol Spike (W_VOL = 1)
+    if eff_show_vol
+        if sig_vol_spike
+            total_w += W_VOL
+            if close > open
+                bull_pts += W_VOL
+            else
+                bear_pts += W_VOL
 
-// Debug Plots (Hidden by default, useful for dev)
-plot(debug ? TS_latched : na, "Trend Strength", color=color.yellow, display=display.none)
-plot(debug ? bias_signed : na, "Bias Signed", color=color.blue, display=display.none)
-plot(debug ? conf_latched : na, "CONF Score", color=color.purple, display=display.none)
-plot(debug ? regF : na, "Regime Factor", color=color.white, display=display.none)
-plot(debug ? conf_raw : na, "CONF Raw", color=color.orange, display=display.none)
+    // 8. Fractal Break (W_FR = 3)
+    if eff_fractals_plot
+        total_w += W_FR
+        if fr_state_inf == 1
+            bull_pts += W_FR
+        else if fr_state_inf == -1
+            bear_pts += W_FR
 
-// -----------------------------------------------------------------------------
-// 9. ALERTS
-// -----------------------------------------------------------------------------
-// Alerts use latched values to ensure they fire only on confirmed logic in Closed Bar mode
-bull_entry = ta.crossover(conf_latched, 70) and reg_latched == "TREND"
-bear_entry = ta.crossunder(conf_latched, 30) and reg_latched == "TREND"
+    // 9. Bollinger Band Touch (W_BB = 1)
+    if eff_BB_plot
+        // Re-calculate touch logic here or reuse variables if scope allows.
+        // Variables 'approach_up' and 'approach_dn' are local to the BB block above.
+        // We need to re-evaluate or check global scope.
+        // Since 'approach_up' was defined in local scope of 'if eff_BB_plot' block above (lines 1730-1755 approx),
+        // we cannot access it here directly if it wasn't declared global.
+        // Checking code... 'approach_up' and 'approach_dn' were initialized to false at line 1736 in global scope.
+        // So we can use them.
 
-reg_to_trend = reg_latched == "TREND" and reg_latched[1] != "TREND"
-reg_to_range = reg_latched == "RANGE" and reg_latched[1] != "RANGE"
+        // approach_dn (Low < Lower) -> Long Signal (Bullish)
+        if approach_dn
+            total_w += W_BB
+            bull_pts += W_BB
 
-alertcondition(bull_entry, "Bull Entry Zone", "CONF entered Bull Zone (70+) with Trend")
-alertcondition(bear_entry, "Bear Entry Zone", "CONF entered Bear Zone (30-) with Trend")
-alertcondition(reg_to_trend, "REG Trend", "Regime changed to TREND")
-alertcondition(reg_to_range, "REG Range", "Regime changed to RANGE")
+        // approach_up (High > Upper) -> Short Signal (Bearish)
+        if approach_up
+            total_w += W_BB
+            bear_pts += W_BB
 
-// End of Script
+    // Calc Score 0-100
+    if total_w > 0
+        float net_pts = bull_pts - bear_pts
+        conf_score := 50 + (net_pts / total_w) * 50
+    else
+        conf_score := 50.0
+
+    conf_bias := conf_score > 55 ? "Bull" : conf_score < 45 ? "Bear" : "Neutral"
+
+    // Visualization (Table) - Restricted to Last Bar and Panel Toggle
+    if barstate.islast and eff_show_conf_meter and not na(info_panel)
+        color c_conf = conf_score > 55 ? color.green : conf_score < 45 ? color.red : color.new(color.gray, 100) // Transparent Neutral
+        table.cell(info_panel, 0, 10, "CONF", text_size=size.small, text_color=color.silver)
+        table.cell(info_panel, 1, 10, str.tostring(math.round(conf_score)), text_size=size.small, text_color=color.white, bgcolor=color.new(c_conf, 30))
+        table.merge_cells(info_panel, 1, 10, 2, 10)
+
+
+// --- Stage 7: Regime ---
+// Trend / Range / Squeeze
+
+var string regime_state = "Range"
+var color regime_bg = na
+
+// Calculate Regime regardless of display for history
+// Calc BBW
+[bb_m, bb_u, bb_l] = ta.bb(close, 20, 2.0)
+bbw = (bb_u - bb_l) / bb_m
+// Squeeze
+avg_bbw = ta.sma(bbw, 50)
+is_squeeze = bbw < (avg_bbw * 0.7)
+
+// Calc ADX
+[_, _, adx_r] = ta.dmi(14, 14)
+is_trend = adx_r > 25
+
+// Logic
+if is_squeeze
+    regime_state := "SQUEEZE"
+    regime_bg := color.new(color.yellow, 90)
+else if is_trend
+    regime_state := "TREND"
+    regime_bg := color.new(color.blue, 92)
+else
+    regime_state := "RANGE"
+    regime_bg := na
+
+// Update Panel
+// Safe Write Helper not strictly needed if we check indices, but here we just check if active.
+if eff_regime_panel and not na(info_panel) and barstate.islast
+    // Use fixed index 11 (Safe now as Rows = 14)
+    color c_reg_bg = regime_state == "SQUEEZE" ? color.new(color.yellow, 30) : regime_state == "TREND" ? color.new(color.blue, 30) : color.new(color.gray, 100)
+    table.cell(info_panel, 0, 11, "REG", text_size=size.small, text_color=color.silver)
+    table.cell(info_panel, 1, 11, regime_state, text_size=size.small, text_color=color.white, bgcolor=c_reg_bg)
+    table.merge_cells(info_panel, 1, 11, 2, 11)
+
+// --- CENTRALIZED BACKGROUND ROUTING (Fix Bug #2) ---
+color bg_final = na
+
+// Logic to filter regime_bg based on mode
+color regime_bg_filtered = na
+if eff_regime_bg_mode == "Squeeze BG" and regime_state == "SQUEEZE"
+    regime_bg_filtered := regime_bg
+else if eff_regime_bg_mode == "Trend BG" and regime_state == "TREND"
+    regime_bg_filtered := regime_bg
+else if eff_regime_bg_mode == "Both"
+    regime_bg_filtered := regime_bg
+
+// Logic for Confluence BG (New)
+color conf_bg_color = na
+if show_conf_bg
+    if conf_score > 55
+        conf_bg_color := color.new(color.green, transp_bg)
+    else if conf_score < 45
+        conf_bg_color := color.new(color.red, transp_bg)
+    else
+        conf_bg_color := color.new(color.gray, 100) // Transparent Neutral
+
+// Priority 1: Session (Highest)
+if eff_sess_bg_enable and not na(bg_sess_color)
+    bg_final := bg_sess_color
+// Priority 2: Confluence BG (New)
+else if show_conf_bg
+    bg_final := conf_bg_color
+// Priority 3: Regime
+else if not na(regime_bg_filtered)
+    bg_final := regime_bg_filtered
+
+// Single Output
+bgcolor(bg_final, title="MCCS Master Background")
+
+
+// --- Stage 5: Alerts (Centralized) ---
+// alert_profile: Minimal, Normal, Moderate
+// Events based on registry
+
+// 1. Prepare Conditions
+bool al_tl_break = (sig_tl_bull and not sig_tl_bull[1]) or (sig_tl_bear and not sig_tl_bear[1])
+bool al_div      = (sig_div_bull and not sig_div_bull[1]) or (sig_div_bear and not sig_div_bear[1])
+bool al_conf_cross = ta.crossover(conf_score, 75) or ta.crossunder(conf_score, 25) // Tighter Thresholds for Alerts
+bool al_regime_chg = regime_state != regime_state[1]
+
+// 2. Cooldown Logic
+var int last_alert_time_tl = 0
+var int last_alert_time_div = 0
+var int last_alert_time_reg = 0
+var int last_alert_time_conf = 0
+
+// 3. Execution
+if alert_profile != "Off"
+    // TL Break (Minimal+)
+    if (alert_profile == "Minimal" or alert_profile == "Normal" or alert_profile == "Moderate")
+        if al_tl_break and (bar_index - last_alert_time_tl > alert_cooldown)
+            alert("MCCS: Trendline Breakout Detected", alert.freq_once_per_bar_close)
+            last_alert_time_tl := bar_index
+
+    // Normal + Moderate
+    if (alert_profile == "Normal" or alert_profile == "Moderate")
+        if al_div and (bar_index - last_alert_time_div > alert_cooldown)
+            alert("MCCS: Divergence Detected", alert.freq_once_per_bar_close)
+            last_alert_time_div := bar_index
+
+    // Moderate Only
+    if alert_profile == "Moderate"
+        if al_regime_chg and (bar_index - last_alert_time_reg > alert_cooldown)
+            alert("MCCS: Regime Change to " + regime_state, alert.freq_once_per_bar_close)
+            last_alert_time_reg := bar_index
+
+        if al_conf_cross and (bar_index - last_alert_time_conf > alert_cooldown)
+            alert("MCCS: High Confluence Event (Score: " + str.tostring(conf_score) + ")", alert.freq_once_per_bar_close)
+            last_alert_time_conf := bar_index
+
+// Alert Conditions (For TradingView Setup)
+// Consolidated for easy selection
+alertcondition(al_tl_break, "Trendline Breakout", "Fractal Trendline Breakout")
+alertcondition(al_div, "Divergence", "Divergence Detected")
+alertcondition(al_regime_chg, "Regime Change", "Market Regime Changed")
+alertcondition(al_conf_cross, "Confluence Extreme", "Confluence Score Extreme (75/25)")
