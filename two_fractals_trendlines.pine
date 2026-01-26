@@ -12,6 +12,7 @@ int PANEL_COLS = 3
 // Confluence Weights
 int W_FR    = 4
 int W_FVG   = 4
+int W_CLOUD = 2
 int W_SLOPE = 1
 int W_TL    = 1
 int W_SEG   = 1
@@ -2590,14 +2591,14 @@ if eff_calc_conf
         else if sig_seg_bear
             bear_pts += W_SEG
 
-    // 3. MA / EMA Cross (W_MA = 2)
+    // 3. MA / EMA Cross (W_MA = 1, W_CLOUD = 1)
     // Cloud
     if eff_en_cloud
-        total_w += W_MA
+        total_w += W_CLOUD
         if sig_ema_bull
-            bull_pts += W_MA
+            bull_pts += W_CLOUD
         else if sig_ema_bear
-            bear_pts += W_MA
+            bear_pts += W_CLOUD
 
     // MA1/MA2
     if eff_ma1_type != "None" and eff_ma2_type != "None"
