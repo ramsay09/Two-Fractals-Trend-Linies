@@ -36,6 +36,7 @@ show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tool
                       \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n• Independent Controls: Toggle Panel and Background separately.")
 regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
 
+
 // fractals input
 fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, tooltip='')
 sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, tooltip='Bill Williams Fractals (five Candles): white triangle. Works as support and resistance level. 
@@ -366,6 +367,9 @@ eff_show_conf_meter = show_conf_meter
 eff_regime_panel    = show_regime_panel
 eff_regime_bg_mode  = regime_bg_mode
 
+// Global Engine Flag (Run if ANY confluence or regime feature is enabled)
+bool run_engine = eff_show_conf_meter or show_conf_bg or eff_regime_panel or eff_regime_bg_mode != "None"
+
 //----------------- Global Signal Registry (For Alerts & Confluence) -----------------
 // These variables are reset to false/na on every bar execution
 // We populate them inside the respective feature blocks
@@ -662,7 +666,7 @@ else
 //---------------------------------------------------- macd and rsi divergences (Visuals for Chart) -------------------------------------------------------------
 
 // Stage 3: Divergences Hard-Gating
-ON_DIV = eff_plot_div
+ON_DIV = eff_plot_div or run_engine
 
 float rsi_d = na
 float macdLine = na
@@ -709,12 +713,20 @@ if ON_DIV
 
 plot_bear_combined = ON_DIV and (c_div_bear or h_div_bear)
 plot_bull_combined = ON_DIV and (c_div_bull or h_div_bull)
+
+// Independent Calculation for CONF Engine (even if plot is off)
+// Note: c_div_* and h_div_* are computed above inside ON_DIV block.
+// If ON_DIV is false (user disabled plot), these are false/na.
+// To make CONF independent, we need to run DIV logic if run_engine is true.
+// However, the calculation above is gated by ON_DIV.
+// FIX: We must update the gate above.
+
 if ON_DIV
     sig_div_bull := c_div_bull or h_div_bull
     sig_div_bear := c_div_bear or h_div_bear
 
-plotshape(plot_bear_combined, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,  textcolor=color.new(color.red, 0),  color=color.new(color.red, 0), title='Bear divergence') 
-plotshape(plot_bull_combined, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,  textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Bull divergence')
+plotshape(eff_plot_div and plot_bear_combined, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,  textcolor=color.new(color.red, 0),  color=color.new(color.red, 0), title='Bear divergence')
+plotshape(eff_plot_div and plot_bull_combined, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,  textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Bull divergence')
 
 
 
@@ -1700,7 +1712,10 @@ float lower_3 = na
 bool approach_up = false
 bool approach_dn = false
 
-if eff_BB_plot
+// Independent Calculation for CONF Engine if enabled
+bool calc_bb_for_conf = run_engine or eff_BB_plot
+
+if calc_bb_for_conf
     ops_bb += 1 // Count Ops
 
     //bb1
@@ -2560,203 +2575,200 @@ else
         tbl_dbg := na
         
 
-//--------------------------------------------------------- STAGE 6: CONFLUENCE METER ---------------------------------------------------------
+//--------------------------------------------------------- CONF PRO BIAS ENGINE v2 ---------------------------------------------------------
 
 // Calculations
 // Changed to Series (removed var) to allow historical background plotting
 float conf_score = 50.0
 string conf_bias = "Neutral"
-
-eff_calc_conf = eff_show_conf_meter or show_conf_bg
-
-if eff_calc_conf
-    float bull_pts = 0.0
-    float bear_pts = 0.0
-    float total_w  = 0.0
-
-    // 1. Trendlines (W_TL = 3)
-    if eff_plot_trendline
-        total_w += W_TL
-        if sig_tl_bull
-            bull_pts += W_TL
-        else if sig_tl_bear
-            bear_pts += W_TL
-
-    // 2. Segments (W_SEG = 2)
-    if eff_plot_segments
-        total_w += W_SEG
-        if sig_seg_bull
-            bull_pts += W_SEG
-        else if sig_seg_bear
-            bear_pts += W_SEG
-
-    // 3. MA / EMA Cross (W_MA = 2)
-    // Cloud
-    if eff_en_cloud
-        total_w += W_MA
-        if sig_ema_bull
-            bull_pts += W_MA
-        else if sig_ema_bear
-            bear_pts += W_MA
-
-    // MA1/MA2
-    if eff_ma1_type != "None" and eff_ma2_type != "None"
-        total_w += W_MA
-        if ma1_val > ma2_val
-            bull_pts += W_MA
-        else
-            bear_pts += W_MA
-
-    // MA Slope Logic (W_SLOPE = 1)
-    bool active_slope_1 = eff_ma1_type != "None" and ma1_slope_c
-    bool active_slope_2 = eff_ma2_type != "None" and ma2_slope_c
-
-    bool is_bull_1 = ma1_val >= ma1_val[1]
-    bool is_bull_2 = ma2_val >= ma2_val[1]
-
-    if active_slope_1 and active_slope_2
-        // Both active: Must agree to count
-        if is_bull_1 == is_bull_2
-            total_w += W_SLOPE
-            if is_bull_1
-                bull_pts += W_SLOPE
-            else
-                bear_pts += W_SLOPE
-    else if active_slope_1
-        total_w += W_SLOPE
-        if is_bull_1
-            bull_pts += W_SLOPE
-        else
-            bear_pts += W_SLOPE
-    else if active_slope_2
-        total_w += W_SLOPE
-        if is_bull_2
-            bull_pts += W_SLOPE
-        else
-            bear_pts += W_SLOPE
-
-    // 4. Divergence (W_DIV = 2)
-    if eff_plot_div
-        total_w += W_DIV
-        if sig_div_bull
-            bull_pts += W_DIV
-        else if sig_div_bear
-            bear_pts += W_DIV
-
-    // 5. Pattern (W_PAT = 2)
-    if eff_plot_l12_bar // L12 uses W_L12 actually, Plan said "L12: 1", "Pattern: 2". Pattern is likely F-Bar.
-        total_w += W_L12
-        if sig_l12_bull
-            bull_pts += W_L12
-        else if sig_l12_bear
-            bear_pts += W_L12
-
-    if eff_plot_f_bar // Fakey/Pin
-        total_w += W_PAT
-        if sig_pat_bull
-            bull_pts += W_PAT
-        else if sig_pat_bear
-            bear_pts += W_PAT
-
-    // 6. FVG (W_FVG = 1)
-    if eff_plot_fvg1 or eff_plot_fvg2
-        total_w += W_FVG
-        if sig_fvg_bull
-            bull_pts += W_FVG
-        else if sig_fvg_bear
-            bear_pts += W_FVG
-
-    // 7. Vol Spike (W_VOL = 1)
-    if eff_show_vol
-        if sig_vol_spike
-            total_w += W_VOL
-            if close > open
-                bull_pts += W_VOL
-            else
-                bear_pts += W_VOL
-
-    // 8. Fractal Break (W_FR = 3)
-    if eff_fractals_plot
-        total_w += W_FR
-        if fr_state_inf == 1
-            bull_pts += W_FR
-        else if fr_state_inf == -1
-            bear_pts += W_FR
-
-    // 9. Bollinger Band Touch (W_BB = 1)
-    if eff_BB_plot
-        // Re-calculate touch logic here or reuse variables if scope allows.
-        // Variables 'approach_up' and 'approach_dn' are local to the BB block above.
-        // We need to re-evaluate or check global scope.
-        // Since 'approach_up' was defined in local scope of 'if eff_BB_plot' block above (lines 1730-1755 approx),
-        // we cannot access it here directly if it wasn't declared global.
-        // Checking code... 'approach_up' and 'approach_dn' were initialized to false at line 1736 in global scope.
-        // So we can use them.
-
-        // approach_dn (Low < Lower) -> Long Signal (Bullish)
-        if approach_dn
-            total_w += W_BB
-            bull_pts += W_BB
-
-        // approach_up (High > Upper) -> Short Signal (Bearish)
-        if approach_up
-            total_w += W_BB
-            bear_pts += W_BB
-
-    // Calc Score 0-100
-    if total_w > 0
-        float net_pts = bull_pts - bear_pts
-        conf_score := 50 + (net_pts / total_w) * 50
-    else
-        conf_score := 50.0
-
-    conf_bias := conf_score > 55 ? "Bull" : conf_score < 45 ? "Bear" : "Neutral"
-
-    // Visualization (Table) - Restricted to Last Bar and Panel Toggle
-    if barstate.islast and eff_show_conf_meter and not na(info_panel)
-        color c_conf = conf_score > 55 ? color.green : conf_score < 45 ? color.red : color.new(color.gray, 100) // Transparent Neutral
-        table.cell(info_panel, 0, 10, "CONF", text_size=size.small, text_color=color.silver)
-        table.cell(info_panel, 1, 10, str.tostring(math.round(conf_score)), text_size=size.small, text_color=color.white, bgcolor=color.new(c_conf, 30))
-        table.merge_cells(info_panel, 1, 10, 2, 10)
-
-
-// --- Stage 7: Regime ---
-// Trend / Range / Squeeze
+float conf_trendiness = 0.0
 
 var string regime_state = "Range"
 var color regime_bg = na
 
-// Calculate Regime regardless of display for history
-// Calc BBW
-[bb_m, bb_u, bb_l] = ta.bb(close, 20, 2.0)
-bbw = (bb_u - bb_l) / bb_m
-// Squeeze
-avg_bbw = ta.sma(bbw, 50)
-is_squeeze = bbw < (avg_bbw * 0.7)
+// Helpers
+f_clamp(_x, _min, _max) => math.max(_min, math.min(_max, _x))
 
-// Calc ADX
-[_, _, adx_r] = ta.dmi(14, 14)
-is_trend = adx_r > 25
+f_norm_atr(_x, _atr) =>
+    _safe_atr = math.max(_atr, syminfo.mintick)
+    _x / _safe_atr
 
-// Logic
-if is_squeeze
-    regime_state := "SQUEEZE"
-    regime_bg := color.new(color.yellow, 90)
-else if is_trend
-    regime_state := "TREND"
-    regime_bg := color.new(color.blue, 92)
-else
-    regime_state := "RANGE"
-    regime_bg := na
+f_trace_calc(_prev, _impulse, _decay, _cap) =>
+    _raw = _prev * _decay + _impulse
+    f_clamp(_raw, -_cap, _cap)
 
-// Update Panel
-// Safe Write Helper not strictly needed if we check indices, but here we just check if active.
-if eff_regime_panel and not na(info_panel) and barstate.islast
-    // Use fixed index 11 (Safe now as Rows = 14)
-    color c_reg_bg = regime_state == "SQUEEZE" ? color.new(color.yellow, 30) : regime_state == "TREND" ? color.new(color.blue, 30) : color.new(color.gray, 100)
-    table.cell(info_panel, 0, 11, "REG", text_size=size.small, text_color=color.silver)
-    table.cell(info_panel, 1, 11, regime_state, text_size=size.small, text_color=color.white, bgcolor=c_reg_bg)
-    table.merge_cells(info_panel, 1, 11, 2, 11)
+// Variables for Trace Engine
+var float trace_f = 0.0
+var float trace_o = 0.0
+var float trace_bb = 0.0
+var float trace_div = 0.0
+
+// Variables for Alerts
+bool cv2_zone_bull = false
+bool cv2_zone_bear = false
+
+// --- Engine Execution ---
+if run_engine
+    // --- 1. Trendiness Engine ---
+    // Kaufman ER
+    float er_num = math.abs(close - close[20])
+    float er_den = math.sum(math.abs(close - close[1]), 20)
+    float er_val = er_den != 0 ? er_num / er_den : 0.0
+
+    // ADX Trend Strength
+    [dmi_p, dmi_m, adx_raw] = ta.dmi(14, 14)
+    float adx_str = f_clamp((adx_raw - 15) / (30 - 15), 0.0, 1.0)
+
+    // BBW Expansion (Optional Booster)
+    [bb_mid, bb_upp, bb_low] = ta.bb(close, 20, 2.0)
+    float bbw_cur = (bb_upp - bb_low) / bb_mid
+    float bbw_sma = ta.sma(bbw_cur, 50)
+    float bbw_str = f_clamp((bbw_cur - bbw_sma) / math.max(bbw_sma, 0.00001), 0.0, 1.0)
+
+    // Combined Trendiness [0..1]
+    // Weights: ER 0.55, ADX 0.35, BBW 0.10
+    float trendiness = f_clamp(0.55 * er_num / math.max(er_den, 0.00001) + 0.35 * adx_str + 0.10 * bbw_str, 0.0, 1.0)
+    conf_trendiness := trendiness * 100.0
+
+    // --- 2. Independent Bias Engine (State) ---
+    // Internal EMAs (Fixed 50/200)
+    float ema_fast = ta.ema(close, 50)
+    float ema_slow = ta.ema(close, 200)
+    float atr_eng = ta.atr(14)
+
+    // A) Spread Strength
+    float spread_val = (ema_fast - ema_slow)
+    float spread_norm = f_norm_atr(spread_val, atr_eng)
+    // Deadzone: 0.15, Scale: 1.0
+    if math.abs(spread_norm) < 0.15
+        spread_norm := 0.0
+    float bias_spread = f_clamp(spread_norm / 1.0, 0.0, 1.0) * math.sign(spread_norm)
+
+    // B) Slope Strength (Fast EMA)
+    // Length 8
+    float slope_val = ema_fast - ema_fast[8]
+    float slope_norm = f_norm_atr(slope_val, atr_eng) / 8.0
+    // Deadzone: 0.03, Scale: 0.25
+    if math.abs(slope_norm) < 0.03
+        slope_norm := 0.0
+    float bias_slope = f_clamp(slope_norm / 0.25, 0.0, 1.0) * math.sign(slope_norm)
+
+    // C) Fractal State Bias
+    // Fixed strength 0.45
+    float bias_fract = fr_state_inf * 0.45
+
+    // Weighted Bias Raw [-1..1]
+    // Weights: Spread 0.45, Slope 0.25, Fract 0.30
+    float bias_raw = 0.45 * bias_spread + 0.25 * bias_slope + 0.30 * bias_fract
+
+    // Apply Trendiness Gate (Collapse to 0 in range)
+    float bias_signed = bias_raw * trendiness
+
+    // --- 3. Event / Quality Engine (Trace) ---
+    // A) F-Trigger (Fakey)
+    float imp_f = 0.0
+    if f_up
+        imp_f := 1.0
+    else if f_dn
+        imp_f := -1.0
+    // Decay 0.65, Cap 1.0
+    trace_f := f_trace_calc(trace_f, imp_f, 0.65, 1.0)
+
+    // B) O-Trigger (Outside)
+    float imp_o = 0.0
+    if o_bar
+        if close > high[1] // Red
+            imp_o := -1.0
+        else if close < low[1] // Green
+            imp_o := 1.0
+    // Decay 0.65, Cap 1.0
+    trace_o := f_trace_calc(trace_o, imp_o, 0.65, 1.0)
+
+    // C) BB-Trigger
+    float imp_bb = 0.0
+    // Logic: Auto (Continuation if Trend, Reversion if Range)
+    // Use internal ADX logic
+    bool is_trend_bb = adx_raw > 25
+
+    if approach_up
+        imp_bb := is_trend_bb ? 1.0 : -1.0 // Cont: Bull, Rev: Bear
+    if approach_dn
+        imp_bb := is_trend_bb ? -1.0 : 1.0 // Cont: Bear, Rev: Bull
+
+    // Decay 0.75, Cap 2.0
+    trace_bb := f_trace_calc(trace_bb, imp_bb, 0.75, 2.0)
+
+    // D) DIV-Trigger
+    float imp_div = 0.0
+    if sig_div_bull
+        imp_div := 1.0
+    else if sig_div_bear
+        imp_div := -1.0
+    // Decay 0.88, Cap 2.5
+    trace_div := f_trace_calc(trace_div, imp_div, 0.88, 2.5)
+
+    // Compute Trigger Signed [-1..1]
+    // Average of normalized traces
+    float trig_sum = (trace_f/1.0) + (trace_o/1.0) + (trace_bb/2.0) + (trace_div/2.5)
+    float trig_signed = trig_sum / 4.0
+    float trig_mag = math.abs(trig_signed)
+
+    // Quality Filter
+    float quality = 1.0
+    if bias_signed != 0
+        bool aligned = math.sign(trig_signed) == math.sign(bias_signed)
+        bool misaligned = math.sign(trig_signed) != math.sign(bias_signed)
+
+        if aligned
+            quality += 0.12 * trig_mag
+        if misaligned
+            quality -= 0.12 * trig_mag
+
+    quality := f_clamp(quality, 0.85, 1.15)
+
+    // --- 4. Final Score & Smoothing ---
+    float conf_final_signed = f_clamp(bias_signed * quality, -1.0, 1.0)
+    float conf_final_raw = 50 + 50 * conf_final_signed
+    // Smoothing: Fixed EMA 7
+    conf_score := ta.ema(conf_final_raw, 7)
+
+    // Alerts (Zone Entry) with Stability Filter (TrendStrength > 55)
+    cv2_zone_bull := ta.crossover(conf_score, 70) and conf_trendiness > 55
+    cv2_zone_bear := ta.crossunder(conf_score, 30) and conf_trendiness > 55
+
+    // --- Regime Logic (Integrated into Flow) ---
+    // Calc BBW (for Squeeze)
+    [bb_m, bb_u, bb_l] = ta.bb(close, 20, 2.0)
+    bbw = (bb_u - bb_l) / bb_m
+    avg_bbw = ta.sma(bbw, 50)
+    is_squeeze = bbw < (avg_bbw * 0.7)
+
+    // Smart Regime based on TrendStrength (TS)
+    if is_squeeze
+        regime_state := "SQUEEZE"
+        regime_bg := color.new(color.yellow, 90)
+    else if conf_trendiness >= 55
+        regime_state := "TREND"
+        regime_bg := color.new(color.blue, 92)
+    else if conf_trendiness <= 45
+        regime_state := "RANGE"
+        regime_bg := na
+    else
+        regime_state := "MIXED"
+        regime_bg := na
+
+// Visualization (Table) - Runs if CONF UI enabled
+if barstate.islast and eff_show_conf_meter and not na(info_panel)
+    color c_conf = conf_score > 60 ? color.green : conf_score < 40 ? color.red : color.new(color.gray, 100)
+    // Combine text for compact display
+    string txt_conf = "C: " + str.tostring(math.round(conf_score)) + " | TS: " + str.tostring(math.round(conf_trendiness)) + " | " + regime_state
+
+    table.cell(info_panel, 0, 10, "CONF", text_size=size.small, text_color=color.silver)
+    table.cell(info_panel, 1, 10, txt_conf, text_size=size.small, text_color=color.white, bgcolor=color.new(c_conf, 30))
+    table.merge_cells(info_panel, 1, 10, 2, 10)
+
+// Update Panel (Regime row removed as it's merged into CONF row)
+// We keep the logic clean.
 
 // --- CENTRALIZED BACKGROUND ROUTING (Fix Bug #2) ---
 color bg_final = na
@@ -2771,14 +2783,66 @@ else if eff_regime_bg_mode == "Both"
     regime_bg_filtered := regime_bg
 
 // Logic for Confluence BG (New)
+// Sticky Hysteresis State Machine (Bull 60/55, Bear 40/45) with Confirmation Bars
+var int conf_bg_state = 0 // 0=Neutral, 1=Bull, -1=Bear
+var int conf_confirm_cnt = 0
+int CONFIRM_BARS = timeframe.isintraday ? 2 : 3
+
+// Logic
+if conf_bg_state == 0
+    if conf_score > 60
+        conf_confirm_cnt += 1
+        if conf_confirm_cnt >= CONFIRM_BARS
+            conf_bg_state := 1
+            conf_confirm_cnt := 0
+    else if conf_score < 40
+        conf_confirm_cnt += 1
+        if conf_confirm_cnt >= CONFIRM_BARS
+            conf_bg_state := -1
+            conf_confirm_cnt := 0
+    else
+        conf_confirm_cnt := 0
+
+else if conf_bg_state == 1
+    if conf_score < 55
+        conf_confirm_cnt += 1
+        if conf_confirm_cnt >= CONFIRM_BARS
+            conf_bg_state := 0
+            conf_confirm_cnt := 0
+    else
+        conf_confirm_cnt := 0
+
+else if conf_bg_state == -1
+    if conf_score > 45
+        conf_confirm_cnt += 1
+        if conf_confirm_cnt >= CONFIRM_BARS
+            conf_bg_state := 0
+            conf_confirm_cnt := 0
+    else
+        conf_confirm_cnt := 0
+
+// Set Global Bias String based on State
+conf_bias := conf_bg_state == 1 ? "Bull" : conf_bg_state == -1 ? "Bear" : "Neutral"
+
 color conf_bg_color = na
 if show_conf_bg
-    if conf_score > 55
+    if conf_bg_state == 1
         conf_bg_color := color.new(color.green, transp_bg)
-    else if conf_score < 45
+    else if conf_bg_state == -1
         conf_bg_color := color.new(color.red, transp_bg)
     else
         conf_bg_color := color.new(color.gray, 100) // Transparent Neutral
+
+// Debug Panel Update (Simplified)
+if debug_on and barstate.islast
+    if na(tbl_dbg)
+        tbl_dbg := table.new(position.bottom_right, 2, 20, bgcolor=color.new(color.black, 50), frame_width=1, frame_color=color.gray)
+
+    table.cell(tbl_dbg, 0, 13, "CONF Score", text_color=color.silver, text_size=size.small)
+    table.cell(tbl_dbg, 1, 13, str.tostring(conf_score, "#.1"), text_color=color.white, text_size=size.small)
+
+    table.cell(tbl_dbg, 0, 14, "TrendStrength", text_color=color.silver, text_size=size.small)
+    table.cell(tbl_dbg, 1, 14, str.tostring(conf_trendiness, "#.1"), text_color=color.yellow, text_size=size.small)
 
 // Priority 1: Session (Highest)
 if eff_sess_bg_enable and not na(bg_sess_color)
@@ -2809,6 +2873,7 @@ var int last_alert_time_tl = 0
 var int last_alert_time_div = 0
 var int last_alert_time_reg = 0
 var int last_alert_time_conf = 0
+var int last_alert_time_cv2_zone = 0
 
 // 3. Execution
 if alert_profile != "Off"
@@ -2834,9 +2899,18 @@ if alert_profile != "Off"
             alert("MCCS: High Confluence Event (Score: " + str.tostring(conf_score) + ")", alert.freq_once_per_bar_close)
             last_alert_time_conf := bar_index
 
+    // CONF Alerts (Zone Entry)
+    if (cv2_zone_bull or cv2_zone_bear) and (bar_index - last_alert_time_cv2_zone > alert_cooldown)
+        string dir = cv2_zone_bull ? "Bull" : "Bear"
+        alert("MCCS CONF: Strong " + dir + " Zone Entry (Score: " + str.tostring(conf_score, "#.0") + ")", alert.freq_once_per_bar_close)
+        last_alert_time_cv2_zone := bar_index
+
 // Alert Conditions (For TradingView Setup)
 // Consolidated for easy selection
 alertcondition(al_tl_break, "Trendline Breakout", "Fractal Trendline Breakout")
 alertcondition(al_div, "Divergence", "Divergence Detected")
 alertcondition(al_regime_chg, "Regime Change", "Market Regime Changed")
 alertcondition(al_conf_cross, "Confluence Extreme", "Confluence Score Extreme (75/25)")
+
+alertcondition(cv2_zone_bull, "CONF Strong Bull", "CONF Strong Bull Zone Entry")
+alertcondition(cv2_zone_bear, "CONF Strong Bear", "CONF Strong Bear Zone Entry")
