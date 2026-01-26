@@ -17,6 +17,16 @@ debug       = input.bool(false, "Debug Info", group=grp_ui)
 f_clamp(x, lo, hi) => math.max(lo, math.min(x, hi))
 f_safe_div(a, b)   => b != 0 ? a / b : 0
 f_sign0(x)         => x > 0 ? 1 : x < 0 ? -1 : 0
+f_softsat(x, k) =>
+    if k <= 0
+        0.0
+    else
+        float u = x / k
+        if u > 10
+            1.0
+        else
+            float e2u = math.exp(2 * u)
+            (e2u - 1) / (e2u + 1)
 
 // Update Gating
 // "Closed Bar": updates strictly on confirmed bar.
@@ -68,6 +78,18 @@ pl = ta.pivotlow(piv_l_len, piv_r_len)
 // 3.7 RSI (for Divergence)
 rsi_val = ta.rsi(close, 14)
 
+// 3.8 Pre-Calc Bias Components (Global for Scaling)
+// Spread
+spread_norm_raw = (ema_fast - ema_slow) / atr_safe
+spread_abs_raw  = math.abs(spread_norm_raw)
+spread_k        = ta.ema(spread_abs_raw, 100) // Auto-scaling factor
+
+// Slope
+slope_len_bi    = 8
+slope_norm_raw  = (ema_fast - ema_fast[slope_len_bi]) / (atr_safe * slope_len_bi)
+slope_abs_raw   = math.abs(slope_norm_raw)
+slope_k         = ta.ema(slope_abs_raw, 100) // Auto-scaling factor
+
 // -----------------------------------------------------------------------------
 // 4. REGIME / Trendiness Engine
 // -----------------------------------------------------------------------------
@@ -78,8 +100,9 @@ trend_bbw = f_clamp(f_safe_div(bbw_raw - bbw_sma, bbw_sma), 0, 1) // Expansion r
 
 // Combine
 trendiness_raw = 0.55 * trend_er + 0.35 * trend_adx + 0.10 * trend_bbw
-trendiness     = f_clamp(trendiness_raw, 0, 1)
-TS             = math.round(100 * trendiness)
+trendiness_s   = ta.ema(f_clamp(trendiness_raw, 0, 1), 8) // Smoothed per spec
+trendiness     = trendiness_s // Use smoothed globally
+TS             = math.round(100 * trendiness_s)
 
 // State Machine (Hysteresis / Ternary)
 var string reg_state = "RANGE" // Init
@@ -98,60 +121,49 @@ if update_allowed
 atrp = f_safe_div(atr_safe, close)
 volF = f_clamp((atrp - 0.002) / (0.01 - 0.002), 0, 1)
 
+// Deadzones (Keep existing logic but remove hard scales)
 dz_spread = 0.15 + 0.08 * (1 - trendiness) + 0.05 * volF
-spread_scale = 1.00 * (1 + 0.2 * volF)
-
 dz_slope  = 0.03 + 0.02 * (1 - trendiness) + 0.01 * volF
-slope_scale = 0.25 * (1 + 0.2 * volF)
 
-// 5.2 Spread Strength
-spread_norm     = (ema_fast - ema_slow) / atr_safe
-spread_abs      = math.abs(spread_norm)
-spread_strength = spread_abs < dz_spread ? 0 : f_clamp(spread_abs / spread_scale, 0, 1)
-spread_signed   = f_sign0(spread_norm) * spread_strength
+// 5.2 Spread Strength (Soft Saturation)
+spread_strength = spread_abs_raw < dz_spread ? 0 : f_softsat(spread_abs_raw - dz_spread, spread_k)
+spread_signed   = f_sign0(spread_norm_raw) * spread_strength
 
-// 5.3 Slope Strength
-slope_len_bi = 8
-slope_norm   = (ema_fast - ema_fast[slope_len_bi]) / (atr_safe * slope_len_bi)
-slope_abs    = math.abs(slope_norm)
-slope_strength = slope_abs < dz_slope ? 0 : f_clamp(slope_abs / slope_scale, 0, 1)
-slope_signed   = f_sign0(slope_norm) * slope_strength
+// 5.3 Slope Strength (Soft Saturation)
+slope_strength = slope_abs_raw < dz_slope ? 0 : f_softsat(slope_abs_raw - dz_slope, slope_k)
+slope_signed   = f_sign0(slope_norm_raw) * slope_strength
 
-// 5.4 Structure State (Latched)
+// 5.4 Structure State (Float Memory + Decay)
 var float last_swing_high = na
 var float last_swing_low  = na
-var int   structure_state = 0
+var float structure_mem   = 0.0
 
-// Pivot updates happen at lag [2], but we need to track them.
-// Since 'ph' and 'pl' are results of 'ta.pivothigh/low', they appear on the bar AFTER the right bars.
-// They are non-na at index 0 when the pivot is confirmed (which is effectively bar[2]).
-// However, strictly speaking, ph is `NaN` except on the bar it confirms.
-// So we update our levels when ph/pl are valid.
-// IMPORTANT: ta.pivothigh returns value at the pivot point, but it's only returned 'piv_r_len' bars later?
-// Actually, ta.pivothigh returns NaN unless the CURRENT bar completes the pattern.
-// If it completes, it returns the High of the pivot bar (which is at [piv_r_len]).
 if not na(ph)
     last_swing_high := ph
 if not na(pl)
     last_swing_low := pl
 
-// Latch Logic (Dow Theory)
 if update_allowed
-    if not na(last_swing_high) and close > last_swing_high
-        structure_state := 1
-    else if not na(last_swing_low) and close < last_swing_low
-        structure_state := -1
-    // else keep state
+    // Breakout with ATR Buffer
+    if not na(last_swing_high) and close > (last_swing_high + 0.15 * atr_safe)
+        structure_mem := 1.0
+    else if not na(last_swing_low) and close < (last_swing_low - 0.15 * atr_safe)
+        structure_mem := -1.0
 
-structure_strength_factor = 0.45
-structure_signed = structure_state * structure_strength_factor
+    // Decay in Non-Trend Regimes (Range/Mixed)
+    if reg_state != "TREND"
+        structure_mem := structure_mem * 0.90
+
+structure_signed = structure_mem * 0.45 // Weight
 
 // 5.5 Bias Combine
 // Weights: Spread 0.45, Slope 0.25, Structure 0.30
 bias_signed_raw = (spread_signed * 0.45) + (slope_signed * 0.25) + (structure_signed * 0.30)
 
-// Trendiness Gate
-bias_signed = bias_signed_raw * trendiness
+// Regime Factor (Pro Bias)
+// TREND -> 1.0, MIXED -> 0.55, RANGE -> 0.15
+regF = reg_state == "TREND" ? 1.0 : reg_state == "MIXED" ? 0.55 : 0.15
+bias_signed = bias_signed_raw * regF
 
 // -----------------------------------------------------------------------------
 // 6. EVENT / QUALITY ENGINE
@@ -301,8 +313,8 @@ trigger_signed = (tr_f/cap_f * 0.25) + (tr_o/cap_o * 0.25) + (tr_bb/cap_bb * 0.2
 
 trigger_mag = math.abs(trigger_signed)
 
-aligned = f_sign0(trigger_signed) == f_sign0(bias_signed_raw)
-misaligned = f_sign0(trigger_signed) != f_sign0(bias_signed_raw)
+aligned = f_sign0(trigger_signed) == f_sign0(bias_signed)
+misaligned = f_sign0(trigger_signed) != f_sign0(bias_signed)
 
 quality_boost = 0.10 + 0.05 * trendiness
 quality = 1.0
@@ -321,57 +333,102 @@ conf_signed = f_clamp(bias_signed * quality, -1, 1)
 
 // Map to 0..100
 conf_raw = 50 + 50 * conf_signed
+
+// Guarantee 1: Range Drift to 50
+if reg_state == "RANGE"
+    conf_raw := 50 + (conf_raw - 50) * 0.35
+
 conf_score_smooth = ta.ema(conf_raw, 7) // EMA 7 per spec
 
+// Output Latch (Fix for Closed Bar Repainting)
+var float conf_latched = na
+var string reg_latched = "RANGE"
+var int   TS_latched   = 0
+
+if calc_mode == "Realtime (Repainting)" or barstate.isconfirmed
+    conf_latched := conf_score_smooth
+    reg_latched  := reg_state
+    TS_latched   := TS
+else
+    conf_latched := nz(conf_latched[1], conf_score_smooth)
+    reg_latched  := reg_latched[1]
+    TS_latched   := nz(TS_latched[1], TS)
+
 // 7.1 Bias BG State Logic
-widen = math.round(6 * (1 - trendiness))
+// Use TS_latched for stable thresholds in Closed Bar mode
+widen = math.round(6 * (1 - (TS_latched / 100.0)))
 bull_on  = 60 + widen
 bull_off = 55 + widen
 bear_on  = 40 - widen
 bear_off = 45 - widen
 
 base_bars = timeframe.isintraday ? 2 : 3
-confirm_bars = f_clamp(base_bars + (trendiness < 0.35 ? 1 : 0), 1, 4)
+confirm_bars = f_clamp(base_bars + (TS_latched < 35 ? 1 : 0), 1, 4)
 
 var int bias_state = 0
 var int bull_cnt = 0
 var int bear_cnt = 0
+var int exit_cnt = 0
+var int state_age = 0
 
 // Range Kill-Switch
 if update_allowed
-    if TS < 45
+    if reg_latched == "RANGE"
         bias_state := 0
         bull_cnt   := 0
         bear_cnt   := 0
+        exit_cnt   := 0
+        state_age  := 0
     else
-        // Counters
-        if conf_score_smooth > bull_on
+        // Entry Counters
+        if conf_latched > bull_on
             bull_cnt += 1
         else
             bull_cnt := 0
 
-        if conf_score_smooth < bear_on
+        if conf_latched < bear_on
             bear_cnt += 1
         else
             bear_cnt := 0
 
-        // State Transitions
-        if bias_state != 1 and bull_cnt >= confirm_bars
-            bias_state := 1
-        if bias_state != -1 and bear_cnt >= confirm_bars
-            bias_state := -1
+        // Exit Counters (HoldBars + Confirmation)
+        bool cond_exit_bull = bias_state == 1 and conf_latched < bull_off
+        bool cond_exit_bear = bias_state == -1 and conf_latched > bear_off
 
-        // Exits (Hysteresis)
-        if bias_state == 1 and conf_score_smooth < bull_off
+        if cond_exit_bull or cond_exit_bear
+            exit_cnt += 1
+        else
+            exit_cnt := 0
+
+        // State Age
+        if bias_state != 0
+            state_age += 1
+        else
+            state_age := 0
+
+        // State Transitions
+        // Entry
+        if bias_state == 0
+            if bull_cnt >= confirm_bars
+                bias_state := 1
+                state_age := 1
+                exit_cnt := 0
+            else if bear_cnt >= confirm_bars
+                bias_state := -1
+                state_age := 1
+                exit_cnt := 0
+
+        // Exit (Must hold 3 bars and confirm exit 2 bars)
+        if bias_state != 0 and state_age >= 3 and exit_cnt >= 2
             bias_state := 0
-        if bias_state == -1 and conf_score_smooth > bear_off
-            bias_state := 0
+            state_age := 0
+            exit_cnt := 0
 
 // -----------------------------------------------------------------------------
 // 8. VISUALIZATION
 // -----------------------------------------------------------------------------
 // 8.1 Background Blocks
-intensity = f_clamp(TS / 100.0, 0, 1)
+intensity = f_clamp(TS_latched / 100.0, 0, 1)
 alpha_val = 90 - math.round(60 * intensity) // Stronger trend = less transparent
 
 bg_col = color.new(color.gray, 100)
@@ -390,33 +447,28 @@ var table panel = table.new(position.bottom_right, 2, 2, bgcolor=color.new(color
 if show_panel and barstate.islast
     // Row 1: CONF
     table.cell(panel, 0, 0, "CONF", text_color=color.white, text_size=size.small)
-    conf_col = conf_score_smooth > 55 ? color.green : conf_score_smooth < 45 ? color.red : color.gray
-    table.cell(panel, 1, 0, str.tostring(math.round(conf_score_smooth)), text_color=conf_col, text_size=size.small)
+    conf_col = conf_latched > 55 ? color.green : conf_latched < 45 ? color.red : color.gray
+    table.cell(panel, 1, 0, str.tostring(math.round(conf_latched)), text_color=conf_col, text_size=size.small)
 
     // Row 2: REG
     table.cell(panel, 0, 1, "REG", text_color=color.white, text_size=size.small)
-    reg_col = reg_state == "TREND" ? color.orange : color.silver
-    table.cell(panel, 1, 1, reg_state, text_color=reg_col, text_size=size.small)
+    reg_col = reg_latched == "TREND" ? color.orange : color.silver
+    table.cell(panel, 1, 1, reg_latched, text_color=reg_col, text_size=size.small)
 
 // Debug Plots (Hidden by default, useful for dev)
-plot(debug ? TS : na, "Trend Strength", color=color.yellow, display=display.none)
+plot(debug ? TS_latched : na, "Trend Strength", color=color.yellow, display=display.none)
 plot(debug ? bias_signed : na, "Bias Signed", color=color.blue, display=display.none)
-plot(debug ? conf_score_smooth : na, "CONF Score", color=color.purple, display=display.none)
+plot(debug ? conf_latched : na, "CONF Score", color=color.purple, display=display.none)
 
 // -----------------------------------------------------------------------------
 // 9. ALERTS
 // -----------------------------------------------------------------------------
-// Only trigger on closed bar confirmed states if mode is Closed Bar?
-// Spec says: "Alerts nur Closed-Bar sicher (wenn calc_mode Closed Bar)"
-// But usually alerts should fire based on the calculated values.
-// We will use the 'conf_score_smooth' which respects the gating.
-// If calc_mode is Closed Bar, 'conf_score_smooth' updates only on close, so crossover happens once per bar close.
+// Alerts use latched values to ensure they fire only on confirmed logic in Closed Bar mode
+bull_entry = ta.crossover(conf_latched, 70) and TS_latched >= 55
+bear_entry = ta.crossunder(conf_latched, 30) and TS_latched >= 55
 
-bull_entry = ta.crossover(conf_score_smooth, 70) and TS >= 55
-bear_entry = ta.crossunder(conf_score_smooth, 30) and TS >= 55
-
-reg_to_trend = reg_state == "TREND" and reg_state[1] != "TREND"
-reg_to_range = reg_state == "RANGE" and reg_state[1] != "RANGE"
+reg_to_trend = reg_latched == "TREND" and reg_latched[1] != "TREND"
+reg_to_range = reg_latched == "RANGE" and reg_latched[1] != "RANGE"
 
 alertcondition(bull_entry, "Bull Entry Zone", "CONF entered Bull Zone (70+) with Trend")
 alertcondition(bear_entry, "Bear Entry Zone", "CONF entered Bear Zone (30-) with Trend")
