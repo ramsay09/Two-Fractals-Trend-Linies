@@ -12,6 +12,7 @@ int PANEL_COLS = 3
 // Confluence Weights
 int W_FR    = 4
 int W_FVG   = 4
+int W_KAMA  = 1
 int W_CLOUD = 1
 int W_SLOPE = 1
 int W_TL    = 1
@@ -22,6 +23,8 @@ int W_DIV   = 1
 int W_PAT   = 1
 int W_VOL   = 1
 int W_BB    = 1
+int W_O     = 1
+
 
 profile_mode    = input.string("Custom", "Profile Mode", options=["Minimal","Normal","Moderate","Custom"], tooltip="Controls the complexity of the script. \n• Minimal: Core features only (Fastest). \n• Normal: Standard setup. \n• Moderate: Adds Extras. \n• Custom: Full manual control of all checkboxes. \nNote: 'Minimal' and 'Normal' enforce hard-gating (disabling heavy features internally).")
 
@@ -164,6 +167,12 @@ ma1_slope_c         = input.bool(false, title="Slope Color", inline="ma1", group
 ma2_type            = input.string("SMA", title="MA 2", options=["None", "SMA", "EMA"], inline="ma2", group=grp_ma)
 ma2_len             = input.int(200, title="", minval=1, inline="ma2", group=grp_ma)
 ma2_slope_c         = input.bool(false, title="Slope Color", inline="ma2", group=grp_ma)
+
+// KAMA Inputs
+//grp_kama            = "KAMA Settings"
+kama_len            = 10 //input.int(10, "Length", inline="kama", minval=1, group=grp_kama)
+kama_fast           = 2 //input.int(2, "⠀Fast", inline="kama", minval=1, group=grp_kama)
+kama_slow           = 30 //input.int(30, "⠀Slow", inline="kama", minval=1, group=grp_kama)
 
 // two fractals trendlines inputs
 grp_fr              = 'Trend lines'
@@ -384,6 +393,10 @@ bool sig_l12_bull       = false
 bool sig_l12_bear       = false
 bool sig_pat_bull       = false
 bool sig_pat_bear       = false // General pattern
+bool sig_o_bull         = false
+bool sig_o_bear         = false
+bool sig_kama_bull      = false
+bool sig_kama_bear      = false
 bool sig_fvg_bull       = false
 bool sig_fvg_bear       = false
 bool sig_vol_spike      = false
@@ -757,6 +770,29 @@ ema2_pl             = plot(eff_en_cloud ? ema2 : na, color=color.new(color.blue,
 fill(ema1_pl, ema2_pl, color=color.new(eff_sig_plot and not ema_buy[1] ? color_ema_sig_dn : eff_sig_plot and not ema_sell[1] ? color_ema_sig_up : color_ema_c, transp_ema_c))
 
 
+//----------------------------------------------------------------- KAMA Calculation -------------------------------------------------------------------
+
+// Function for KAMA
+f_kama(_src, _len, _fast, _slow) =>
+    _change = math.abs(_src - _src[_len])
+    _volatility = math.sum(math.abs(_src - _src[1]), _len)
+    _er = _volatility != 0 ? _change / _volatility : 0
+    _sc = math.pow(_er * (2 / (_fast + 1) - 2 / (_slow + 1)) + 2 / (_slow + 1), 2)
+    var float _kama = 0.0
+    _kama := na(_kama[1]) ? _src : _kama[1] + _sc * (_src - _kama[1])
+    _kama
+
+kama_val = f_kama(close, kama_len, kama_fast, kama_slow)
+
+// KAMA Signals (Slope Mode)
+// Rising = Bullish, Falling = Bearish
+bool kama_bull = kama_val > kama_val[1]
+bool kama_bear = kama_val < kama_val[1]
+
+sig_kama_bull := kama_bull
+sig_kama_bear := kama_bear
+
+
 //------------------------------------------------------------ trend lines (Visuals for Chart) ----------------------------------------------------------------
 
 // Determine logic based on input
@@ -1073,6 +1109,14 @@ if eff_plot_l12_bar
 if eff_plot_f_bar
     sig_pat_bull := f_up
     sig_pat_bear := f_dn
+
+if eff_plot_o_bar
+    // Green O (Long) -> Bullish
+    if o_bar and close < low[1]
+        sig_o_bull := true
+    // Red O (Short) -> Bearish
+    if o_bar and close > high[1]
+        sig_o_bear := true
 
 
 //----------------------------------------------------------------- segments (Visuals for Chart) --------------------------------------------------------------
@@ -2658,6 +2702,21 @@ if eff_calc_conf
             bull_pts += W_PAT
         else if sig_pat_bear
             bear_pts += W_PAT
+
+    // Outside Bar (W_O = 1)
+    if eff_plot_o_bar
+        total_w += W_O
+        if sig_o_bull
+            bull_pts += W_O
+        else if sig_o_bear
+            bear_pts += W_O
+
+    // KAMA (W_KAMA = 3)
+    total_w += W_KAMA
+    if sig_kama_bull
+        bull_pts += W_KAMA
+    else if sig_kama_bear
+        bear_pts += W_KAMA
 
     // 6. FVG (W_FVG = 1)
     if eff_plot_fvg1 or eff_plot_fvg2
