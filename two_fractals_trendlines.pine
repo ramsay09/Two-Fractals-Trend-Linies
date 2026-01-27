@@ -27,8 +27,7 @@ int W_O     = 1
 
 
 // --- TOP LEVEL UI ---
-ui_mode         = input.string("Auto", "Mode", options=["Auto", "Advanced"], tooltip="Auto: Uses professional tuned parameters for CONF/REG based on timeframe.\nAdvanced: Uses manual inputs below.")
-auto_tuning     = input.string("Balanced", "Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Sensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
+auto_tuning     = input.string("Balanced", "Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Auto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
 
 profile_mode    = input.string("Custom", "Profile Mode", options=["Session Open","ORB","Price Action","Range","S&R","Long Term","Custom"], tooltip="Opinionated Defaults for specific trading styles. \n• Custom: Full manual control of all checkboxes.")
 
@@ -56,13 +55,8 @@ show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tool
                       \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n• Independent Controls: Toggle Panel and Background separately.")
 regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
 
-// --- ADVANCED ESSENTIALS (Visible only when Mode = Advanced) ---
-grp_adv_essentials = "Advanced: Essentials"
-adv_core_ema_len    = input.int(13, "Core Smoothing (EMA)", minval=3, maxval=60, group=grp_adv_essentials, tooltip="Smoothing length for the Confidence Score. Lower = Faster, Higher = Smoother.")
-adv_sensitivity     = input.string("Balanced", "Sensitivity", options=["Conservative", "Balanced", "Aggressive"], group=grp_adv_essentials, tooltip="Adjusts internal thresholds for signal confirmation.")
-adv_squeeze_mode    = input.string("Strict", "Squeeze Mode", options=["Off", "Soft", "Strict"], group=grp_adv_essentials, tooltip="Strict: BBW Squeeze AND BB inside KC.\nSoft: BBW Squeeze OR BB inside KC.\nOff: BBW Squeeze only.")
-adv_adr_gate        = input.string("Soft", "ADR Exhaustion Gate", options=["Off", "Soft", "Strong"], group=grp_adv_essentials, tooltip="Reduces signal quality when price exceeds average daily range.")
-adv_confirm_impact  = input.string("Medium", "Confirm Impact (TL/SEG)", options=["Low", "Medium", "High"], group=grp_adv_essentials, tooltip="How strongly Trendlines and Segments influence the Confluence Score.")
+show_adr_info       = input.bool(true, "Show ADR%", inline="REGIME_UI", tooltip="Displays ADR% statistics.")
+
 
 // --- STAGE 2: CONFIGURATION & AUTO-SCALING ---
 
@@ -72,7 +66,8 @@ int tf_sec = timeframe.in_seconds(timeframe.period)
 bool is_fast       = tf_sec <= 900 // <= 15m
 bool is_med        = tf_sec > 900 and tf_sec <= 14400 // > 15m and <= 4h
 bool is_slow       = tf_sec > 14400 and tf_sec < 86400 // > 4h and < 1D
-bool is_daily_plus = tf_sec >= 86400 // >= 1D
+bool is_daily      = tf_sec >= 86400 and tf_sec < 604800 // >= 1D and < 1W
+bool is_weekly_plus= tf_sec >= 604800 // >= 1W
 
 // 2. Define Effective Variables (Init)
 // CONF
@@ -106,142 +101,106 @@ float eff_atr_high   = 1.10
 
 // 3. PARAMETER RESOLVER
 
-if ui_mode == "Auto"
-    // --- AUTO MODE LOGIC ---
+// --- AUTO MODE LOGIC (Full Auto Trader Edition) ---
 
-    // Base Values (Balanced)
-    int a_core_len  = 13
-    int a_persist   = 3
-    int a_vol_len   = 80
-    float a_enter_k = 1.0
-    float a_exit_k  = 0.5
-    float a_decay   = 0.70
-    float a_clamp   = 0.15
-    int a_adx_th    = 20
+// Base Values (Balanced)
+int a_core_len  = 13
+int a_persist   = 3
+int a_vol_len   = 80
+float a_enter_k = 1.0
+float a_exit_k  = 0.5
+float a_decay   = 0.70
+float a_clamp   = 0.15
+int a_adx_th    = 20
 
-    // Tuning Overrides
-    if auto_tuning == "Conservative"
-        a_enter_k := 1.25
-        a_exit_k  := 0.65
-        a_decay   := 0.60
-        a_clamp   := 0.12
-        a_adx_th  := 22
-        // TF Scaling will apply multiplier
-    else if auto_tuning == "Aggressive"
-        a_enter_k := 0.80
-        a_exit_k  := 0.45
-        a_decay   := 0.75
-        a_clamp   := 0.18
-        a_adx_th  := 18
+// Timeframe Scaling Defaults
+if is_fast
+    a_core_len := 8
+    a_persist  := 3
+    a_vol_len  := 50
+else if is_med
+    a_core_len := 13
+    a_persist  := 3
+    a_vol_len  := 80
+else if is_slow
+    a_core_len := 21
+    a_persist  := 2
+    a_vol_len  := 120
+else if is_daily
+    a_core_len := 21
+    a_persist  := 2
+    a_vol_len  := 150
+else // Weekly+
+    a_core_len := 34
+    a_persist  := 2
+    a_vol_len  := 200
 
-    // Timeframe Scaling
-    if is_fast
-        a_core_len := 8
-        a_persist  := 3
-        a_vol_len  := 50
-    else if is_med
-        a_core_len := 13
-        a_persist  := 3
-        a_vol_len  := 80
-    else if is_slow
-        a_core_len := 21
-        a_persist  := 2
-        a_vol_len  := 120
-    else // Daily+
-        a_core_len := 34
-        a_persist  := 2
-        a_vol_len  := 150
+// Auto Tuning Logic
+if auto_tuning == "Conservative"
+    a_enter_k := 1.25
+    a_exit_k  := 0.65
+    a_decay   := 0.60
+    a_clamp   := 0.12
+    a_adx_th  := 22
 
-    // Apply Tuning Multipliers to Scaled Values
-    if auto_tuning == "Conservative"
-        a_core_len := math.round(a_core_len * 1.5)
-        a_vol_len  := math.round(a_vol_len * 1.5)
-        a_persist  := math.min(a_persist + 2, 6)
-        eff_use_adr_gate := true
-        eff_adr_warn := 75.0 // Stronger gate
-        eff_adr_hard := 100.0
+    // Scale up for robustness
+    a_core_len := math.round(a_core_len * 1.4)
+    a_vol_len  := math.round(a_vol_len * 1.4)
+    a_persist  := math.min(a_persist + 2, 6)
 
-    else if auto_tuning == "Aggressive"
-        a_core_len := math.max(math.round(a_core_len * 0.7), 5)
-        a_vol_len  := math.max(math.round(a_vol_len * 0.7), 30)
-        a_persist  := math.max(a_persist - 1, 2)
-        eff_use_adr_gate := is_daily_plus ? false : true // Off on Daily+
-        eff_adr_warn := 85.0
-        eff_adr_hard := 110.0
-    else
-        // Balanced
-        eff_use_adr_gate := is_daily_plus ? false : true
+    // ADR Gate: Soft (Enabled)
+    eff_use_adr_gate := true
+    eff_adr_warn := 85.0
+    eff_adr_hard := 110.0
 
-    // Assignment
-    eff_core_ema_len := int(a_core_len)
-    eff_vol_len      := int(a_vol_len)
-    eff_enter_k      := a_enter_k
-    eff_exit_k       := a_exit_k
-    eff_persist_bars := int(a_persist)
-    eff_ov_decay     := a_decay
-    eff_ov_clamp     := a_clamp
-    eff_adx_th       := a_adx_th
+else if auto_tuning == "Aggressive"
+    a_enter_k := 0.80
+    a_exit_k  := 0.45
+    a_decay   := 0.75
+    a_clamp   := 0.18
+    a_adx_th  := 18
 
-    // Fixed Auto Settings
-    eff_squeeze_strict := true
-    eff_use_kc_squeeze := true
+    // Scale down for speed
+    a_core_len := math.max(math.round(a_core_len * 0.75), 5)
+    a_vol_len  := math.max(math.round(a_vol_len * 0.75), 30)
+    a_persist  := math.max(a_persist - 1, 2) // Prompt says max(base-1, 2). Assuming I take current persisted value which is base.
+
+    // ADR Gate: Off on Daily+, Soft otherwise
+    eff_use_adr_gate := (is_daily or is_weekly_plus) ? false : true
+    eff_adr_warn := 85.0
+    eff_adr_hard := 110.0
 
 else
-    // --- ADVANCED MODE LOGIC ---
-    eff_core_ema_len := adv_core_ema_len
+    // Balanced
+    // No multipliers on TF base values
+    a_enter_k := 1.00
+    a_exit_k  := 0.50
+    a_decay   := 0.70
+    a_clamp   := 0.15
+    a_adx_th  := 20
 
-    // Sensitivity Mapping (Derived from Auto Concepts but Fixed)
-    if adv_sensitivity == "Conservative"
-        eff_vol_len      := 120
-        eff_enter_k      := 1.25
-        eff_exit_k       := 0.65
-        eff_persist_bars := 4
-        eff_adx_th       := 22
-    else if adv_sensitivity == "Aggressive"
-        eff_vol_len      := 50
-        eff_enter_k      := 0.80
-        eff_exit_k       := 0.45
-        eff_persist_bars := 2
-        eff_adx_th       := 18
-    else // Balanced
-        eff_vol_len      := 80
-        eff_enter_k      := 1.0
-        eff_exit_k       := 0.50
-        eff_persist_bars := 3
-        eff_adx_th       := 20
+    // ADR Gate: Soft (Enabled)
+    eff_use_adr_gate := true
+    eff_adr_warn := 85.0
+    eff_adr_hard := 110.0
 
-    // Squeeze Mode
-    if adv_squeeze_mode == "Off"
-        eff_use_kc_squeeze := false
-    else if adv_squeeze_mode == "Soft"
-        eff_use_kc_squeeze := true
-        eff_squeeze_strict := false
-    else // Strict
-        eff_use_kc_squeeze := true
-        eff_squeeze_strict := true
+// Assignment
+eff_core_ema_len := int(a_core_len)
+eff_vol_len      := int(a_vol_len)
+eff_enter_k      := a_enter_k
+eff_exit_k       := a_exit_k
+eff_persist_bars := int(a_persist)
+eff_ov_decay     := a_decay
+eff_ov_clamp     := a_clamp
+eff_adx_th       := a_adx_th
 
-    // ADR Gate
-    if adv_adr_gate == "Off"
-        eff_use_adr_gate := false
-    else if adv_adr_gate == "Strong"
-        eff_use_adr_gate := true
-        eff_adr_warn := 75.0
-        eff_adr_hard := 100.0
-    else // Soft
-        eff_use_adr_gate := true
-        eff_adr_warn := 85.0
-        eff_adr_hard := 110.0
-
-    // Confirm Impact
-    if adv_confirm_impact == "Low"
-        eff_ov_decay := 0.60
-        eff_ov_clamp := 0.10
-    else if adv_confirm_impact == "High"
-        eff_ov_decay := 0.75
-        eff_ov_clamp := 0.18
-    else // Medium
-        eff_ov_decay := 0.70
-        eff_ov_clamp := 0.15
+// Fixed REG Settings
+eff_bb_len         := 20
+eff_bb_mult        := 2.0
+eff_kc_len         := 20
+eff_kc_mult        := 1.5
+eff_squeeze_strict := true
+eff_use_kc_squeeze := true
 
 // fractals input
 fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, tooltip='')
@@ -274,7 +233,6 @@ mtf_opacity       = input.int(15, "Opacity %", minval=0, maxval=100, group=grp_m
 
 // Additional Context Inputs 
 grp_add         = "Additional Context"
-show_adr_info   = input.bool(false, "Show ADR% info", group=grp_add, tooltip="Displays ADR% statistics.")
 use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", group=grp_add, inline="sess_1st", tooltip="")
 sess_1st_tf     = input.timeframe("5", "", group=grp_add, inline="sess_1st", tooltip="Lines remain at the high and low of the first candle of the running trading session. \nSelect the timeframe for the 1st Session Candle calculation.")
 show_pch_pcl    = input.bool(true, "Previous Candle High/Low", group=grp_add, inline="add_1", tooltip="")
@@ -346,9 +304,9 @@ BB_plot             = input.bool(true, title='Bollinger Bands⠀', inline="bb_t"
 near_bb             = input.bool(true, title='Touched BBs only', inline="bb_t", group=grp_bb, tooltip='This maintains a better chart overview and works as reversal zone indicator. 
                       n\Works as support and resistence, as reversal zone and as squeeze indicator.')
 // BB_length_1 & BB_sdev_1 moved to Advanced: REG
-BB_sdev_2           = 3//input.float(3.0, minval=0.001, title='BB 2 StdDev', group=grp_bb, tooltip='')
-BB_sdev_3           = 4//input.float(4.0, minval=0.001, title='BB 3 StdDev', group=grp_bb, tooltip='')
-BB_sdev_4           = 5//input.float(5.0, minval=0.001, title='BB 4 StdDev', group=grp_bb, tooltip='')
+BB_sdev_2           = 3
+BB_sdev_3           = 4
+BB_sdev_4           = 5
 
 
 // ema cloud and ma inputs
@@ -371,10 +329,9 @@ ma2_len             = input.int(200, title="", minval=1, inline="ma2", group=grp
 ma2_slope_c         = input.bool(false, title="Slope Color", inline="ma2", group=grp_ma)
 
 // KAMA Inputs
-//grp_kama            = "KAMA Settings"
-kama_len            = 10 //input.int(10, "Length", inline="kama", minval=1, group=grp_kama)
-kama_fast           = 2 //input.int(2, "⠀Fast", inline="kama", minval=1, group=grp_kama)
-kama_slow           = 30 //input.int(30, "⠀Slow", inline="kama", minval=1, group=grp_kama)
+kama_len            = 10
+kama_fast           = 2
+kama_slow           = 30
 
 // two fractals trendlines inputs
 grp_fr              = 'Trend lines'
@@ -2838,7 +2795,7 @@ float d_range = na
 float adr = na
 float adr_pct = na
 
-if eff_use_adr_gate
+if eff_use_adr_gate or show_adr_info
     // 1. Daily Range (Developing) - Uses lookahead to capture current developing range on intraday
     d_range := request.security(syminfo.tickerid, "D", high - low, lookahead=barmerge.lookahead_on)
 
@@ -2851,7 +2808,7 @@ if eff_use_adr_gate
         adr_pct := (d_range / adr) * 100
 
 // Optional Debug Info
-plot(eff_use_adr_gate and show_adr_info ? adr_pct : na, title="ADR %", color=color.new(color.white, 100), display=display.data_window)
+plot(show_adr_info ? adr_pct : na, title="ADR %", color=color.new(color.white, 100), display=display.data_window + display.status_line)
 
 var label lbl_adr = na
 if eff_use_adr_gate and show_adr_info and barstate.islast
