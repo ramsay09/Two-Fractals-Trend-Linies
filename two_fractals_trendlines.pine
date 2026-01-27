@@ -12,7 +12,7 @@ int PANEL_COLS = 3
 // Confluence Weights
 int W_FR    = 4
 int W_FVG   = 4
-int W_CLOUD = 2
+int W_CLOUD = 1
 int W_SLOPE = 1
 int W_TL    = 1
 int W_SEG   = 1
