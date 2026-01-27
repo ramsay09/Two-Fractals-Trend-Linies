@@ -56,42 +56,13 @@ show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tool
                       \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n• Independent Controls: Toggle Panel and Background separately.")
 regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
 
-// --- ADVANCED: CONF ---
-grp_adv_conf = "Advanced: CONF"
-core_ema_len    = input.int(13, "Core Smoothing", minval=1, group=grp_adv_conf, tooltip="EMA length to smooth the raw bias score.")
-vol_len         = input.int(80, "Volatility Length", minval=10, group=grp_adv_conf, tooltip="Length for StDev calculation to scale thresholds.")
-enter_k         = input.float(1.0, "Enter Threshold K", step=0.05, group=grp_adv_conf, tooltip="Multiplier for Volatility to determine Entry Threshold.")
-exit_k          = input.float(0.5, "Exit Threshold K", step=0.05, group=grp_adv_conf, tooltip="Multiplier for Volatility to determine Exit Threshold.")
-persist_bars    = input.int(3, "Persistence (Bars)", minval=1, group=grp_adv_conf, tooltip="Number of bars a signal must persist before flipping state.")
-overlay_decay   = input.float(0.70, "Overlay Decay", step=0.05, maxval=1.0, group=grp_adv_conf, tooltip="Decay factor for Trendlines/Segments influence per bar.")
-overlay_clamp   = input.float(0.15, "Overlay Clamp", step=0.01, maxval=0.5, group=grp_adv_conf, tooltip="Max influence (0.0-1.0) the overlay can have on the final score.")
-
-// --- ADVANCED: REG ---
-grp_adv_reg = "Advanced: REG"
-adx_len         = input.int(14, "ADX Length", minval=1, group=grp_adv_reg)
-adx_th          = input.int(20, "ADX Threshold", minval=1, group=grp_adv_reg)
-
-// BB / KC (Moved to Advanced REG)
-BB_length_1         = input.int(20, minval=1, title='BB Length', inline="bb_i", group=grp_adv_reg)
-BB_sdev_1           = input.float(2.0, minval=0.001, maxval=3.8, step= 0.2, title='⠀BB 1 StdDev', inline="bb_i", group=grp_adv_reg)
-
-inp_use_kc_squeeze  = input.bool(true, "Use Keltner Squeeze", group=grp_adv_reg, tooltip="Adds 'BB inside KC' condition to Squeeze detection.")
-kc_len              = input.int(20, "KC Length", minval=5, group=grp_adv_reg)
-kc_mult             = input.float(1.5, "KC Mult (ATR)", step=0.1, group=grp_adv_reg)
-inp_squeeze_strict  = input.bool(true, "Squeeze Strict (BB inside KC)", group=grp_adv_reg, tooltip="Strict: BBW Squeeze AND BB inside KC.\nSoft: BBW Squeeze OR BB inside KC.")
-
-// --- ADVANCED: ADR / ATR ---
-grp_adv_adr = "Advanced: ADR / ATR"
-inp_use_adr_gate    = input.bool(true, "Use ADR/ATR Gates", group=grp_adv_adr, tooltip="Reduces Confluence Quality if price extended beyond expected daily range.")
-adr_len             = input.int(20, "ADR Length (D)", minval=5, group=grp_adv_adr)
-adr_warn_pct        = input.float(85, "ADR Exhaustion (warn %)", step=1, group=grp_adv_adr)
-adr_hard_pct        = input.float(110, "ADR Exhaustion (hard %)", step=1, group=grp_adv_adr)
-show_adr_info       = input.bool(false, "Show ADR% info", group=grp_adv_adr)
-
-atr_len             = input.int(14, "ATR Length", minval=5, group=grp_adv_adr)
-atr_norm_len        = input.int(50, "ATR Norm Length", minval=20, group=grp_adv_adr, tooltip="Reference MA length to normalize current ATR.")
-atr_low             = input.float(0.90, "ATR Low Threshold", step=0.01, group=grp_adv_adr, tooltip="Below this ratio (ATR/Ref), market is considered 'Low Volatility'.")
-atr_high            = input.float(1.10, "ATR High Threshold", step=0.01, group=grp_adv_adr, tooltip="Above this ratio, market is 'High Volatility'.")
+// --- ADVANCED ESSENTIALS (Visible only when Mode = Advanced) ---
+grp_adv_essentials = "Advanced: Essentials"
+adv_core_ema_len    = input.int(13, "Core Smoothing (EMA)", minval=3, maxval=60, group=grp_adv_essentials, tooltip="Smoothing length for the Confidence Score. Lower = Faster, Higher = Smoother.")
+adv_sensitivity     = input.string("Balanced", "Sensitivity", options=["Conservative", "Balanced", "Aggressive"], group=grp_adv_essentials, tooltip="Adjusts internal thresholds for signal confirmation.")
+adv_squeeze_mode    = input.string("Strict", "Squeeze Mode", options=["Off", "Soft", "Strict"], group=grp_adv_essentials, tooltip="Strict: BBW Squeeze AND BB inside KC.\nSoft: BBW Squeeze OR BB inside KC.\nOff: BBW Squeeze only.")
+adv_adr_gate        = input.string("Soft", "ADR Exhaustion Gate", options=["Off", "Soft", "Strong"], group=grp_adv_essentials, tooltip="Reduces signal quality when price exceeds average daily range.")
+adv_confirm_impact  = input.string("Medium", "Confirm Impact (TL/SEG)", options=["Low", "Medium", "High"], group=grp_adv_essentials, tooltip="How strongly Trendlines and Segments influence the Confluence Score.")
 
 // --- STAGE 2: CONFIGURATION & AUTO-SCALING ---
 
@@ -103,80 +74,174 @@ bool is_med        = tf_sec > 900 and tf_sec <= 14400 // > 15m and <= 4h
 bool is_slow       = tf_sec > 14400 and tf_sec < 86400 // > 4h and < 1D
 bool is_daily_plus = tf_sec >= 86400 // >= 1D
 
-// 2. Auto Parameter Logic
-// Initialize with Balanced defaults
-int auto_core_len   = 13
-int auto_persist    = 3
-int auto_vol_len    = 80
-float auto_enter_k  = 1.0
-float auto_exit_k   = 0.5
-float auto_decay    = 0.70
-float auto_clamp    = 0.15
-int auto_adx_th     = 20
+// 2. Define Effective Variables (Init)
+// CONF
+int eff_core_ema_len = 13
+int eff_vol_len      = 80
+float eff_enter_k    = 1.0
+float eff_exit_k     = 0.5
+int eff_persist_bars = 3
+float eff_ov_decay   = 0.70
+float eff_ov_clamp   = 0.15
 
-// Tuning Overrides
-if auto_tuning == "Conservative"
-    auto_enter_k := 1.25
-    auto_exit_k  := 0.65
-    auto_decay   := 0.60
-    auto_clamp   := 0.12
-    auto_adx_th  := 22
-else if auto_tuning == "Aggressive"
-    auto_enter_k := 0.80
-    auto_exit_k  := 0.45
-    auto_decay   := 0.75
-    auto_clamp   := 0.18
-    auto_adx_th  := 18
+// REG
+int eff_adx_len      = 14
+int eff_adx_th       = 20
+int eff_bb_len       = 20
+float eff_bb_mult    = 2.0
+int eff_kc_len       = 20
+float eff_kc_mult    = 1.5
+bool eff_squeeze_strict = true
+bool eff_use_kc_squeeze = true
 
-// Timeframe Scaling Overrides
-if is_fast
-    auto_core_len := 8
-    auto_persist  := 3
-    auto_vol_len  := 50
-else if is_med
-    auto_core_len := 13
-    auto_persist  := 3
-    auto_vol_len  := 80
-else if is_slow
-    auto_core_len := 21
-    auto_persist  := 2
-    auto_vol_len  := 120
-else // Daily+
-    auto_core_len := 34
-    auto_persist  := 2
-    auto_vol_len  := 150
+// ADR/ATR
+bool eff_use_adr_gate = true
+int eff_adr_len      = 20
+float eff_adr_warn   = 85.0
+float eff_adr_hard   = 110.0
+int eff_atr_len      = 14
+int eff_atr_norm     = 50
+float eff_atr_low    = 0.90
+float eff_atr_high   = 1.10
 
-// 3. Effective Parameter Assignment
-// CONF Params
-int eff_core_ema_len = ui_mode == "Auto" ? auto_core_len : core_ema_len
-int eff_vol_len      = ui_mode == "Auto" ? auto_vol_len : vol_len
-float eff_enter_k    = ui_mode == "Auto" ? auto_enter_k : enter_k
-float eff_exit_k     = ui_mode == "Auto" ? auto_exit_k : exit_k
-int eff_persist_bars = ui_mode == "Auto" ? auto_persist : persist_bars
-float eff_ov_decay   = ui_mode == "Auto" ? auto_decay : overlay_decay
-float eff_ov_clamp   = ui_mode == "Auto" ? auto_clamp : overlay_clamp
+// 3. PARAMETER RESOLVER
 
-// REG Params
-int eff_adx_len      = ui_mode == "Auto" ? 14 : adx_len
-int eff_adx_th       = ui_mode == "Auto" ? auto_adx_th : adx_th
-int eff_bb_len       = ui_mode == "Auto" ? 20 : BB_length_1
-float eff_bb_mult    = ui_mode == "Auto" ? 2.0 : BB_sdev_1
-int eff_kc_len       = ui_mode == "Auto" ? 20 : kc_len
-float eff_kc_mult    = ui_mode == "Auto" ? 1.5 : kc_mult
-bool eff_squeeze_strict = ui_mode == "Auto" ? true : inp_squeeze_strict
+if ui_mode == "Auto"
+    // --- AUTO MODE LOGIC ---
 
-// ADR/ATR Params
-bool auto_adr_enable = not is_daily_plus // Disable ADR gate on Daily+ in Auto
-bool eff_adr_gate    = ui_mode == "Auto" ? auto_adr_enable : inp_use_adr_gate
+    // Base Values (Balanced)
+    int a_core_len  = 13
+    int a_persist   = 3
+    int a_vol_len   = 80
+    float a_enter_k = 1.0
+    float a_exit_k  = 0.5
+    float a_decay   = 0.70
+    float a_clamp   = 0.15
+    int a_adx_th    = 20
 
-int eff_adr_len      = ui_mode == "Auto" ? 20 : adr_len
-float eff_adr_warn   = ui_mode == "Auto" ? 85.0 : adr_warn_pct
-float eff_adr_hard   = ui_mode == "Auto" ? 110.0 : adr_hard_pct
+    // Tuning Overrides
+    if auto_tuning == "Conservative"
+        a_enter_k := 1.25
+        a_exit_k  := 0.65
+        a_decay   := 0.60
+        a_clamp   := 0.12
+        a_adx_th  := 22
+        // TF Scaling will apply multiplier
+    else if auto_tuning == "Aggressive"
+        a_enter_k := 0.80
+        a_exit_k  := 0.45
+        a_decay   := 0.75
+        a_clamp   := 0.18
+        a_adx_th  := 18
 
-int eff_atr_len      = ui_mode == "Auto" ? 14 : atr_len
-int eff_atr_norm     = ui_mode == "Auto" ? 50 : atr_norm_len
-float eff_atr_low    = ui_mode == "Auto" ? 0.90 : atr_low
-float eff_atr_high   = ui_mode == "Auto" ? 1.10 : atr_high
+    // Timeframe Scaling
+    if is_fast
+        a_core_len := 8
+        a_persist  := 3
+        a_vol_len  := 50
+    else if is_med
+        a_core_len := 13
+        a_persist  := 3
+        a_vol_len  := 80
+    else if is_slow
+        a_core_len := 21
+        a_persist  := 2
+        a_vol_len  := 120
+    else // Daily+
+        a_core_len := 34
+        a_persist  := 2
+        a_vol_len  := 150
+
+    // Apply Tuning Multipliers to Scaled Values
+    if auto_tuning == "Conservative"
+        a_core_len := math.round(a_core_len * 1.5)
+        a_vol_len  := math.round(a_vol_len * 1.5)
+        a_persist  := math.min(a_persist + 2, 6)
+        eff_use_adr_gate := true
+        eff_adr_warn := 75.0 // Stronger gate
+        eff_adr_hard := 100.0
+
+    else if auto_tuning == "Aggressive"
+        a_core_len := math.max(math.round(a_core_len * 0.7), 5)
+        a_vol_len  := math.max(math.round(a_vol_len * 0.7), 30)
+        a_persist  := math.max(a_persist - 1, 2)
+        eff_use_adr_gate := is_daily_plus ? false : true // Off on Daily+
+        eff_adr_warn := 85.0
+        eff_adr_hard := 110.0
+    else
+        // Balanced
+        eff_use_adr_gate := is_daily_plus ? false : true
+
+    // Assignment
+    eff_core_ema_len := int(a_core_len)
+    eff_vol_len      := int(a_vol_len)
+    eff_enter_k      := a_enter_k
+    eff_exit_k       := a_exit_k
+    eff_persist_bars := int(a_persist)
+    eff_ov_decay     := a_decay
+    eff_ov_clamp     := a_clamp
+    eff_adx_th       := a_adx_th
+
+    // Fixed Auto Settings
+    eff_squeeze_strict := true
+    eff_use_kc_squeeze := true
+
+else
+    // --- ADVANCED MODE LOGIC ---
+    eff_core_ema_len := adv_core_ema_len
+
+    // Sensitivity Mapping (Derived from Auto Concepts but Fixed)
+    if adv_sensitivity == "Conservative"
+        eff_vol_len      := 120
+        eff_enter_k      := 1.25
+        eff_exit_k       := 0.65
+        eff_persist_bars := 4
+        eff_adx_th       := 22
+    else if adv_sensitivity == "Aggressive"
+        eff_vol_len      := 50
+        eff_enter_k      := 0.80
+        eff_exit_k       := 0.45
+        eff_persist_bars := 2
+        eff_adx_th       := 18
+    else // Balanced
+        eff_vol_len      := 80
+        eff_enter_k      := 1.0
+        eff_exit_k       := 0.50
+        eff_persist_bars := 3
+        eff_adx_th       := 20
+
+    // Squeeze Mode
+    if adv_squeeze_mode == "Off"
+        eff_use_kc_squeeze := false
+    else if adv_squeeze_mode == "Soft"
+        eff_use_kc_squeeze := true
+        eff_squeeze_strict := false
+    else // Strict
+        eff_use_kc_squeeze := true
+        eff_squeeze_strict := true
+
+    // ADR Gate
+    if adv_adr_gate == "Off"
+        eff_use_adr_gate := false
+    else if adv_adr_gate == "Strong"
+        eff_use_adr_gate := true
+        eff_adr_warn := 75.0
+        eff_adr_hard := 100.0
+    else // Soft
+        eff_use_adr_gate := true
+        eff_adr_warn := 85.0
+        eff_adr_hard := 110.0
+
+    // Confirm Impact
+    if adv_confirm_impact == "Low"
+        eff_ov_decay := 0.60
+        eff_ov_clamp := 0.10
+    else if adv_confirm_impact == "High"
+        eff_ov_decay := 0.75
+        eff_ov_clamp := 0.18
+    else // Medium
+        eff_ov_decay := 0.70
+        eff_ov_clamp := 0.15
 
 // fractals input
 fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, tooltip='')
@@ -209,6 +274,7 @@ mtf_opacity       = input.int(15, "Opacity %", minval=0, maxval=100, group=grp_m
 
 // Additional Context Inputs 
 grp_add         = "Additional Context"
+show_adr_info   = input.bool(false, "Show ADR% info", group=grp_add, tooltip="Displays ADR% statistics.")
 use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", group=grp_add, inline="sess_1st", tooltip="")
 sess_1st_tf     = input.timeframe("5", "", group=grp_add, inline="sess_1st", tooltip="Lines remain at the high and low of the first candle of the running trading session. \nSelect the timeframe for the 1st Session Candle calculation.")
 show_pch_pcl    = input.bool(true, "Previous Candle High/Low", group=grp_add, inline="add_1", tooltip="")
@@ -279,7 +345,6 @@ grp_bb              = 'Bollinger Bands'
 BB_plot             = input.bool(true, title='Bollinger Bands⠀', inline="bb_t", group=grp_bb, tooltip='')
 near_bb             = input.bool(true, title='Touched BBs only', inline="bb_t", group=grp_bb, tooltip='This maintains a better chart overview and works as reversal zone indicator. 
                       n\Works as support and resistence, as reversal zone and as squeeze indicator.')
-BB_calc_tog         = input.bool(true, title='Toggle BB Calculation (Standard/Exponential)', group=grp_bb, tooltip='Works as support and resistence, as reversal zone and as squeeze indicator. Standard -> checked')
 // BB_length_1 & BB_sdev_1 moved to Advanced: REG
 BB_sdev_2           = 3//input.float(3.0, minval=0.001, title='BB 2 StdDev', group=grp_bb, tooltip='')
 BB_sdev_3           = 4//input.float(4.0, minval=0.001, title='BB 3 StdDev', group=grp_bb, tooltip='')
@@ -539,8 +604,6 @@ eff_regime_bg_mode  = regime_bg_mode
 
 // ADR/KC Logic (Mapped to Config Stage)
 // We map the legacy names to our new effective variables to minimize downstream changes
-eff_use_adr_gate    = eff_adr_gate
-eff_use_kc_squeeze  = ui_mode == "Auto" ? true : inp_use_kc_squeeze
 squeeze_strict      = eff_squeeze_strict
 
 //----------------- Global Signal Registry (For Alerts & Confluence) -----------------
@@ -1893,13 +1956,11 @@ l_12m_s4 := f_draw_pivot(l_12m_s4, m12_S4, color.green, 6, 9, Intra_D_W_M, plot_
 //----------------------------------- Bollinger Bands ------------------------------------
 
 f_stdev(_bb_len) => ta.stdev(close, _bb_len)
-f_sma(_sma_len) => BB_calc_tog ? ta.sma(close, _sma_len) : ta.ema(close, _sma_len)
+f_sma(_sma_len) => ta.sma(close, _sma_len)
 
-f_bb_basis(_sma_len) => BB_calc_tog ? f_sma(_sma_len) : ta.ema((open + high + low + close) / 4, _sma_len)
+f_bb_basis(_sma_len) => f_sma(_sma_len)
 
-f_bb_dev(_sma_len) => BB_calc_tog ? f_stdev(_sma_len) : math.sqrt(ta.sma((((open + high + low + close) 
-     / 4 - ta.ema((open + high + low + close) / 4, _sma_len)) * ((open + high + low + close) 
-     / 4 - ta.ema((open + high + low + close) / 4, _sma_len))), _sma_len))
+f_bb_dev(_sma_len) => f_stdev(_sma_len)
 
 // Stage 4: Bollinger Bands Hard-Gating
 float basis = na
@@ -1916,13 +1977,13 @@ if eff_BB_plot
     ops_bb += 1 // Count Ops
 
     //bb1
-    basis := f_bb_basis(BB_length_1)
-    dev_1 := BB_sdev_1 * f_bb_dev(BB_length_1)
+    basis := f_bb_basis(eff_bb_len)
+    dev_1 := eff_bb_mult * f_bb_dev(eff_bb_len)
     upper_1 := basis + dev_1
     lower_1 := basis - dev_1
 
     //bb3
-    dev_3 := BB_sdev_3 * f_bb_dev(BB_length_1)
+    dev_3 := BB_sdev_3 * f_bb_dev(eff_bb_len)
     upper_3 := basis + dev_3
     lower_3 := basis - dev_3
 
@@ -2993,8 +3054,8 @@ if eff_calc_conf
     float overlay_clamped = math.max(-eff_ov_clamp, math.min(eff_ov_clamp, overlay_raw)) * ov_scale
 
     // --- 6.1 ADR Exhaustion Flags (Stage 6) ---
-    bool adr_warn = eff_adr_gate and not na(adr_pct) and adr_pct >= eff_adr_warn
-    bool adr_hard = eff_adr_gate and not na(adr_pct) and adr_pct >= eff_adr_hard
+    bool adr_warn = eff_use_adr_gate and not na(adr_pct) and adr_pct >= eff_adr_warn
+    bool adr_hard = eff_use_adr_gate and not na(adr_pct) and adr_pct >= eff_adr_hard
 
     // --- 4. Final Calculation & Confidence Gate ---
     final_raw := core_smooth + overlay_clamped
