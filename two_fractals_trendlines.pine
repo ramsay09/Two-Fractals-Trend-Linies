@@ -26,7 +26,7 @@ int W_BB    = 1
 int W_O     = 1
 
 
-profile_mode    = input.string("Custom", "Profile Mode", options=["Minimal","Normal","Moderate","Custom"], tooltip="Controls the complexity of the script. \n• Minimal: Core features only (Fastest). \n• Normal: Standard setup. \n• Moderate: Adds Extras. \n• Custom: Full manual control of all checkboxes. \nNote: 'Minimal' and 'Normal' enforce hard-gating (disabling heavy features internally).")
+profile_mode    = input.string("Custom", "Profile Mode", options=["Session Open","ORB","Price Action","Range","S&R","Long Term","Custom"], tooltip="Opinionated Defaults for specific trading styles. \n• Custom: Full manual control of all checkboxes.")
 
 // adx, hma and ema1 x ema2 mtf trend info panel
 panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
@@ -35,10 +35,42 @@ panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['N
 // Confluence & Regime
 //grp_conf            = "Confluence & Regime"
 show_conf_meter     = input.bool(true, "Confluence Meter⠀⠀⠀", inline="conf_ui", tooltip="")
-show_conf_bg        = input.bool(false, "Confluence Meter BG", inline="conf_ui", tooltip="Aggregates active signals (Trendlines, MA, etc.) into a 0-100 score. \n• >55: Bullish \n• <45: Bearish \nPlots the Confluence Signal background color.")
+show_conf_bg        = input.bool(false, "Confluence Meter BG", inline="conf_ui", tooltip="CONF (Trend Bias) shows the current dominant trend direction as a compact 0–100 score.
+                     \n• BULL / BEAR / NEUT = direction
+                     \n• Number = bias strength (50 = neutral)
+                     \n• H / M / L = quality / reliability (high / medium / low)
+                     How CONF is built:
+                     \n• Core bias comes from structural trend components (mainly FVG state + fractal/structure + a trend filter).
+                     \n  The first FVG sets the bias and it stays valid until an opposite FVG appears.
+                     \n• Trendlines & Segments act only as short-lived confirmation (with decay) and cannot flip the bias on their own.
+                     \n• REG (SQUEEZE/TREND/RANGE) gates reliability: in SQUEEZE, CONF is intentionally dampened (FVG is not counted at full weight).
+                     Visuals:
+                     \n• Green/Red = Bull/Bear bias
+                     \n• NEUT is fully transparent (panel + chart background).
+                     \n\nPlots the Confluence Signal background color.")
+
 show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. 
                       \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n• Independent Controls: Toggle Panel and Background separately.")
 regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
+
+// Stage 0 — Definitions & Guardrails
+// 0.1 Begriffe
+// Core Components (Trend Bias relevant):
+// fr_state_inf (−1/0/+1)
+// fvg_state_inf (−1/0/+1) → Trend beginnt mit erster FVG und gilt bis gegenteilige FVG (ist bereits var-state)
+// sig_kama_bull/bear (Slope)
+//
+// Confirm-Events (Overlay, kurzlebig):
+// sig_tl_bull/bear (Trendline Break)
+// sig_seg_bull/bear (Segments Break/State)
+//
+// Regime Gate:
+// regime_state ∈ {SQUEEZE,TREND,RANGE}
+//
+// 0.2 Guardrails
+// Keine neuen request.security() Calls für CONF-Engine (Performance stabil halten).
+// CONF-Engine darf nicht von aktivierten “Event Tools” abhängen (außer Confirm-Overlay, das begrenzt ist).
+// Confirm-Overlay darf niemals alleine einen Bias-Flip auslösen (nur “anschieben”, begrenzt).
 
 // fractals input
 fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, tooltip='')
@@ -279,73 +311,97 @@ transp_bg           = input.int(85, 'Background Color Transparency', minval=1, m
 //-------------------------------------------------------- GLOBAL ON-FLAGS (Performance / Gating) --------------------------------------------------------
 // Stage 0: Centralized Gating Flags as aliases for inputs
 
-// Profile Helper
-f_profile(_custom, _min, _norm, _mod) =>
+// Preset Helper
+f_preset(_custom, _sessOpen, _orb, _pa, _range, _sr, _lt) =>
     result = _custom
-    if profile_mode == "Minimal"
-        result := _min
-    else if profile_mode == "Normal"
-        result := _norm
-    else if profile_mode == "Moderate"
-        result := _mod
+    if profile_mode == "Session Open"
+        result := _sessOpen
+    else if profile_mode == "ORB"
+        result := _orb
+    else if profile_mode == "Price Action"
+        result := _pa
+    else if profile_mode == "Range"
+        result := _range
+    else if profile_mode == "S&R"
+        result := _sr
+    else if profile_mode == "Long Term"
+        result := _lt
+    result
+
+// Preset Helper for Strings
+f_preset_str(_custom, _sessOpen, _orb, _pa, _range, _sr, _lt) =>
+    result = _custom
+    if profile_mode == "Session Open"
+        result := _sessOpen
+    else if profile_mode == "ORB"
+        result := _orb
+    else if profile_mode == "Price Action"
+        result := _pa
+    else if profile_mode == "Range"
+        result := _range
+    else if profile_mode == "S&R"
+        result := _sr
+    else if profile_mode == "Long Term"
+        result := _lt
     result
 
 // Effective Feature Flags
-eff_fractals_plot   = f_profile(fractals_plot, fractals_plot, fractals_plot, fractals_plot)
-eff_sub_fractals    = f_profile(sub_fractals, sub_fractals, sub_fractals, sub_fractals)
-eff_plot_trendline  = f_profile(plot_trendline, plot_trendline, plot_trendline, plot_trendline)
+//                                          Cust           SessOpen  ORB    PA     Range  S&R    LT
+eff_fractals_plot   = f_preset(fractals_plot,     true,     true,  true,  true,  true,  true)
+eff_sub_fractals    = f_preset(sub_fractals,      false,    false, false, false, false, false)
+eff_plot_trendline  = f_preset(plot_trendline,    false,    true,  true,  false, false, false)
 
-eff_vp_enable       = f_profile(vp_enable, false, false, vp_enable) // VP: Custom/Mod
-eff_vp_smart        = f_profile(vp_smart, vp_smart, vp_smart, vp_smart)
+eff_vp_enable       = f_preset(vp_enable,         false,    false, false, false, false, false)
+eff_vp_smart        = f_preset(vp_smart,          vp_smart, vp_smart, vp_smart, vp_smart, vp_smart, vp_smart)
 
-eff_show_mtf_candles= f_profile(show_mtf_candles, false, false, show_mtf_candles) // MTF: Custom/Mod
+eff_show_mtf_candles= f_preset(show_mtf_candles,  false,    false, false, false, false, false)
 
-eff_use_sess_1st    = f_profile(use_sess_1st, false, use_sess_1st, use_sess_1st) // Sess 1st: Norm/Mod
-eff_show_pch_pcl    = f_profile(show_pch_pcl, false, show_pch_pcl, show_pch_pcl)
-eff_show_last_frac  = f_profile(show_last_frac, false, show_last_frac, show_last_frac)
-eff_show_vol        = f_profile(show_vol, false, show_vol, show_vol)
+eff_use_sess_1st    = f_preset(use_sess_1st,      true,     true,  false, false, false, false)
+eff_show_pch_pcl    = f_preset(show_pch_pcl,      true,     false, false, false, true,  false)
+eff_show_last_frac  = f_preset(show_last_frac,    false,    false, false, false, true,  false)
+eff_show_vol        = f_preset(show_vol,          true,     true,  true,  false, false, false)
 
-eff_plot_fvg1       = f_profile(plot_fvg1, false, plot_fvg1, plot_fvg1)
-eff_plot_fvg2       = f_profile(plot_fvg2, false, plot_fvg2, plot_fvg2) // FVG2: Norm/Mod
+eff_plot_fvg1       = f_preset(plot_fvg1,         true,     true,  true,  false, true,  true)
+eff_plot_fvg2       = f_preset(plot_fvg2,         false,    false, false, false, false, true)
 
-eff_ps_mode         = f_profile(ps_mode, "None", "None", ps_mode) // Smart S/R: Mod/Custom only
+eff_ps_mode         = f_preset_str(ps_mode, "None", "None", "None", "Auto", "Auto", "Auto")
 
-eff_BB_plot         = f_profile(BB_plot, BB_plot, BB_plot, BB_plot) // Minimal allows BB if checked
+eff_BB_plot         = f_preset(BB_plot,           false,    false, false, true,  false, false)
 
-eff_en_cloud        = f_profile(en_cloud, en_cloud, en_cloud, en_cloud)
-eff_sig_plot        = f_profile(sig_plot, sig_plot, sig_plot, sig_plot)
-eff_ma1_type        = f_profile(ma1_type, ma1_type, ma1_type, ma1_type)
-eff_ma2_type        = f_profile(ma2_type, ma2_type, ma2_type, ma2_type)
+eff_en_cloud        = f_preset(en_cloud,          false,    false, false, false, false, true)
+eff_sig_plot        = f_preset(sig_plot,          sig_plot, sig_plot, sig_plot, sig_plot, sig_plot, sig_plot)
+eff_ma1_type        = f_preset_str(ma1_type, ma1_type, ma1_type, ma1_type, ma1_type, ma1_type, ma1_type)
+eff_ma2_type        = f_preset_str(ma2_type, ma2_type, ma2_type, ma2_type, ma2_type, ma2_type, ma2_type)
 
-eff_plot_div        = f_profile(plot_div, false, plot_div, plot_div) // Div: Norm/Mod
+eff_plot_div        = f_preset(plot_div,          false,    false, false, true,  false, false)
 
 // Bar Patterns
-eff_plot_l12_bar    = f_profile(plot_l12_bar, false, plot_l12_bar, plot_l12_bar)
-eff_plot_nr_bar     = f_profile(plot_nr_bar, false, plot_nr_bar, plot_nr_bar)
-eff_plot_i_bar      = f_profile(plot_i_bar, false, plot_i_bar, plot_i_bar)
-eff_plot_o_bar      = f_profile(plot_o_bar, false, plot_o_bar, plot_o_bar)
-eff_plot_s_bar      = f_profile(plot_s_bar, false, plot_s_bar, plot_s_bar)
-eff_plot_f_bar      = f_profile(plot_f_bar, false, plot_f_bar, plot_f_bar)
+eff_plot_l12_bar    = f_preset(plot_l12_bar,      false,    false, true,  false, false, false)
+eff_plot_nr_bar     = f_preset(plot_nr_bar,       false,    false, false, false, false, false)
+eff_plot_i_bar      = f_preset(plot_i_bar,        false,    false, false, false, false, false)
+eff_plot_o_bar      = f_preset(plot_o_bar,        false,    false, true,  false, false, false)
+eff_plot_s_bar      = f_preset(plot_s_bar,        false,    false, false, false, false, false)
+eff_plot_f_bar      = f_preset(plot_f_bar,        false,    false, true,  false, false, false)
 
-eff_plot_segments   = f_profile(plot_segments, plot_segments, plot_segments, plot_segments)
+eff_plot_segments   = f_preset(plot_segments,     false,    false, true,  false, false, false)
 
-// Pivots (Classic) - Min: Off
-eff_plot_pivots_h1  = f_profile(plot_pivots_h1, false, plot_pivots_h1, plot_pivots_h1)
-eff_plot_pivots_h4  = f_profile(plot_pivots_h4, false, plot_pivots_h4, plot_pivots_h4)
-eff_plot_pivots_d   = f_profile(plot_pivots_d, false, plot_pivots_d, plot_pivots_d)
-eff_plot_pivots_w   = f_profile(plot_pivots_w, false, plot_pivots_w, plot_pivots_w)
-eff_plot_pivots_m   = f_profile(plot_pivots_m, false, plot_pivots_m, plot_pivots_m)
-eff_plot_pivots_3m  = f_profile(plot_pivots_3m, false, plot_pivots_3m, plot_pivots_3m)
-eff_plot_pivots_12m = f_profile(plot_pivots_12m, false, plot_pivots_12m, plot_pivots_12m)
+// Pivots (Classic)
+eff_plot_pivots_h1  = f_preset(plot_pivots_h1,    false,    false, false, false, false, false)
+eff_plot_pivots_h4  = f_preset(plot_pivots_h4,    false,    false, false, false, false, false)
+eff_plot_pivots_d   = f_preset(plot_pivots_d,     false,    false, false, true,  true,  true)
+eff_plot_pivots_w   = f_preset(plot_pivots_w,     false,    false, false, true,  true,  true)
+eff_plot_pivots_m   = f_preset(plot_pivots_m,     false,    false, false, false, true,  true)
+eff_plot_pivots_3m  = f_preset(plot_pivots_3m,    false,    false, false, false, false, false)
+eff_plot_pivots_12m = f_preset(plot_pivots_12m,   false,    false, false, false, false, false)
 
-// Sessions - Min: Off
-eff_london_show     = f_profile(london_show, false, london_show, london_show)
-eff_ny_show         = f_profile(ny_show, false, ny_show, ny_show)
-eff_tokyo_show      = f_profile(tokyo_show, false, tokyo_show, tokyo_show)
-eff_sydney_show     = f_profile(sydney_show, false, sydney_show, sydney_show)
+// Sessions
+eff_london_show     = f_preset(london_show,       true,     true,  false, false, false, false)
+eff_ny_show         = f_preset(ny_show,           true,     true,  false, false, false, false)
+eff_tokyo_show      = f_preset(tokyo_show,        true,     true,  false, false, false, false)
+eff_sydney_show     = f_preset(sydney_show,       true,     true,  false, false, false, false)
 
-// Session BG Flag (Minimal = OFF)
-eff_sess_bg_enable  = f_profile(true, false, true, true)
+// Session BG Flag
+eff_sess_bg_enable  = f_preset(true,              true,     true,  false, false, false, false)
 
 int active_sec_calls = 0
 // Performance Counters (Per Bar)
@@ -2605,182 +2661,7 @@ else
         tbl_dbg := na
         
 
-//--------------------------------------------------------- STAGE 6: CONFLUENCE METER ---------------------------------------------------------
-
-// Calculations
-// Changed to Series (removed var) to allow historical background plotting
-float conf_score = 50.0
-string conf_bias = "Neutral"
-
-eff_calc_conf = eff_show_conf_meter or show_conf_bg
-
-if eff_calc_conf
-    float bull_pts = 0.0
-    float bear_pts = 0.0
-    float total_w  = 0.0
-
-    // 1. Trendlines (W_TL = 3)
-    if eff_plot_trendline
-        total_w += W_TL
-        if sig_tl_bull
-            bull_pts += W_TL
-        else if sig_tl_bear
-            bear_pts += W_TL
-
-    // 2. Segments (W_SEG = 2)
-    if eff_plot_segments
-        total_w += W_SEG
-        if sig_seg_bull
-            bull_pts += W_SEG
-        else if sig_seg_bear
-            bear_pts += W_SEG
-
-    // 3. MA / EMA Cross (W_MA = 1, W_CLOUD = 1)
-    // Cloud
-    if eff_en_cloud
-        total_w += W_CLOUD
-        if sig_ema_bull
-            bull_pts += W_CLOUD
-        else if sig_ema_bear
-            bear_pts += W_CLOUD
-
-    // MA1/MA2
-    if eff_ma1_type != "None" and eff_ma2_type != "None"
-        total_w += W_MA
-        if ma1_val > ma2_val
-            bull_pts += W_MA
-        else
-            bear_pts += W_MA
-
-    // MA Slope Logic (W_SLOPE = 1)
-    bool active_slope_1 = eff_ma1_type != "None" and ma1_slope_c
-    bool active_slope_2 = eff_ma2_type != "None" and ma2_slope_c
-
-    bool is_bull_1 = ma1_val >= ma1_val[1]
-    bool is_bull_2 = ma2_val >= ma2_val[1]
-
-    if active_slope_1 and active_slope_2
-        // Both active: Must agree to count
-        if is_bull_1 == is_bull_2
-            total_w += W_SLOPE
-            if is_bull_1
-                bull_pts += W_SLOPE
-            else
-                bear_pts += W_SLOPE
-    else if active_slope_1
-        total_w += W_SLOPE
-        if is_bull_1
-            bull_pts += W_SLOPE
-        else
-            bear_pts += W_SLOPE
-    else if active_slope_2
-        total_w += W_SLOPE
-        if is_bull_2
-            bull_pts += W_SLOPE
-        else
-            bear_pts += W_SLOPE
-
-    // 4. Divergence (W_DIV = 2)
-    if eff_plot_div
-        total_w += W_DIV
-        if sig_div_bull
-            bull_pts += W_DIV
-        else if sig_div_bear
-            bear_pts += W_DIV
-
-    // 5. Pattern (W_PAT = 2)
-    if eff_plot_l12_bar // L12 uses W_L12 actually, Plan said "L12: 1", "Pattern: 2". Pattern is likely F-Bar.
-        total_w += W_L12
-        if sig_l12_bull
-            bull_pts += W_L12
-        else if sig_l12_bear
-            bear_pts += W_L12
-
-    if eff_plot_f_bar // Fakey/Pin
-        total_w += W_PAT
-        if sig_pat_bull
-            bull_pts += W_PAT
-        else if sig_pat_bear
-            bear_pts += W_PAT
-
-    // Outside Bar (W_O = 1)
-    if eff_plot_o_bar
-        total_w += W_O
-        if sig_o_bull
-            bull_pts += W_O
-        else if sig_o_bear
-            bear_pts += W_O
-
-    // KAMA (W_KAMA = 3)
-    total_w += W_KAMA
-    if sig_kama_bull
-        bull_pts += W_KAMA
-    else if sig_kama_bear
-        bear_pts += W_KAMA
-
-    // 6. FVG (W_FVG = 1)
-    if eff_plot_fvg1 or eff_plot_fvg2
-        total_w += W_FVG
-        if sig_fvg_bull
-            bull_pts += W_FVG
-        else if sig_fvg_bear
-            bear_pts += W_FVG
-
-    // 7. Vol Spike (W_VOL = 1)
-    if eff_show_vol
-        if sig_vol_spike
-            total_w += W_VOL
-            if close > open
-                bull_pts += W_VOL
-            else
-                bear_pts += W_VOL
-
-    // 8. Fractal Break (W_FR = 3)
-    if eff_fractals_plot
-        total_w += W_FR
-        if fr_state_inf == 1
-            bull_pts += W_FR
-        else if fr_state_inf == -1
-            bear_pts += W_FR
-
-    // 9. Bollinger Band Touch (W_BB = 1)
-    if eff_BB_plot
-        // Re-calculate touch logic here or reuse variables if scope allows.
-        // Variables 'approach_up' and 'approach_dn' are local to the BB block above.
-        // We need to re-evaluate or check global scope.
-        // Since 'approach_up' was defined in local scope of 'if eff_BB_plot' block above (lines 1730-1755 approx),
-        // we cannot access it here directly if it wasn't declared global.
-        // Checking code... 'approach_up' and 'approach_dn' were initialized to false at line 1736 in global scope.
-        // So we can use them.
-
-        // approach_dn (Low < Lower) -> Long Signal (Bullish)
-        if approach_dn
-            total_w += W_BB
-            bull_pts += W_BB
-
-        // approach_up (High > Upper) -> Short Signal (Bearish)
-        if approach_up
-            total_w += W_BB
-            bear_pts += W_BB
-
-    // Calc Score 0-100
-    if total_w > 0
-        float net_pts = bull_pts - bear_pts
-        conf_score := 50 + (net_pts / total_w) * 50
-    else
-        conf_score := 50.0
-
-    conf_bias := conf_score > 55 ? "Bull" : conf_score < 45 ? "Bear" : "Neutral"
-
-    // Visualization (Table) - Restricted to Last Bar and Panel Toggle
-    if barstate.islast and eff_show_conf_meter and not na(info_panel)
-        color c_conf = conf_score > 55 ? color.green : conf_score < 45 ? color.red : color.new(color.gray, 100) // Transparent Neutral
-        table.cell(info_panel, 0, 10, "CONF", text_size=size.small, text_color=color.silver)
-        table.cell(info_panel, 1, 10, str.tostring(math.round(conf_score)), text_size=size.small, text_color=color.white, bgcolor=color.new(c_conf, 30))
-        table.merge_cells(info_panel, 1, 10, 2, 10)
-
-
-// --- Stage 7: Regime ---
+// --- Stage 7 (Moved Up): Regime ---
 // Trend / Range / Squeeze
 
 var string regime_state = "Range"
@@ -2809,14 +2690,198 @@ else
     regime_state := "RANGE"
     regime_bg := na
 
-// Update Panel
-// Safe Write Helper not strictly needed if we check indices, but here we just check if active.
+// Update Panel (Moved Up)
 if eff_regime_panel and not na(info_panel) and barstate.islast
-    // Use fixed index 11 (Safe now as Rows = 14)
     color c_reg_bg = regime_state == "SQUEEZE" ? color.new(color.yellow, 30) : regime_state == "TREND" ? color.new(color.blue, 30) : color.new(color.gray, 100)
     table.cell(info_panel, 0, 11, "REG", text_size=size.small, text_color=color.silver)
     table.cell(info_panel, 1, 11, regime_state, text_size=size.small, text_color=color.white, bgcolor=c_reg_bg)
     table.merge_cells(info_panel, 1, 11, 2, 11)
+
+
+//--------------------------------------------------------- CONF Engine v2: Core + Confirm + Regime Gate ---------------------------------------------------------
+
+float conf_score = 50.0
+string conf_bias = "Neutral"
+float final_raw = 0.0 // Exposed for Alerts
+
+eff_calc_conf = eff_show_conf_meter or show_conf_bg
+
+// Core Weights
+float W_FR_CORE = 4.0
+float W_FVG_CORE = 4.0
+float W_KAMA_CORE = 2.0
+
+// Variables for Smoothing & State
+var int conf_state_engine = 0 // 0=Neut, 1=Bull, -1=Bear
+
+if eff_calc_conf
+    // --- 1. Core Score Calculation ---
+    float core_w_sum = 0.0
+    float core_raw_sum = 0.0
+
+    // Fractals (Core)
+    if eff_fractals_plot
+        core_w_sum += W_FR_CORE
+        core_raw_sum += (fr_state_inf * W_FR_CORE)
+
+    // FVG (Core + Regime Gate)
+    // Gate: Dampen FVG in SQUEEZE
+    float w_fvg_effective = W_FVG_CORE
+    if regime_state == "SQUEEZE"
+        w_fvg_effective := W_FVG_CORE * 0.35
+
+    // Always available (Core). FVG State is calculated globally on Current TF.
+    core_w_sum += w_fvg_effective
+    core_raw_sum += (fvg_state_inf * w_fvg_effective)
+
+    // KAMA (Core)
+    float kama_val_score = 0.0
+    if sig_kama_bull
+        kama_val_score := 1.0
+    else if sig_kama_bear
+        kama_val_score := -1.0
+
+    core_w_sum += W_KAMA_CORE
+    core_raw_sum += (kama_val_score * W_KAMA_CORE)
+
+    // Calculate Core Raw (-1.0 to 1.0)
+    float core_raw = (core_w_sum > 0) ? (core_raw_sum / core_w_sum) : 0.0
+
+    // --- 2. Smoothing & Hysteresis ---
+    float core_smooth = ta.ema(core_raw, 8) // Smoothing Period 8
+
+    // State Machine
+    // Enter Bull: > 0.12 (2 bars), Exit: < 0.04
+    // Enter Bear: < -0.12 (2 bars), Exit: > -0.04
+
+    bool enter_bull = core_smooth > 0.12
+    bool enter_bear = core_smooth < -0.12
+    bool enter_bull_p = enter_bull and enter_bull[1] // Persistence
+    bool enter_bear_p = enter_bear and enter_bear[1]
+
+    if conf_state_engine == 0 // Neutral
+        if enter_bull_p
+            conf_state_engine := 1
+        else if enter_bear_p
+            conf_state_engine := -1
+    else if conf_state_engine == 1 // Bull
+        if core_smooth < 0.04
+            conf_state_engine := 0
+    else if conf_state_engine == -1 // Bear
+        if core_smooth > -0.04
+            conf_state_engine := 0
+
+    // --- 3. Confirm-Events (Overlay) ---
+    // Trendlines & Segments with Decay
+    var float ov_tl = 0.0
+    var float ov_seg = 0.0
+    float decay = 0.70
+
+    // Update Overlay States
+    if sig_tl_bull
+        ov_tl := 1.0
+    else if sig_tl_bear
+        ov_tl := -1.0
+    else
+        ov_tl := ov_tl * decay // Decay
+
+    if sig_seg_bull
+        ov_seg := 1.0
+    else if sig_seg_bear
+        ov_seg := -1.0
+    else
+        ov_seg := ov_seg * decay
+
+    // Calculate Overlay Contribution
+    // Weighted Average of active overlays
+    float ov_w_sum = 0.0
+    float ov_raw_sum = 0.0
+
+    if eff_plot_trendline
+        ov_w_sum += 1.0
+        ov_raw_sum += ov_tl
+
+    if eff_plot_segments
+        ov_w_sum += 1.0
+        ov_raw_sum += ov_seg
+
+    float overlay_raw = (ov_w_sum > 0) ? (ov_raw_sum / ov_w_sum) : 0.0
+    // Clamp Overlay (Anti-Flip)
+    float overlay_clamped = math.max(-0.15, math.min(0.15, overlay_raw))
+
+    // --- 4. Final Calculation & Confidence Gate ---
+    final_raw := core_smooth + overlay_clamped
+    // Clamp Final
+    final_raw := math.max(-1.0, math.min(1.0, final_raw))
+
+    // Regime Confidence Gate (Dampen the Score magnitude, but preserve direction/state)
+    float conf_gate = 1.0
+    if regime_state == "SQUEEZE"
+        conf_gate := 0.40
+    else if regime_state == "RANGE"
+        conf_gate := 0.70
+
+    // Apply Gate to Magnitude relative to 50
+    // Score 0-100. Center 50.
+    // 50 + (50 * final_raw * gate)
+    conf_score := 50 + (50 * final_raw * conf_gate)
+
+    // Determine Display Bias based on ENGINE STATE, not just score
+    conf_bias := conf_state_engine == 1 ? "BULL" : conf_state_engine == -1 ? "BEAR" : "NEUT"
+
+    // --- 5. Quality Tag (H/M/L) ---
+    // Agreement: How many cores match the state?
+    // Cores: FR, FVG, KAMA
+    float aligned_core = 0.0
+    float active_core = 0.0
+    int state_sign = conf_state_engine // 1, -1, 0
+
+    // Helper for sign match (0 matches nothing)
+    // FR
+    if eff_fractals_plot
+        active_core += 1.0
+        if state_sign != 0 and math.sign(fr_state_inf) == state_sign
+            aligned_core += 1.0
+
+    // FVG (Use effective weight presence)
+    if eff_plot_fvg1 or eff_plot_fvg2
+        active_core += 1.0
+        if state_sign != 0 and math.sign(fvg_state_inf) == state_sign
+            aligned_core += 1.0
+
+    // KAMA
+    active_core += 1.0
+    float kama_sign = sig_kama_bull ? 1.0 : sig_kama_bear ? -1.0 : 0.0
+    if state_sign != 0 and kama_sign == state_sign
+        aligned_core += 1.0
+
+    float agreement = (active_core > 0) ? (aligned_core / active_core) : 0.0
+    float magnitude = math.abs(final_raw)
+
+    string quality = "L"
+    if magnitude >= 0.35 and agreement >= 0.66 and regime_state != "SQUEEZE"
+        quality := "H"
+    else if magnitude >= 0.20 and agreement >= 0.50
+        quality := "M"
+    else
+        quality := "L"
+
+    // --- 6. Visualization (Panel) ---
+    // BULL 72 H / NEUT 50 L
+    if barstate.islast and eff_show_conf_meter and not na(info_panel)
+        string panel_txt = conf_bias + " " + str.tostring(math.round(conf_score)) + " " + quality
+
+        color c_conf = color.new(color.gray, 100) // Default Transp
+        if conf_state_engine == 1 // Bull
+            c_conf := color.new(color.green, 30)
+        else if conf_state_engine == -1 // Bear
+            c_conf := color.new(color.red, 30)
+
+        // Neutral remains transparent
+
+        table.cell(info_panel, 0, 10, "CONF", text_size=size.small, text_color=color.silver)
+        table.cell(info_panel, 1, 10, panel_txt, text_size=size.small, text_color=color.white, bgcolor=c_conf)
+        table.merge_cells(info_panel, 1, 10, 2, 10)
 
 // --- CENTRALIZED BACKGROUND ROUTING (Fix Bug #2) ---
 color bg_final = na
