@@ -53,6 +53,28 @@ show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tool
                       \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n• Independent Controls: Toggle Panel and Background separately.")
 regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
 
+// ADR / Range-Expectation
+grp_adr             = "ADR / Today's Range Gate"
+inp_use_adr_gate    = input.bool(true, "Use ADR/ATR Gates", group=grp_adr, tooltip="Reduces Confluence Quality if price extended beyond expected daily range.")
+adr_len             = input.int(20, "ADR Length (D)", minval=5, group=grp_adr)
+adr_warn_pct        = input.float(85, "ADR Exhaustion (warn %)", step=1, group=grp_adr)
+adr_hard_pct        = input.float(110, "ADR Exhaustion (hard %)", step=1, group=grp_adr)
+show_adr_info       = input.bool(false, "Show ADR% info", group=grp_adr)
+
+// ATR Expansion
+grp_atr             = "ATR Expansion & Norm"
+atr_len             = input.int(14, "ATR Length", minval=5, group=grp_atr)
+atr_norm_len        = input.int(50, "ATR Norm Length", minval=20, group=grp_atr, tooltip="Reference MA length to normalize current ATR.")
+atr_low             = input.float(0.90, "ATR Low Threshold", step=0.01, group=grp_atr, tooltip="Below this ratio (ATR/Ref), market is considered 'Low Volatility'.")
+atr_high            = input.float(1.10, "ATR High Threshold", step=0.01, group=grp_atr, tooltip="Above this ratio, market is 'High Volatility'.")
+
+// Keltner Channel Squeeze
+grp_kc              = "Keltner Channel Squeeze"
+inp_use_kc_squeeze  = input.bool(true, "Use Keltner Squeeze", group=grp_kc, tooltip="Adds 'BB inside KC' condition to Squeeze detection.")
+kc_len              = input.int(20, "KC Length", minval=5, group=grp_kc)
+kc_mult             = input.float(1.5, "KC Mult (ATR)", step=0.1, group=grp_kc)
+inp_squeeze_strict  = input.bool(true, "Squeeze Strict (BB inside KC)", group=grp_kc, tooltip="Strict: BBW Squeeze AND BB inside KC.\nSoft: BBW Squeeze OR BB inside KC.")
+
 // Stage 0 — Definitions & Guardrails
 // 0.1 Begriffe
 // Core Components (Trend Bias relevant):
@@ -431,6 +453,11 @@ ON_PS           = eff_ps_mode != "None"
 eff_show_conf_meter = show_conf_meter
 eff_regime_panel    = show_regime_panel
 eff_regime_bg_mode  = regime_bg_mode
+
+// ADR/KC Presets
+eff_use_adr_gate    = f_preset(inp_use_adr_gate,   true, true, true,  true, true, true)
+eff_use_kc_squeeze  = f_preset(inp_use_kc_squeeze, true, true, false, true, true, true)
+squeeze_strict      = f_preset(inp_squeeze_strict, true, true, true,  true, true, true)
 
 //----------------- Global Signal Registry (For Alerts & Confluence) -----------------
 // These variables are reset to false/na on every bar execution
@@ -2661,19 +2688,76 @@ else
         tbl_dbg := na
         
 
-// --- Stage 7 (Moved Up): Regime ---
+// --- Stage 2: ADR/Today Range Calculation ---
+float d_range = na
+float adr = na
+float adr_pct = na
+
+if eff_use_adr_gate
+    // 1. Daily Range (Developing) - Uses lookahead to capture current developing range on intraday
+    d_range := request.security(syminfo.tickerid, "D", high - low, lookahead=barmerge.lookahead_on)
+
+    // 2. ADR (Historical/Stable)
+    adr := request.security(syminfo.tickerid, "D", ta.sma(high - low, adr_len))
+    active_sec_calls += 2
+
+    // 3. ADR %
+    if not na(d_range) and not na(adr) and adr > 0
+        adr_pct := (d_range / adr) * 100
+
+// Optional Debug Info
+plot(eff_use_adr_gate and show_adr_info ? adr_pct : na, title="ADR %", color=color.new(color.white, 100), display=display.data_window)
+
+var label lbl_adr = na
+if eff_use_adr_gate and show_adr_info and barstate.islast
+    label.delete(lbl_adr)
+    lbl_adr := label.new(bar_index, high, "ADR%: " + str.tostring(adr_pct, "#.#") + "%", yloc=yloc.abovebar, color=color.new(color.gray, 50), textcolor=color.white, style=label.style_label_down, size=size.small)
+
+
+// --- Stage 3: ATR Expansion Logic ---
+float calc_atr = ta.atr(atr_len)
+float atr_ref  = ta.sma(calc_atr, atr_norm_len)
+float atr_norm = (not na(atr_ref) and atr_ref > 0) ? (calc_atr / atr_ref) : 1.0
+
+bool atr_is_low  = atr_norm < atr_low
+bool atr_is_high = atr_norm > atr_high
+
+
+// --- Stage 4: Keltner Channel & Squeeze Detector ---
+// KC Calc
+float kc_mid = ta.ema(close, kc_len)
+float kc_range = ta.atr(kc_len)
+float kc_up = kc_mid + (kc_range * kc_mult)
+float kc_dn = kc_mid - (kc_range * kc_mult)
+
+// BB Calc (Specific for Squeeze - Standard 20/2.0 per Regime defaults)
+[s_bb_mid, s_bb_up, s_bb_dn] = ta.bb(close, 20, 2.0)
+
+// KC Squeeze: BB is fully INSIDE KC
+bool squeeze_kc = (s_bb_up < kc_up) and (s_bb_dn > kc_dn)
+
+
+// --- Stage 5 (Regime Upgrade): Squeeze Integration ---
 // Trend / Range / Squeeze
 
 var string regime_state = "Range"
 var color regime_bg = na
 
 // Calculate Regime regardless of display for history
-// Calc BBW
-[bb_m, bb_u, bb_l] = ta.bb(close, 20, 2.0)
-bbw = (bb_u - bb_l) / bb_m
-// Squeeze
+// Calc BBW (Standard 20, 2.0) - Reusing Stage 4 values
+bbw = (s_bb_up - s_bb_dn) / s_bb_mid
 avg_bbw = ta.sma(bbw, 50)
-is_squeeze = bbw < (avg_bbw * 0.7)
+
+// 1. BBW Squeeze (Original Logic)
+bool is_squeeze_bbw = bbw < (avg_bbw * 0.7)
+
+// 2. Combine with KC Squeeze (Stage 4)
+bool is_squeeze = is_squeeze_bbw // Default
+if eff_use_kc_squeeze
+    if squeeze_strict
+        is_squeeze := is_squeeze_bbw and squeeze_kc
+    else
+        is_squeeze := is_squeeze_bbw or squeeze_kc
 
 // Calc ADX
 [_, _, adx_r] = ta.dmi(14, 14)
@@ -2806,8 +2890,20 @@ if eff_calc_conf
         ov_raw_sum += ov_seg
 
     float overlay_raw = (ov_w_sum > 0) ? (ov_raw_sum / ov_w_sum) : 0.0
+
+    // --- Stage 8: Confirm-Events Upgrade (ATR Filter) ---
+    float ov_scale = 1.0
+    if atr_is_low
+        ov_scale := 0.60
+    else if atr_is_high
+        ov_scale := 1.00
+
     // Clamp Overlay (Anti-Flip)
-    float overlay_clamped = math.max(-0.15, math.min(0.15, overlay_raw))
+    float overlay_clamped = math.max(-0.15, math.min(0.15, overlay_raw)) * ov_scale
+
+    // --- 6.1 ADR Exhaustion Flags (Stage 6) ---
+    bool adr_warn = eff_use_adr_gate and not na(adr_pct) and adr_pct >= adr_warn_pct
+    bool adr_hard = eff_use_adr_gate and not na(adr_pct) and adr_pct >= adr_hard_pct
 
     // --- 4. Final Calculation & Confidence Gate ---
     final_raw := core_smooth + overlay_clamped
@@ -2820,6 +2916,12 @@ if eff_calc_conf
         conf_gate := 0.40
     else if regime_state == "RANGE"
         conf_gate := 0.70
+
+    // ADR Gate Add-on (Confidence Dampening)
+    if adr_warn
+        conf_gate := conf_gate * 0.85
+    if adr_hard
+        conf_gate := conf_gate * 0.70
 
     // Apply Gate to Magnitude relative to 50
     // Score 0-100. Center 50.
@@ -2865,6 +2967,20 @@ if eff_calc_conf
         quality := "M"
     else
         quality := "L"
+
+    // --- Stage 9: Quality Degrade (ADR/ATR) ---
+    if adr_warn
+        if quality == "H"
+            quality := "M"
+        else if quality == "M"
+            quality := "L"
+
+    if adr_hard
+        quality := "L"
+
+    // Optional: Low ATR in Non-Trend degrade
+    if atr_is_low and regime_state != "TREND" and quality == "H"
+        quality := "M"
 
     // --- 6. Visualization (Panel) ---
     // BULL 72 H / NEUT 50 L
