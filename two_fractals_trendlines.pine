@@ -29,7 +29,7 @@ int W_O     = 1
 // --- TOP LEVEL UI ---
 auto_tuning     = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Auto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
 
-profile_mode    = input.string("Custom", "Profile Mode", options=["Session Open","ORB","Price Action","Range","S&R","Long Term","Custom"], tooltip="Opinionated Defaults for specific trading styles. \n• Custom: Full manual control of all checkboxes.")
+trading_approach = input.string("Custom", "Trading Approach", options=["Custom", "Session Map", "ORB", "Mean Reversion", "Breakout", "Squeeze Breakout", "Trend Continuation"], tooltip="Presets for specific trading workflows. \n• Custom: Full manual control.\n• Session Map: Structure, Key Levels, ADR.\n• ORB: Opening Range, RVOL.\n• Mean Reversion: VWAP, Bands, Divergences.\n• Breakout/Squeeze: RVOL, Structure, Momentum.\n• Trend Continuation: CONF/REG, FVG.")
 
 // adx, hma and ema1 x ema2 mtf trend info panel
 panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
@@ -265,6 +265,63 @@ fvg2_limit      = input.int(5, title="⠀⠀ Visible Boxes", minval=1, maxval=50
 col_fvg2_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg2, inline="f2_3")
 col_fvg2_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀⠀⠀⠀ Bearish Color", group=grp_fvg2, inline="f2_3")
 
+// Key Levels Inputs
+grp_key             = "Key Levels"
+key_levels_enabled  = input.bool(true, "Key Levels ⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_key, tooltip="Displays Previous Daily High/Low and Open levels.")
+show_pdh            = input.bool(true, "PDH", inline="kl_1", group=grp_key)
+show_pdl            = input.bool(true, "PDL", inline="kl_1", group=grp_key)
+show_pdc            = input.bool(false, "PDC", inline="kl_1", group=grp_key)
+show_wopen          = input.bool(true, "Weekly Open", inline="kl_2", group=grp_key)
+show_mopen          = input.bool(false, "Monthly Open", inline="kl_2", group=grp_key)
+key_style           = input.string("Lines", "Style", options=["Lines", "Labels", "Both"], inline="kl_3", group=grp_key)
+key_extend          = input.bool(true, "Extend", inline="kl_3", group=grp_key)
+
+// RVOL Inputs
+grp_rvol            = "Relative Volume (RVOL)"
+rvol_enabled        = input.bool(true, "RVOL Enabled ⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_rvol, tooltip="Relative Volume: Current Volume / Average Volume.")
+rvol_len            = input.int(20, "Length", minval=1, group=grp_rvol, inline="rv_1")
+rvol_display        = input.string("Marker", "Display", options=["None", "Marker", "Label", "Both"], group=grp_rvol, inline="rv_1")
+rvol_th_1           = input.float(1.2, "Low", step=0.1, group=grp_rvol, inline="rv_2")
+rvol_th_2           = input.float(2.0, "Med", step=0.1, group=grp_rvol, inline="rv_2")
+rvol_th_3           = input.float(3.0, "High", step=0.1, group=grp_rvol, inline="rv_2")
+tod_rvol_enabled    = input.bool(false, "ToD RVOL (Heavy)", group=grp_rvol, tooltip="⚠ Experimental: Uses Time-of-Day specific averages. Uses arrays.")
+
+// VWAP Inputs
+grp_vwap            = "VWAP"
+vwap_enabled        = input.bool(true, "VWAP Enabled ⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_vwap)
+vwap_anchor         = input.string("Session (Daily Reset)", "Anchor", options=["Session (Daily Reset)", "Weekly"], group=grp_vwap, inline="vw_1")
+vwap_src            = input.source(hlc3, "Source", group=grp_vwap, inline="vw_1")
+vwap_show_line      = input.bool(true, "Show Line", group=grp_vwap, inline="vw_2")
+vwap_only_sess      = input.bool(false, "Calc Only in Sessions", group=grp_vwap, inline="vw_2", tooltip="Pauses accumulation outside configured trading sessions.")
+
+vwap_bands_enabled  = input.bool(true, "Bands Enabled", group=grp_vwap, inline="vw_3")
+vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_3")
+vwap_stdev_len      = input.int(100, "Rolling Len", minval=2, group=grp_vwap, inline="vw_3")
+band_k1             = input.float(1.0, "K1", step=0.5, group=grp_vwap, inline="vw_4")
+band_k2             = input.float(2.0, "K2", step=0.5, group=grp_vwap, inline="vw_4")
+band_k3             = input.float(3.0, "K3", step=0.5, group=grp_vwap, inline="vw_4")
+
+vwap_z_enabled      = input.bool(true, "Z-Score Enabled", group=grp_vwap, inline="vw_5")
+z_th_entry          = input.float(2.0, "Entry Th", step=0.1, group=grp_vwap, inline="vw_5")
+z_th_tp             = input.float(2.5, "TP Th", step=0.1, group=grp_vwap, inline="vw_5")
+z_th_ext            = input.float(3.0, "Ext Th", step=0.1, group=grp_vwap, inline="vw_5")
+
+// OR/IB Inputs
+grp_or              = "Opening Range / Initial Balance"
+or_enabled          = input.bool(true, "OR/IB Enabled ⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_or)
+or_type             = input.string("Opening Range", "Type", options=["Opening Range", "Initial Balance"], group=grp_or, inline="or_1")
+or_sess             = input.string("New York", "Session", options=["London", "New York", "Custom"], group=grp_or, inline="or_1")
+or_cust             = input.session("0930-1600", "Custom Sess", group=grp_or, inline="or_2")
+or_min              = input.int(15, "Duration (Min)", minval=1, group=grp_or, inline="or_2")
+or_display          = input.string("Box+Lines", "Display", options=["Box+Lines", "Box", "Lines"], group=grp_or, inline="or_3")
+or_lock             = input.bool(true, "Lock after Window", group=grp_or, inline="or_3")
+
+// Squeeze Box
+grp_sq              = "Squeeze Box"
+sq_box_enabled      = input.bool(true, "Squeeze Box ⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_sq)
+sq_source           = input.string("REG=SQUEEZE", "Source", options=["REG=SQUEEZE"], group=grp_sq)
+sq_lock             = input.bool(true, "Lock on Release", group=grp_sq)
+
 // Smart MTF S&R
 grp_psr             = "Smart S&R (Support & Resistance)"
 ps_mode             = input.string("None", title="Smart S&R", options=["None", "Manuell", "Auto"], group=grp_psr, inline="en_tf", tooltip="")
@@ -301,6 +358,34 @@ type ActiveSD
     bool  is_bull
     bool  mitigated
     int   start_time
+
+// --- New UDTs ---
+type VwapState
+    float cumVol
+    float cumPV
+    float vwap
+
+type WelfordState
+    int n
+    float mean
+    float m2
+
+type OrState
+    int start_bar
+    float hi
+    float lo
+    bool building
+    bool locked
+    box id_box
+    line l_hi
+    line l_lo
+
+type SqState
+    float hi
+    float lo
+    bool active
+    bool locked
+    box id_box
 
 // Bollinger Bands
 grp_bb              = 'Bollinger Bands'
@@ -443,96 +528,119 @@ transp_bg           = input.int(85, 'Background Color Transparency', minval=1, m
 // Stage 0: Centralized Gating Flags as aliases for inputs
 
 // Preset Helper
-f_preset(_custom, _sessOpen, _orb, _pa, _range, _sr, _lt) =>
+f_approach_bool(_custom, _sessMap, _orb, _mr, _brk, _sqzBrk, _trend) =>
     result = _custom
-    if profile_mode == "Session Open"
-        result := _sessOpen
-    else if profile_mode == "ORB"
+    if trading_approach == "Session Map"
+        result := _sessMap
+    else if trading_approach == "ORB"
         result := _orb
-    else if profile_mode == "Price Action"
-        result := _pa
-    else if profile_mode == "Range"
-        result := _range
-    else if profile_mode == "S&R"
-        result := _sr
-    else if profile_mode == "Long Term"
-        result := _lt
+    else if trading_approach == "Mean Reversion"
+        result := _mr
+    else if trading_approach == "Breakout"
+        result := _brk
+    else if trading_approach == "Squeeze Breakout"
+        result := _sqzBrk
+    else if trading_approach == "Trend Continuation"
+        result := _trend
     result
 
 // Preset Helper for Strings
-f_preset_str(_custom, _sessOpen, _orb, _pa, _range, _sr, _lt) =>
+f_approach_str(_custom, _sessMap, _orb, _mr, _brk, _sqzBrk, _trend) =>
     result = _custom
-    if profile_mode == "Session Open"
-        result := _sessOpen
-    else if profile_mode == "ORB"
+    if trading_approach == "Session Map"
+        result := _sessMap
+    else if trading_approach == "ORB"
         result := _orb
-    else if profile_mode == "Price Action"
-        result := _pa
-    else if profile_mode == "Range"
-        result := _range
-    else if profile_mode == "S&R"
-        result := _sr
-    else if profile_mode == "Long Term"
-        result := _lt
+    else if trading_approach == "Mean Reversion"
+        result := _mr
+    else if trading_approach == "Breakout"
+        result := _brk
+    else if trading_approach == "Squeeze Breakout"
+        result := _sqzBrk
+    else if trading_approach == "Trend Continuation"
+        result := _trend
     result
 
 // Effective Feature Flags
-//                                          Cust           SessOpen  ORB    PA     Range  S&R    LT
-eff_fractals_plot   = f_preset(fractals_plot,     true,     true,  true,  true,  true,  true)
-eff_sub_fractals    = f_preset(sub_fractals,      false,    false, false, false, false, false)
-eff_plot_trendline  = f_preset(plot_trendline,    false,    true,  true,  false, false, false)
+//                                          Cust           SessMap   ORB    MR     Brk    SqzBrk  Trend
+eff_fractals_plot   = f_approach_bool(fractals_plot,      true,     true,  true,  true,  true,   true)
+eff_sub_fractals    = f_approach_bool(sub_fractals,       false,    false, false, false, false,  false)
+eff_plot_trendline  = f_approach_bool(plot_trendline,     false,    true,  false, true,  true,   true)
 
-eff_vp_enable       = f_preset(vp_enable,         false,    false, false, false, false, false)
-eff_vp_smart        = f_preset(vp_smart,          vp_smart, vp_smart, vp_smart, vp_smart, vp_smart, vp_smart)
+eff_vp_enable       = f_approach_bool(vp_enable,          false,    false, false, false, false,  false)
+eff_vp_smart        = f_approach_bool(vp_smart,           vp_smart, false, false, false, false,  false)
 
-eff_show_mtf_candles= f_preset(show_mtf_candles,  false,    false, false, false, false, false)
+eff_show_mtf_candles= f_approach_bool(show_mtf_candles,   false,    false, false, false, false,  false)
 
-eff_use_sess_1st    = f_preset(use_sess_1st,      true,     true,  false, false, false, false)
-eff_show_pch_pcl    = f_preset(show_pch_pcl,      true,     false, false, false, true,  false)
-eff_show_last_frac  = f_preset(show_last_frac,    false,    false, false, false, true,  false)
-eff_show_vol        = f_preset(show_vol,          true,     true,  true,  false, false, false)
+eff_use_sess_1st    = f_approach_bool(use_sess_1st,       false,    false, false, false, false,  false)
+eff_show_pch_pcl    = f_approach_bool(show_pch_pcl,       false,    false, false, false, false,  false)
+eff_show_last_frac  = f_approach_bool(show_last_frac,     false,    false, false, false, false,  false)
+eff_show_vol        = f_approach_bool(show_vol,           true,     false, false, false, false,  false) // Legacy spike, prefer RVOL in new modes
 
-eff_plot_fvg1       = f_preset(plot_fvg1,         true,     true,  true,  false, true,  true)
-eff_plot_fvg2       = f_preset(plot_fvg2,         false,    false, false, false, false, true)
+eff_plot_fvg1       = f_approach_bool(plot_fvg1,          false,    false, false, false, false,  true)
+eff_plot_fvg2       = f_approach_bool(plot_fvg2,          false,    false, false, false, false,  false)
 
-eff_ps_mode         = f_preset_str(ps_mode, "None", "None", "None", "Auto", "Auto", "Auto")
+eff_ps_mode         = f_approach_str(ps_mode,             "None",   "None","None","None","None", "Auto")
 
-eff_BB_plot         = f_preset(BB_plot,           false,    false, false, true,  false, false)
+eff_BB_plot         = f_approach_bool(BB_plot,            false,    false, false, false, false,  false) // MR uses VWAP Bands
 
-eff_en_cloud        = f_preset(en_cloud,          false,    false, false, false, false, true)
-eff_sig_plot        = f_preset(sig_plot,          sig_plot, sig_plot, sig_plot, sig_plot, sig_plot, sig_plot)
-eff_ma1_type        = f_preset_str(ma1_type, ma1_type, ma1_type, ma1_type, ma1_type, ma1_type, ma1_type)
-eff_ma2_type        = f_preset_str(ma2_type, ma2_type, ma2_type, ma2_type, ma2_type, ma2_type, ma2_type)
+eff_en_cloud        = f_approach_bool(en_cloud,           false,    false, false, false, false,  false)
+eff_sig_plot        = f_approach_bool(sig_plot,           sig_plot, false, false, false, false,  false)
+eff_ma1_type        = f_approach_str(ma1_type,            ma1_type, "None","None","None","None", "None")
+eff_ma2_type        = f_approach_str(ma2_type,            ma2_type, "None","None","None","None", "None")
 
-eff_plot_div        = f_preset(plot_div,          false,    false, false, true,  false, false)
+eff_plot_div        = f_approach_bool(plot_div,           false,    false, true,  false, false,  false)
 
 // Bar Patterns
-eff_plot_l12_bar    = f_preset(plot_l12_bar,      false,    false, true,  false, false, false)
-eff_plot_nr_bar     = f_preset(plot_nr_bar,       false,    false, false, false, false, false)
-eff_plot_i_bar      = f_preset(plot_i_bar,        false,    false, false, false, false, false)
-eff_plot_o_bar      = f_preset(plot_o_bar,        false,    false, true,  false, false, false)
-eff_plot_s_bar      = f_preset(plot_s_bar,        false,    false, false, false, false, false)
-eff_plot_f_bar      = f_preset(plot_f_bar,        false,    false, true,  false, false, false)
+eff_plot_l12_bar    = f_approach_bool(plot_l12_bar,       false,    false, false, false, false,  false)
+eff_plot_nr_bar     = f_approach_bool(plot_nr_bar,        false,    false, false, false, false,  false)
+eff_plot_i_bar      = f_approach_bool(plot_i_bar,         false,    false, false, false, false,  false)
+eff_plot_o_bar      = f_approach_bool(plot_o_bar,         false,    false, false, false, false,  false)
+eff_plot_s_bar      = f_approach_bool(plot_s_bar,         false,    false, false, false, false,  false)
+eff_plot_f_bar      = f_approach_bool(plot_f_bar,         false,    false, false, false, false,  false)
 
-eff_plot_segments   = f_preset(plot_segments,     false,    false, true,  false, false, false)
+eff_plot_segments   = f_approach_bool(plot_segments,      false,    false, false, false, false,  false)
 
 // Pivots (Classic)
-eff_plot_pivots_h1  = f_preset(plot_pivots_h1,    false,    false, false, false, false, false)
-eff_plot_pivots_h4  = f_preset(plot_pivots_h4,    false,    false, false, false, false, false)
-eff_plot_pivots_d   = f_preset(plot_pivots_d,     false,    false, false, true,  true,  true)
-eff_plot_pivots_w   = f_preset(plot_pivots_w,     false,    false, false, true,  true,  true)
-eff_plot_pivots_m   = f_preset(plot_pivots_m,     false,    false, false, false, true,  true)
-eff_plot_pivots_3m  = f_preset(plot_pivots_3m,    false,    false, false, false, false, false)
-eff_plot_pivots_12m = f_preset(plot_pivots_12m,   false,    false, false, false, false, false)
+eff_plot_pivots_h1  = f_approach_bool(plot_pivots_h1,     false,    false, false, false, false,  false)
+eff_plot_pivots_h4  = f_approach_bool(plot_pivots_h4,     false,    false, false, false, false,  false)
+eff_plot_pivots_d   = f_approach_bool(plot_pivots_d,      false,    false, false, false, false,  false)
+eff_plot_pivots_w   = f_approach_bool(plot_pivots_w,      false,    false, false, false, false,  false)
+eff_plot_pivots_m   = f_approach_bool(plot_pivots_m,      false,    false, false, false, false,  false)
+eff_plot_pivots_3m  = f_approach_bool(plot_pivots_3m,     false,    false, false, false, false,  false)
+eff_plot_pivots_12m = f_approach_bool(plot_pivots_12m,    false,    false, false, false, false,  false)
 
 // Sessions
-eff_london_show     = f_preset(london_show,       true,     true,  false, false, false, false)
-eff_ny_show         = f_preset(ny_show,           true,     true,  false, false, false, false)
-eff_tokyo_show      = f_preset(tokyo_show,        true,     true,  false, false, false, false)
-eff_sydney_show     = f_preset(sydney_show,       true,     true,  false, false, false, false)
+eff_london_show     = f_approach_bool(london_show,        true,     true,  false, false, false,  false)
+eff_ny_show         = f_approach_bool(ny_show,            true,     true,  false, false, false,  false)
+eff_tokyo_show      = f_approach_bool(tokyo_show,         true,     true,  false, false, false,  false)
+eff_sydney_show     = f_approach_bool(sydney_show,        true,     true,  false, false, false,  false)
 
 // Session BG Flag
-eff_sess_bg_enable  = f_preset(true,              true,     true,  false, false, false, false)
+eff_sess_bg_enable  = f_approach_bool(true,               false,    false, false, false, false,  false)
+
+// Key Levels Flags
+eff_key_levels_enabled = f_approach_bool(key_levels_enabled, true, true, true, true, true, true)
+eff_show_pdh    = f_approach_bool(show_pdh, true, true, true, true, true, false)
+eff_show_pdl    = f_approach_bool(show_pdl, true, true, true, true, true, false)
+eff_show_pdc    = f_approach_bool(show_pdc, false, false, false, false, false, false)
+eff_show_wopen  = f_approach_bool(show_wopen, true, false, true, false, false, true)
+eff_show_mopen  = f_approach_bool(show_mopen, false, false, false, false, false, false)
+
+// RVOL Flags
+eff_rvol_enabled = f_approach_bool(rvol_enabled, false, true, false, true, true, false)
+
+// VWAP Flags
+eff_vwap_enabled = f_approach_bool(vwap_enabled, false, false, true, false, false, true)
+eff_vwap_anchor  = f_approach_str(vwap_anchor, "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Weekly")
+eff_vwap_bands   = f_approach_bool(vwap_bands_enabled, false, false, true, false, false, false)
+eff_vwap_z       = f_approach_bool(vwap_z_enabled, false, false, true, false, false, false)
+
+// OR/IB Flags
+eff_or_enabled   = f_approach_bool(or_enabled, false, true, false, false, false, false)
+
+// Squeeze Box Flags
+eff_sq_box_enabled = f_approach_bool(sq_box_enabled, false, false, false, false, true, false)
 
 int active_sec_calls = 0
 // Performance Counters (Per Bar)
@@ -614,6 +722,114 @@ f_label_get_or_create(_lb, _x, _y, _txt, _col) =>
         label.set_text(ret, _txt)
         label.set_textcolor(ret, _col)
     ret
+
+
+//------------------------------------------------------- Key Levels Module -------------------------------------------------------
+// Stage 1: PDH/PDL + Weekly/Monthly Open
+
+// 1. Data Fetching (O(1))
+[d_h, d_l, d_c] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]], lookahead=barmerge.lookahead_on)
+w_o = request.security(syminfo.tickerid, "W", open, lookahead=barmerge.lookahead_on)
+m_o = request.security(syminfo.tickerid, "M", open, lookahead=barmerge.lookahead_on)
+
+if eff_key_levels_enabled
+    active_sec_calls += 3
+
+// 2. Objects
+var line l_pdh = na, var label lb_pdh = na
+var line l_pdl = na, var label lb_pdl = na
+var line l_pdc = na, var label lb_pdc = na
+var line l_wo  = na, var label lb_wo  = na
+var line l_mo  = na, var label lb_mo  = na
+
+// Helper
+f_draw_key_level(_l, _lb, _val, _txt, _col, _en, _style, _extend) =>
+    line ret_l = _l
+    label ret_lb = _lb
+
+    // Check Visibility: Current TF < Target TF (Daily/Weekly) to avoid clutter
+    // Simple heuristic: Key Levels always visible intraday
+
+    if eff_key_levels_enabled and _en and not na(_val) and barstate.islast
+        // Create or Update Line
+        if key_style != "Labels"
+            ret_l := f_line_get_or_create(ret_l, bar_index, _val, bar_index + 10, _val, _col, _style)
+            if _extend
+                line.set_extend(ret_l, extend.right)
+            else
+                line.set_extend(ret_l, extend.none)
+        else
+            line.delete(ret_l)
+            ret_l := na
+
+        // Create or Update Label
+        if key_style != "Lines"
+            ret_lb := f_label_get_or_create(ret_lb, bar_index + 10, _val, _txt, _col)
+        else
+            label.delete(ret_lb)
+            ret_lb := na
+    else
+        line.delete(ret_l)
+        ret_l := na
+        label.delete(ret_lb)
+        ret_lb := na
+
+    [ret_l, ret_lb]
+
+// 3. Execution
+[t_l_pdh, t_lb_pdh] = f_draw_key_level(l_pdh, lb_pdh, d_h, "PDH", color.new(color.red, 30), eff_show_pdh, line.style_dashed, key_extend)
+l_pdh := t_l_pdh, lb_pdh := t_lb_pdh
+
+[t_l_pdl, t_lb_pdl] = f_draw_key_level(l_pdl, lb_pdl, d_l, "PDL", color.new(color.green, 30), eff_show_pdl, line.style_dashed, key_extend)
+l_pdl := t_l_pdl, lb_pdl := t_lb_pdl
+
+[t_l_pdc, t_lb_pdc] = f_draw_key_level(l_pdc, lb_pdc, d_c, "PDC", color.new(color.gray, 30), eff_show_pdc, line.style_dotted, key_extend)
+l_pdc := t_l_pdc, lb_pdc := t_lb_pdc
+
+[t_l_wo, t_lb_wo] = f_draw_key_level(l_wo, lb_wo, w_o, "W.Open", color.new(color.orange, 0), eff_show_wopen, line.style_solid, key_extend)
+l_wo := t_l_wo, lb_wo := t_lb_wo
+
+[t_l_mo, t_lb_mo] = f_draw_key_level(l_mo, lb_mo, m_o, "M.Open", color.new(color.white, 0), eff_show_mopen, line.style_solid, key_extend)
+l_mo := t_l_mo, lb_mo := t_lb_mo
+
+
+//------------------------------------------------------- RVOL Module -------------------------------------------------------
+// Stage 2: Standard RVOL + Optional ToD
+
+float rvol_val = na
+string rvol_state = "0"
+
+if eff_rvol_enabled
+    // Standard RVOL
+    float v_avg = ta.sma(volume, rvol_len)
+
+    // Optional ToD RVOL (Placeholder / Basic Implementation)
+    // If ToD enabled, we could switch v_avg logic here.
+    // For now, standard SMA is robust.
+
+    if v_avg > 0
+        rvol_val := volume / v_avg
+
+    if not na(rvol_val)
+        if rvol_val >= rvol_th_3
+            rvol_state := "3"
+        else if rvol_val >= rvol_th_2
+            rvol_state := "2"
+        else if rvol_val >= rvol_th_1
+            rvol_state := "1"
+
+// Visuals
+if eff_rvol_enabled and rvol_display != "None" and rvol_state != "0"
+    color c_rv = rvol_state == "3" ? color.red : rvol_state == "2" ? color.orange : color.yellow
+    string txt = "RVOL " + str.tostring(rvol_val, "#.#")
+
+    if rvol_display == "Marker" or rvol_display == "Both"
+        plotshape(true, style=shape.circle, location=location.bottom, color=c_rv, size=size.tiny, title="RVOL Marker")
+
+    if rvol_display == "Label" or rvol_display == "Both"
+        var label lb_rvol = na
+        label.delete(lb_rvol)
+        lb_rvol := label.new(bar_index, low, txt, yloc=yloc.belowbar, color=c_rv, style=label.style_label_up, textcolor=color.black, size=size.small)
 
 
 //-------------------------------------------------------- williams fractals (Visuals for Chart) --------------------------------------------------------------
@@ -2080,6 +2296,212 @@ if show_sess_on_tf
             bg_sess_color := any_sess_active ? na : color.new(color.blue, 85)
 
 
+//------------------------------------------------------- VWAP Core & Bands -------------------------------------------------------
+// Stage 3 & 4: VWAP Core + Bands + Z-Score
+
+var VwapState vs = VwapState.new(0.0, 0.0, na)
+var WelfordState ws = WelfordState.new(0, 0.0, 0.0)
+
+// Anchor Logic
+bool new_anchor = false
+if eff_vwap_anchor == "Session (Daily Reset)"
+    new_anchor := ta.change(time("D"))
+else if eff_vwap_anchor == "Weekly"
+    new_anchor := ta.change(time("W"))
+
+// Session Filter
+bool in_calc_window = true
+if vwap_only_sess
+    // any_sess_active is defined in Trading Sessions Logic
+    in_calc_window := any_sess_active
+
+// Update Logic
+float vwap_val = na
+float sigma_val = na
+float z_val = na
+string stretch_state = "NORMAL"
+
+if eff_vwap_enabled
+    // Anchor Reset
+    if new_anchor
+        vs.cumVol := 0.0
+        vs.cumPV := 0.0
+        vs.vwap := na
+        ws.n := 0
+        ws.mean := 0.0
+        ws.m2 := 0.0
+
+    // Core Calc
+    if in_calc_window
+        vs.cumVol += volume
+        vs.cumPV += (volume * vwap_src)
+
+    if vs.cumVol > 0
+        vwap_val := vs.cumPV / vs.cumVol
+        vs.vwap := vwap_val
+
+    // Bands / Sigma Calc
+    if not na(vwap_val) and (eff_vwap_bands or eff_vwap_z)
+        float dev = close - vwap_val
+
+        if vwap_sigma_mode == "Rolling (ta.stdev)"
+            sigma_val := ta.stdev(dev, vwap_stdev_len)
+        else // Session (Welford)
+            if in_calc_window
+                ws.n += 1
+                float delta = dev - ws.mean
+                ws.mean += delta / ws.n
+                ws.m2 += delta * (dev - ws.mean)
+
+            float variance = ws.n > 1 ? ws.m2 / (ws.n - 1) : 0.0
+            sigma_val := math.sqrt(variance)
+
+        // Z-Score
+        if eff_vwap_z and not na(sigma_val) and sigma_val > 0
+            z_val := dev / sigma_val
+
+            // State
+            if z_val >= z_th_ext
+                stretch_state := "EXTREME UP"
+            else if z_val >= z_th_tp
+                stretch_state := "TP UP"
+            else if z_val >= z_th_entry
+                stretch_state := "ENTRY UP"
+            else if z_val <= -z_th_ext
+                stretch_state := "EXTREME DN"
+            else if z_val <= -z_th_tp
+                stretch_state := "TP DN"
+            else if z_val <= -z_th_entry
+                stretch_state := "ENTRY DN"
+
+// Plotting
+plot(vwap_show_line ? vwap_val : na, color=color.new(color.orange, 0), title="VWAP")
+
+// Bands
+plot(eff_vwap_bands and not na(sigma_val) ? vwap_val + band_k1 * sigma_val : na, "B1 Up", color.new(color.gray, 80))
+plot(eff_vwap_bands and not na(sigma_val) ? vwap_val - band_k1 * sigma_val : na, "B1 Dn", color.new(color.gray, 80))
+plot(eff_vwap_bands and not na(sigma_val) ? vwap_val + band_k2 * sigma_val : na, "B2 Up", color.new(color.gray, 60))
+plot(eff_vwap_bands and not na(sigma_val) ? vwap_val - band_k2 * sigma_val : na, "B2 Dn", color.new(color.gray, 60))
+plot(eff_vwap_bands and not na(sigma_val) ? vwap_val + band_k3 * sigma_val : na, "B3 Up", color.new(color.gray, 40))
+plot(eff_vwap_bands and not na(sigma_val) ? vwap_val - band_k3 * sigma_val : na, "B3 Dn", color.new(color.gray, 40))
+
+// Label for Z
+var label lb_vwap_z = na
+if eff_vwap_z and stretch_state != "NORMAL" and barstate.islast
+    label.delete(lb_vwap_z)
+    color c_z = str.contains(stretch_state, "EXTREME") ? color.red : color.orange
+    lb_vwap_z := label.new(bar_index, high, "Z: " + str.tostring(z_val, "#.##") + "\n" + stretch_state, color=c_z, style=label.style_label_down, textcolor=color.white, size=size.small)
+else
+    label.delete(lb_vwap_z)
+    lb_vwap_z := na
+
+
+//------------------------------------------------------- Opening Range / Initial Balance -------------------------------------------------------
+// Stage 5: OR/IB Module
+
+var OrState ors = OrState.new(na, na, na, false, false, na, na, na)
+
+// Session Determination
+string or_s_str = na
+if or_sess == "London"
+    or_s_str := london_sess
+else if or_sess == "New York"
+    or_s_str := ny_sess
+else
+    or_s_str := or_cust
+
+bool in_or_sess = false
+if eff_or_enabled
+    in_or_sess := not na(time(timeframe.period, or_s_str, sess_timezone))
+
+bool or_start = in_or_sess and not in_or_sess[1]
+
+// Events
+bool or_break_up = false
+bool or_break_dn = false
+
+if eff_or_enabled
+    // Reset / Start
+    if or_start
+        ors.start_bar := bar_index
+        ors.hi := high
+        ors.lo := low
+        ors.building := true
+        ors.locked := false
+
+        // Colors
+        color c_or_border = color.new(color.blue, 30)
+        color c_or_bg = color.new(color.blue, 92)
+        color c_or_hi = color.new(color.green, 30)
+        color c_or_lo = color.new(color.red, 30)
+
+        // Visibility
+        bool show_box = or_display == "Box+Lines" or or_display == "Box"
+        bool show_lines = or_display == "Box+Lines" or or_display == "Lines"
+
+        // Init/Reset Objects (reuse)
+        if na(ors.id_box)
+            ors.id_box := box.new(bar_index, high, bar_index, low, border_color=show_box ? c_or_border : na, bgcolor=show_box ? c_or_bg : na)
+            ors.l_hi := line.new(bar_index, high, bar_index, high, color=show_lines ? c_or_hi : na)
+            ors.l_lo := line.new(bar_index, low, bar_index, low, color=show_lines ? c_or_lo : na)
+        else
+            box.set_left(ors.id_box, bar_index)
+            box.set_right(ors.id_box, bar_index)
+            box.set_top(ors.id_box, high)
+            box.set_bottom(ors.id_box, low)
+            box.set_border_color(ors.id_box, show_box ? c_or_border : na)
+            box.set_bgcolor(ors.id_box, show_box ? c_or_bg : na)
+
+            line.set_xy1(ors.l_hi, bar_index, high)
+            line.set_xy2(ors.l_hi, bar_index, high)
+            line.set_color(ors.l_hi, show_lines ? c_or_hi : na)
+
+            line.set_xy1(ors.l_lo, bar_index, low)
+            line.set_xy2(ors.l_lo, bar_index, low)
+            line.set_color(ors.l_lo, show_lines ? c_or_lo : na)
+
+    else if ors.building
+        // Check Duration
+        float dur_sec = or_min * 60
+        float elapsed_sec = (bar_index - ors.start_bar + 1) * tf_sec // Estimation via bars, simpler
+
+        if elapsed_sec <= dur_sec
+            // Update
+            ors.hi := math.max(ors.hi, high)
+            ors.lo := math.min(ors.lo, low)
+
+            box.set_top(ors.id_box, ors.hi)
+            box.set_bottom(ors.id_box, ors.lo)
+            box.set_right(ors.id_box, bar_index + 1)
+
+            line.set_y1(ors.l_hi, ors.hi)
+            line.set_y2(ors.l_hi, bar_index + 1)
+
+            line.set_y1(ors.l_lo, ors.lo)
+            line.set_y2(ors.l_lo, bar_index + 1)
+        else
+            // Finish
+            ors.building := false
+            if or_lock
+                ors.locked := true
+                // Freeze
+                box.set_right(ors.id_box, bar_index + 5)
+                line.set_x2(ors.l_hi, bar_index + 5)
+                line.set_x2(ors.l_lo, bar_index + 5)
+
+    else if ors.locked
+        // Extension
+        if barstate.islast
+            box.set_right(ors.id_box, bar_index + 5)
+            line.set_x2(ors.l_hi, bar_index + 5)
+            line.set_x2(ors.l_lo, bar_index + 5)
+
+        // Break Logic (Events)
+        if close > ors.hi and close[1] <= ors.hi
+            or_break_up := true
+        if close < ors.lo and close[1] >= ors.lo
+            or_break_dn := true
+
 //----------------- MTF Candle Overlay Logic -----------------
 
 // Map string selection
@@ -2887,6 +3309,91 @@ if eff_regime_panel and not na(info_panel) and barstate.islast
     table.cell(info_panel, 1, 11, regime_state, text_size=size.small, text_color=color.white, bgcolor=c_reg_bg)
     table.merge_cells(info_panel, 1, 11, 2, 11)
 
+    // Row 12: RVOL
+    if eff_rvol_enabled
+        string rvol_txt = "RVOL " + str.tostring(rvol_val, "#.##")
+        color c_rv_p = color.new(color.gray, 100)
+        if rvol_state == "3"
+            c_rv_p := color.new(color.red, 30)
+        else if rvol_state == "2"
+            c_rv_p := color.new(color.orange, 30)
+
+        table.cell(info_panel, 0, 12, "VOL", text_size=size.small, text_color=color.silver)
+        table.cell(info_panel, 1, 12, rvol_txt, text_size=size.small, text_color=color.white, bgcolor=c_rv_p)
+        table.merge_cells(info_panel, 1, 12, 2, 12)
+
+    // Row 13: VWAP Z
+    if eff_vwap_enabled and eff_vwap_z and not na(z_val)
+        string z_txt = "Z " + str.tostring(z_val, "#.1")
+        color c_z_p = color.new(color.gray, 100)
+        if str.contains(stretch_state, "EXTREME")
+            c_z_p := color.new(color.red, 30)
+        else if str.contains(stretch_state, "TP")
+            c_z_p := color.new(color.orange, 30)
+
+        table.cell(info_panel, 0, 13, "VWP", text_size=size.small, text_color=color.silver)
+        table.cell(info_panel, 1, 13, z_txt, text_size=size.small, text_color=color.white, bgcolor=c_z_p)
+        table.merge_cells(info_panel, 1, 13, 2, 13)
+
+
+//------------------------------------------------------- Squeeze Box Module -------------------------------------------------------
+// Stage 6: Squeeze Box logic
+
+var SqState sqs = SqState.new(na, na, false, false, na)
+
+// Condition
+bool in_sq_condition = (regime_state == "SQUEEZE")
+
+bool sq_start = in_sq_condition and not in_sq_condition[1]
+bool sq_end = not in_sq_condition and in_sq_condition[1]
+
+// Events
+bool sq_break_up = false
+bool sq_break_dn = false
+
+if eff_sq_box_enabled
+    if sq_start
+        sqs.hi := high
+        sqs.lo := low
+        sqs.active := true
+        sqs.locked := false
+
+        // Init/Reset (Single Object Recycle)
+        if na(sqs.id_box)
+            sqs.id_box := box.new(bar_index, high, bar_index, low, border_color=color.new(color.yellow, 30), bgcolor=color.new(color.yellow, 90))
+        else
+            box.set_left(sqs.id_box, bar_index)
+            box.set_right(sqs.id_box, bar_index)
+            box.set_top(sqs.id_box, high)
+            box.set_bottom(sqs.id_box, low)
+            box.set_border_style(sqs.id_box, line.style_solid)
+
+    else if sqs.active
+        // Update H/L
+        sqs.hi := math.max(sqs.hi, high)
+        sqs.lo := math.min(sqs.lo, low)
+
+        box.set_top(sqs.id_box, sqs.hi)
+        box.set_bottom(sqs.id_box, sqs.lo)
+        box.set_right(sqs.id_box, bar_index + 1)
+
+        if sq_end
+            sqs.active := false
+            if sq_lock
+                sqs.locked := true
+                box.set_right(sqs.id_box, bar_index + 5)
+                box.set_border_style(sqs.id_box, line.style_dashed)
+
+    else if sqs.locked
+        if barstate.islast
+             box.set_right(sqs.id_box, bar_index + 5)
+
+        // Break Events
+        if close > sqs.hi and close[1] <= sqs.hi
+            sq_break_up := true
+        if close < sqs.lo and close[1] >= sqs.lo
+            sq_break_dn := true
+
 
 //--------------------------------------------------------- CONF Engine v2: Core + Confirm + Regime Gate ---------------------------------------------------------
 
@@ -3194,3 +3701,29 @@ alertcondition(al_tl_break, "Trendline Breakout", "Fractal Trendline Breakout")
 alertcondition(al_div, "Divergence", "Divergence Detected")
 alertcondition(al_regime_chg, "Regime Change", "Market Regime Changed")
 alertcondition(al_conf_cross, "Confluence Extreme", "Confluence Score Extreme (75/25)")
+
+// --- Extended Alerts (New Modules) ---
+// VWAP
+bool al_vwap_cross_up = eff_vwap_enabled and ta.crossover(close, vwap_val)
+bool al_vwap_cross_dn = eff_vwap_enabled and ta.crossunder(close, vwap_val)
+bool al_z_ext_up      = eff_vwap_enabled and eff_vwap_z and not na(z_val) and z_val >= z_th_ext and z_val[1] < z_th_ext
+bool al_z_ext_dn      = eff_vwap_enabled and eff_vwap_z and not na(z_val) and z_val <= -z_th_ext and z_val[1] > -z_th_ext
+
+alertcondition(al_vwap_cross_up, "VWAP Reclaim Up", "Price reclaimed VWAP (Bullish)")
+alertcondition(al_vwap_cross_dn, "VWAP Reclaim Down", "Price lost VWAP (Bearish)")
+alertcondition(al_z_ext_up, "VWAP Z-Score Extreme High", "Price is extended above VWAP (Extreme)")
+alertcondition(al_z_ext_dn, "VWAP Z-Score Extreme Low", "Price is extended below VWAP (Extreme)")
+
+// OR/IB
+alertcondition(or_break_up, "OR Breakout Up", "Opening Range Breakout Up")
+alertcondition(or_break_dn, "OR Breakout Down", "Opening Range Breakout Down")
+
+// RVOL
+bool al_rvol_spike = eff_rvol_enabled and not na(rvol_val) and rvol_val >= 3.0 and rvol_val[1] < 3.0
+alertcondition(al_rvol_spike, "RVOL Spike (3x)", "Relative Volume > 3.0 detected")
+
+// Squeeze
+alertcondition(sq_start, "Squeeze Start", "Market entered Squeeze Regime")
+alertcondition(sq_end, "Squeeze Release", "Market left Squeeze Regime")
+alertcondition(sq_break_up, "Squeeze Box Break Up", "Price broke Squeeze Box Up")
+alertcondition(sq_break_dn, "Squeeze Box Break Down", "Price broke Squeeze Box Down")
