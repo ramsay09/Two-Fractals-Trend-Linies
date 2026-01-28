@@ -728,13 +728,13 @@ float w_o = na, int w_start = na
 float m_o = na, int m_start = na
 
 if eff_key_levels_enabled
-    [t_dh, t_dl, t_dc, t_ds, t_de] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1], time[1], time], lookahead=barmerge.lookahead_on)
+    [t_dh, t_dl, t_dc, t_ds, t_de] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1], time[1], time], lookahead=barmerge.lookahead_off)
     d_h := t_dh, d_l := t_dl, d_c := t_dc, d_start := t_ds, d_end := t_de
 
-    [t_wo, t_ws] = request.security(syminfo.tickerid, "W", [open, time], lookahead=barmerge.lookahead_on)
+    [t_wo, t_ws] = request.security(syminfo.tickerid, "W", [open, time], lookahead=barmerge.lookahead_off)
     w_o := t_wo, w_start := t_ws
 
-    [t_mo, t_ms] = request.security(syminfo.tickerid, "M", [open, time], lookahead=barmerge.lookahead_on)
+    [t_mo, t_ms] = request.security(syminfo.tickerid, "M", [open, time], lookahead=barmerge.lookahead_off)
     m_o := t_mo, m_start := t_ms
 
     active_sec_calls += 3
@@ -787,9 +787,12 @@ f_draw_kl(_l, _lb, _idx, _val, _txt, _col, _en, _style, _ext) =>
     [ret_l, ret_lb]
 
 // Scan Limits
-int SCAN_LIMIT = 4000 // Max bars back
+int MAX_SCAN = 4000 // Max bars back
 
-if eff_key_levels_enabled and barstate.islast
+if eff_key_levels_enabled and barstate.islast and bar_index > 100
+    // Dynamic Scan Limit (Safe)
+    int scan_limit = math.min(MAX_SCAN, bar_index)
+
     // PDH/PDL/PDC Scan
     if d_start != last_d_start
         idx_pdh := na
@@ -804,30 +807,31 @@ if eff_key_levels_enabled and barstate.islast
         int   scan_last_idx = na
         int   fallback_idx = na
 
-        for i = 1 to SCAN_LIMIT
-            int t = time[i]
-            if t < d_start
-                break
+        if scan_limit >= 1
+            for i = 1 to scan_limit
+                int t = time[i]
+                if t < d_start
+                    break
 
-            if t >= d_start
-                fallback_idx := bar_index - i
+                if t >= d_start
+                    fallback_idx := bar_index - i
 
-            if t >= d_start and t < d_end
-                // Track High (>= to find earliest/left-most in backward scan)
-                if high[i] >= scan_max_h
-                    scan_max_h := high[i]
-                    scan_max_h_idx := bar_index - i
+                if t >= d_start and t < d_end
+                    // Track High (>= to find earliest/left-most in backward scan)
+                    if high[i] >= scan_max_h
+                        scan_max_h := high[i]
+                        scan_max_h_idx := bar_index - i
 
-                // Track Low (<= to find earliest/left-most in backward scan)
-                if low[i] <= scan_min_l
-                    scan_min_l := low[i]
-                    scan_min_l_idx := bar_index - i
+                    // Track Low (<= to find earliest/left-most in backward scan)
+                    if low[i] <= scan_min_l
+                        scan_min_l := low[i]
+                        scan_min_l_idx := bar_index - i
 
-                // Track Close (first encountered going backwards is the latest/close)
-                if na(scan_last_idx)
-                    scan_last_idx := bar_index - i
+                    // Track Close (first encountered going backwards is the latest/close)
+                    if na(scan_last_idx)
+                        scan_last_idx := bar_index - i
 
-        int fb_final = not na(fallback_idx) ? fallback_idx : (bar_index - SCAN_LIMIT)
+        int fb_final = not na(fallback_idx) ? fallback_idx : (bar_index - scan_limit)
         idx_pdh := not na(scan_max_h_idx) ? scan_max_h_idx : fb_final
         idx_pdl := not na(scan_min_l_idx) ? scan_min_l_idx : fb_final
         idx_pdc := not na(scan_last_idx) ? scan_last_idx : fb_final
@@ -836,27 +840,27 @@ if eff_key_levels_enabled and barstate.islast
     // WOpen Scan
     if w_start != last_w_start
         idx_wo := na
-        for i = 0 to SCAN_LIMIT
+        for i = 0 to scan_limit
             if time[i] < w_start
                 break
             if time[i] == w_start
                 idx_wo := bar_index - i
                 break
         if na(idx_wo)
-            idx_wo := bar_index - SCAN_LIMIT
+            idx_wo := bar_index - scan_limit
         last_w_start := w_start
 
     // MOpen Scan
     if m_start != last_m_start
         idx_mo := na
-        for i = 0 to SCAN_LIMIT
+        for i = 0 to scan_limit
             if time[i] < m_start
                 break
             if time[i] == m_start
                 idx_mo := bar_index - i
                 break
         if na(idx_mo)
-            idx_mo := bar_index - SCAN_LIMIT
+            idx_mo := bar_index - scan_limit
         last_m_start := m_start
 
     // Drawing
