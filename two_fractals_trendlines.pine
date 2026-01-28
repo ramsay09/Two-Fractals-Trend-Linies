@@ -6,7 +6,7 @@ general_info   = input.bool(title='General Description', defval=false, tooltip='
                  Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
 
 // Constants for Panel & Weights (Centralized)
-int PANEL_ROWS = 15
+int PANEL_ROWS = 14
 int PANEL_COLS = 3
 
 // Confluence Weights
@@ -29,7 +29,7 @@ int W_O     = 1
 // --- TOP LEVEL UI ---
 auto_tuning     = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Auto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
 
-trading_approach = input.string("Custom", "Strategy Lense", options=["Custom", "Session Map", "ORB", "Mean Reversion", "Breakout", "Squeeze Breakout", "Trend Continuation"], tooltip="Applies focused defaults for a trading lens. Custom = fully manual. \n• Custom: Full manual control.\n• Session Map: Structure, Key Levels, ADR.\n• ORB: Opening Range, RVOL.\n• Mean Reversion: VWAP, Bands, Divergences.\n• Breakout/Squeeze: RVOL, Structure, Momentum.\n• Trend Continuation: CONF/REG, FVG.")
+trading_approach = input.string("Custom", "Context Lense", options=["Custom", "Session Map", "ORB", "Mean Reversion", "Breakout", "Squeeze Breakout", "Trend Continuation"], tooltip="Applies focused defaults for a trading lens. Custom = fully manual. \n• Custom: Full manual control.\n• Session Map: Structure, Key Levels, ADR.\n• ORB: Opening Range, RVOL.\n• Mean Reversion: VWAP, Bands, Divergences.\n• Breakout/Squeeze: RVOL, Structure, Momentum.\n• Trend Continuation: CONF/REG, FVG.")
 
 // adx, hma and ema1 x ema2 mtf trend info panel
 panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
@@ -50,10 +50,6 @@ show_conf_bg        = input.bool(false, "Confluence Meter BG", inline="conf_ui",
                      \n• Green/Red = Bull/Bear bias
                      \n• NEUT is fully transparent (panel + chart background).
                      \n\nPlots the Confluence Signal background color.")
-
-conf_use_vwap_quality = input.bool(true, "CONF: VWAP Quality Gate", tooltip="Adjusts CONF quality using VWAP alignment + stretch (anti-chase). State remains unchanged.")
-conf_vwap_mode = input.string("Auto", "CONF VWAP Anchor", options=["Auto","Session VWAP","Weekly VWAP"], tooltip="Which VWAP anchor CONF uses for quality. Auto: Session ≤ 60m, Weekly > 60m.")
-conf_z_penalty_mode = input.string("Default", "CONF Stretch Penalty", options=["Default","Conservative","Aggressive"], tooltip="How strongly VWAP stretch reduces CONF quality.")
 
 show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)")
 regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
@@ -1735,31 +1731,6 @@ if eff_plot_segments and barstate.isconfirmed
 
 
 
-// --- Stage 2: ADR/Today Range Calculation (Moved Up for Panel) ---
-float d_range = na
-float adr = na
-float adr_pct = na
-
-if eff_use_adr_gate or show_adr_info
-    // 1. Daily Range (Developing) - Uses lookahead to capture current developing range on intraday
-    d_range := request.security(syminfo.tickerid, "D", high - low, lookahead=barmerge.lookahead_on)
-
-    // 2. ADR (Historical/Stable)
-    adr := request.security(syminfo.tickerid, "D", ta.sma(high - low, eff_adr_len))
-    active_sec_calls += 2
-
-    // 3. ADR %
-    if not na(d_range) and not na(adr) and adr > 0
-        adr_pct := (d_range / adr) * 100
-
-// Optional Debug Info
-plot(show_adr_info ? adr_pct : na, title="ADR %", color=color.new(color.white, 100), display=display.data_window + display.status_line)
-
-// ADR Label Removed (Moved to Panel)
-var label lbl_adr = na
-label.delete(lbl_adr)
-
-
 //-------------------------------------------------------------------- info panel -------------------------------------------------------------------------
 
 //indicator funktions for 4h, d, w, m 
@@ -1958,15 +1929,10 @@ if panel_pos != "None"
         table.cell(table_id=info_panel, column=0, row=8, text="ATR14 " + str.tostring(atr14_val, "#.#####"), text_size= size.small, text_color=color.silver)
         table.merge_cells(info_panel, 0, 8, 2, 8)
 
-        // ADR% (Row 9)
-        string adr_txt = "ADR% " + (na(adr_pct) ? "n/a" : str.tostring(adr_pct, "#.#") + "%")
-        table.cell(table_id=info_panel, column=0, row=9, text=adr_txt, text_size=size.small, text_color=color.silver)
-        table.merge_cells(info_panel, 0, 9, 2, 9)
-
-        // HEADER (Row 10: Current)
-        table.cell(table_id=info_panel, column=0, row=10, text="C", text_size= size.small, text_color=color.silver, bgcolor=is_custom_tf ? col_tf_highlight : na)
-        table.cell(table_id=info_panel, column=1, row=10, bgcolor=(Intra_D_W_M) ? fvg_color_c : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=10, bgcolor=(Intra_D_W_M) ? fr_color_c : na, width=2)
+        // HEADER (Row 9: Current)
+        table.cell(table_id=info_panel, column=0, row=9, text="C", text_size= size.small, text_color=color.silver, bgcolor=is_custom_tf ? col_tf_highlight : na)
+        table.cell(table_id=info_panel, column=1, row=9, bgcolor=(Intra_D_W_M) ? fvg_color_c : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=9, bgcolor=(Intra_D_W_M) ? fr_color_c : na, width=2)
 else
     if not na(info_panel)
         table.delete(info_panel)
@@ -1995,84 +1961,172 @@ need_m  = eff_plot_pivots_m  and Intra_D_W
 need_3m = eff_plot_pivots_3m and Intra_D_W_M
 need_12m= eff_plot_pivots_12m and Intra_D_W_M
 
-// Helper: Calculate Pivot Levels
-f_calc_pivot_levels(_h, _l, _c) =>
-    _pp = (_h + _l + _c) / 3
-    _r1 = _pp * 2 - _l
-    _s1 = _pp * 2 - _h
-    _r2 = _pp + (_h - _l)
-    _s2 = _pp - (_h - _l)
-    _r3 = _h + 2 * (_pp - _l)
-    _s3 = _l - 2 * (_h - _pp)
-    _r4 = _pp + 3 * (_h - _l)
-    _s4 = _pp - 3 * (_h - _l)
-    [_pp, _r1, _r2, _r3, _r4, _s1, _s2, _s3, _s4]
+// Data Variables (Initial NA)
+float h1_high = na
+float h1_low = na
+float h1_close = na
 
-// --- Data Fetching & Latching ---
-// We fetch data globally (gated by need_*) and update VARs only on period change to ensure stability.
+float h4_high = na
+float h4_low = na
+float h4_close = na
 
-// H1
-var float h1_PP=na, var float h1_R1=na, var float h1_R2=na, var float h1_R3=na, var float h1_R4=na, var float h1_S1=na, var float h1_S2=na, var float h1_S3=na, var float h1_S4=na
-if need_h1
-    [h1_h, h1_l, h1_c] = request.security(syminfo.tickerid, "60", [high[1], low[1], close[1]], lookahead=barmerge.lookahead_off)
-    if ta.change(time("60")) or na(h1_PP)
-        [t_pp, t_r1, t_r2, t_r3, t_r4, t_s1, t_s2, t_s3, t_s4] = f_calc_pivot_levels(h1_h, h1_l, h1_c)
-        h1_PP:=t_pp, h1_R1:=t_r1, h1_R2:=t_r2, h1_R3:=t_r3, h1_R4:=t_r4, h1_S1:=t_s1, h1_S2:=t_s2, h1_S3:=t_s3, h1_S4:=t_s4
+float d_high = na
+float d_low = na
+float d_close = na
+
+float w_high = na
+float w_low = na
+float w_close = na
+
+float m_high = na
+float m_low = na
+float m_close = na
+
+float m3_high = na
+float m3_low = na
+float m3_close = na
+
+float m12_high = na
+float m12_low = na
+float m12_close = na
+
+// Gated Security Calls - Stage 5: Last Bar Optimization
+if barstate.islast
+    if need_h1
+        [h1_high_t, h1_low_t, h1_close_t] = request.security(syminfo.tickerid, "60", [high[1], low[1], close[1]])
+        h1_high := h1_high_t
+        h1_low := h1_low_t
+        h1_close := h1_close_t
         active_sec_calls += 1
 
-// H4
-var float h4_PP=na, var float h4_R1=na, var float h4_R2=na, var float h4_R3=na, var float h4_R4=na, var float h4_S1=na, var float h4_S2=na, var float h4_S3=na, var float h4_S4=na
-if need_h4
-    [h4_h, h4_l, h4_c] = request.security(syminfo.tickerid, "240", [high[1], low[1], close[1]], lookahead=barmerge.lookahead_off)
-    if ta.change(time("240")) or na(h4_PP)
-        [t_pp, t_r1, t_r2, t_r3, t_r4, t_s1, t_s2, t_s3, t_s4] = f_calc_pivot_levels(h4_h, h4_l, h4_c)
-        h4_PP:=t_pp, h4_R1:=t_r1, h4_R2:=t_r2, h4_R3:=t_r3, h4_R4:=t_r4, h4_S1:=t_s1, h4_S2:=t_s2, h4_S3:=t_s3, h4_S4:=t_s4
+    if need_h4
+        [h4_high_t, h4_low_t, h4_close_t] = request.security(syminfo.tickerid, "240", [high[1], low[1], close[1]])
+        h4_high := h4_high_t
+        h4_low := h4_low_t
+        h4_close := h4_close_t
         active_sec_calls += 1
 
-// Daily
-var float d_PP=na, var float d_R1=na, var float d_R2=na, var float d_R3=na, var float d_R4=na, var float d_S1=na, var float d_S2=na, var float d_S3=na, var float d_S4=na
-if need_d
-    [d_h, d_l, d_c] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]], lookahead=barmerge.lookahead_off)
-    if ta.change(time("D")) or na(d_PP)
-        [t_pp, t_r1, t_r2, t_r3, t_r4, t_s1, t_s2, t_s3, t_s4] = f_calc_pivot_levels(d_h, d_l, d_c)
-        d_PP:=t_pp, d_R1:=t_r1, d_R2:=t_r2, d_R3:=t_r3, d_R4:=t_r4, d_S1:=t_s1, d_S2:=t_s2, d_S3:=t_s3, d_S4:=t_s4
+    if need_d
+        [d_high_t, d_low_t, d_close_t] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]])
+        d_high := d_high_t
+        d_low := d_low_t
+        d_close := d_close_t
         active_sec_calls += 1
 
-// Weekly
-var float w_PP=na, var float w_R1=na, var float w_R2=na, var float w_R3=na, var float w_R4=na, var float w_S1=na, var float w_S2=na, var float w_S3=na, var float w_S4=na
-if need_w
-    [w_h, w_l, w_c] = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]], lookahead=barmerge.lookahead_off)
-    if ta.change(time("W")) or na(w_PP)
-        [t_pp, t_r1, t_r2, t_r3, t_r4, t_s1, t_s2, t_s3, t_s4] = f_calc_pivot_levels(w_h, w_l, w_c)
-        w_PP:=t_pp, w_R1:=t_r1, w_R2:=t_r2, w_R3:=t_r3, w_R4:=t_r4, w_S1:=t_s1, w_S2:=t_s2, w_S3:=t_s3, w_S4:=t_s4
+    if need_w
+        [w_high_t, w_low_t, w_close_t] = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]])
+        w_high := w_high_t
+        w_low := w_low_t
+        w_close := w_close_t
         active_sec_calls += 1
 
-// Monthly
-var float m_PP=na, var float m_R1=na, var float m_R2=na, var float m_R3=na, var float m_R4=na, var float m_S1=na, var float m_S2=na, var float m_S3=na, var float m_S4=na
-if need_m
-    [m_h, m_l, m_c] = request.security(syminfo.tickerid, "M", [high[1], low[1], close[1]], lookahead=barmerge.lookahead_off)
-    if ta.change(time("M")) or na(m_PP)
-        [t_pp, t_r1, t_r2, t_r3, t_r4, t_s1, t_s2, t_s3, t_s4] = f_calc_pivot_levels(m_h, m_l, m_c)
-        m_PP:=t_pp, m_R1:=t_r1, m_R2:=t_r2, m_R3:=t_r3, m_R4:=t_r4, m_S1:=t_s1, m_S2:=t_s2, m_S3:=t_s3, m_S4:=t_s4
+    if need_m
+        [m_high_t, m_low_t, m_close_t] = request.security(syminfo.tickerid, "M", [high[1], low[1], close[1]])
+        m_high := m_high_t
+        m_low := m_low_t
+        m_close := m_close_t
         active_sec_calls += 1
 
-// 3M
-var float m3_PP=na, var float m3_R1=na, var float m3_R2=na, var float m3_R3=na, var float m3_R4=na, var float m3_S1=na, var float m3_S2=na, var float m3_S3=na, var float m3_S4=na
-if need_3m
-    [m3_h, m3_l, m3_c] = request.security(syminfo.tickerid, "3M", [high[1], low[1], close[1]], lookahead=barmerge.lookahead_off)
-    if ta.change(time("3M")) or na(m3_PP)
-        [t_pp, t_r1, t_r2, t_r3, t_r4, t_s1, t_s2, t_s3, t_s4] = f_calc_pivot_levels(m3_h, m3_l, m3_c)
-        m3_PP:=t_pp, m3_R1:=t_r1, m3_R2:=t_r2, m3_R3:=t_r3, m3_R4:=t_r4, m3_S1:=t_s1, m3_S2:=t_s2, m3_S3:=t_s3, m3_S4:=t_s4
+    if need_3m
+        [m3_high_t, m3_low_t, m3_close_t] = request.security(syminfo.tickerid, "3M", [high[1], low[1], close[1]])
+        m3_high := m3_high_t
+        m3_low := m3_low_t
+        m3_close := m3_close_t
         active_sec_calls += 1
 
-// 12M
-var float m12_PP=na, var float m12_R1=na, var float m12_R2=na, var float m12_R3=na, var float m12_R4=na, var float m12_S1=na, var float m12_S2=na, var float m12_S3=na, var float m12_S4=na
-if need_12m
-    [m12_h, m12_l, m12_c] = request.security(syminfo.tickerid, "12M", [high[1], low[1], close[1]], lookahead=barmerge.lookahead_off)
-    if ta.change(time("12M")) or na(m12_PP)
-        [t_pp, t_r1, t_r2, t_r3, t_r4, t_s1, t_s2, t_s3, t_s4] = f_calc_pivot_levels(m12_h, m12_l, m12_c)
-        m12_PP:=t_pp, m12_R1:=t_r1, m12_R2:=t_r2, m12_R3:=t_r3, m12_R4:=t_r4, m12_S1:=t_s1, m12_S2:=t_s2, m12_S3:=t_s3, m12_S4:=t_s4
+    if need_12m
+        [m12_high_t, m12_low_t, m12_close_t] = request.security(syminfo.tickerid, "12M", [high[1], low[1], close[1]])
+        m12_high := m12_high_t
+        m12_low := m12_low_t
+        m12_close := m12_close_t
         active_sec_calls += 1
+
+// --- Calculations ---
+
+// H1 pivot points
+h1_PP           = (h1_high + h1_low + h1_close) / 3
+h1_R1           = h1_PP + h1_PP - h1_low
+h1_R2           = h1_PP + h1_high - h1_low
+h1_R3           = h1_high + 2 * (h1_PP - h1_low)
+h1_R4           = h1_PP + 3 * (h1_high - h1_low)
+h1_S1           = h1_PP - (h1_high - h1_PP)
+h1_S2           = h1_PP - (h1_high - h1_low)
+h1_S3           = h1_low - 2 * (h1_high - h1_PP)
+h1_S4           = h1_PP - 3 * (h1_high - h1_low)
+
+// H4 pivot points
+h4_PP           = (h4_high + h4_low + h4_close) / 3
+h4_R1           = h4_PP + h4_PP - h4_low
+h4_R2           = h4_PP + h4_high - h4_low
+h4_R3           = h4_high + 2 * (h4_PP - h4_low)
+h4_R4           = h4_PP + 3 * (h4_high - h4_low)
+h4_S1           = h4_PP - (h4_high - h4_PP)
+h4_S2           = h4_PP - (h4_high - h4_low)
+h4_S3           = h4_low - 2 * (h4_high - h4_PP)
+h4_S4           = h4_PP - 3 * (h4_high - h4_low)
+
+// Daily pivot points
+d_PP            = (d_high + d_low + d_close) / 3
+
+w_PP            = (w_high + w_low + w_close) / 3
+m_PP            = (m_high + m_low + m_close) / 3
+m3_PP           = (m3_high + m3_low + m3_close) / 3
+m12_PP          = (m12_high + m12_low + m12_close) / 3
+
+// Daily R/S (extended to 4)
+d_R1            = d_PP + d_PP - d_low
+d_R2            = d_PP + d_high - d_low
+d_R3            = d_high + 2 * (d_PP - d_low)
+d_R4            = d_PP + 3 * (d_high - d_low)
+
+d_S1            = d_PP - (d_high - d_PP)
+d_S2            = d_PP - (d_high - d_low)
+d_S3            = d_low - 2 * (d_high - d_PP)
+d_S4            = d_PP - 3 * (d_high - d_low)
+
+// weekly R/S pivot points (extended to 4)
+w_R1            = w_PP + w_PP - w_low
+w_R2            = w_PP + w_high - w_low
+w_R3            = w_high + 2 * (w_PP - w_low)
+w_R4            = w_PP + 3 * (w_high - w_low)
+
+w_S1            = w_PP - (w_high - w_PP)
+w_S2            = w_PP - (w_high - w_low)
+w_S3            = w_low - 2 * (w_high - w_PP)
+w_S4            = w_PP - 3 * (w_high - w_low)
+
+// monthly R/S pivot points (extended to 4)
+m_R1            = m_PP + m_PP - m_low
+m_R2            = m_PP + m_high - m_low
+m_R3            = m_high + 2 * (m_PP - m_low)
+m_R4            = m_PP + 3 * (m_high - m_low)
+
+m_S1            = m_PP - (m_high - m_PP)
+m_S2            = m_PP - (m_high - m_low)
+m_S3            = m_low - 2 * (m_high - m_PP)
+m_S4            = m_PP - 3 * (m_high - m_low)
+
+// 3 month R/S pivot points (extended to 4)
+m3_R1           = m3_PP + m3_PP - m3_low
+m3_R2           = m3_PP + m3_high - m3_low
+m3_R3           = m3_high + 2 * (m3_PP - m3_low)
+m3_R4           = m3_PP + 3 * (m3_high - m3_low)
+
+m3_S1           = m3_PP - (m3_high - m3_PP)
+m3_S2           = m3_PP - (m3_high - m3_low)
+m3_S3           = m3_low - 2 * (m3_high - m3_PP)
+m3_S4           = m3_PP - 3 * (m3_high - m3_low)
+
+// 12 month R/S pivot points (extended to 4)
+m12_R1          = m12_PP + m12_PP - m12_low
+m12_R2          = m12_PP + m12_high - m12_low
+m12_R3          = m12_high + 2 * (m12_PP - m12_low)
+m12_R4          = m12_PP + 3 * (m12_high - m12_low)
+
+m12_S1          = m12_PP - (m12_high - m12_PP)
+m12_S2          = m12_PP - (m12_high - m12_low)
+m12_S3          = m12_low - 2 * (m12_high - m12_PP)
+m12_S4          = m12_PP - 3 * (m12_high - m12_low)
 
 
 // --- ALL PIVOTS AS LINES (Visual Update) ---
@@ -2090,19 +2144,11 @@ var line l_12m_pp = na, var line l_12m_r1 = na, var line l_12m_r2 = na, var line
 f_draw_pivot(_line, _val, _col, _width, _offset_start, _show_cond, _input_active) =>
     line ret_line = _line
     if barstate.islast and _input_active and _show_cond and not na(_val)
-        // Fixed Offsets for Stable Endings
-        // Offset 1: Shift right by offset_start
-        // Offset 2: Length 40 bars
-        int off1 = 5 + _offset_start
-        int off2 = 40 + _offset_start
-        int x1 = bar_index + off1
-        int x2 = bar_index + off2
-
         if na(ret_line)
-            ret_line := line.new(x1, _val, x2, _val, color=_col, width=_width)
+            ret_line := line.new(bar_index + _offset_start, _val, bar_index + _offset_start + 1, _val, color=_col, width=_width)
         else
-            line.set_xy1(ret_line, x1, _val)
-            line.set_xy2(ret_line, x2, _val)
+            line.set_xy1(ret_line, bar_index + _offset_start, _val)
+            line.set_xy2(ret_line, bar_index + _offset_start + 1, _val)
             line.set_color(ret_line, _col)
             line.set_width(ret_line, _width)
     else
@@ -3165,6 +3211,30 @@ else
         tbl_dbg := na
         
 
+// --- Stage 2: ADR/Today Range Calculation ---
+float d_range = na
+float adr = na
+float adr_pct = na
+
+if eff_use_adr_gate or show_adr_info
+    // 1. Daily Range (Developing) - Uses lookahead to capture current developing range on intraday
+    d_range := request.security(syminfo.tickerid, "D", high - low, lookahead=barmerge.lookahead_on)
+
+    // 2. ADR (Historical/Stable)
+    adr := request.security(syminfo.tickerid, "D", ta.sma(high - low, eff_adr_len))
+    active_sec_calls += 2
+
+    // 3. ADR %
+    if not na(d_range) and not na(adr) and adr > 0
+        adr_pct := (d_range / adr) * 100
+
+// Optional Debug Info
+plot(show_adr_info ? adr_pct : na, title="ADR %", color=color.new(color.white, 100), display=display.data_window + display.status_line)
+
+var label lbl_adr = na
+if eff_use_adr_gate and show_adr_info and barstate.islast
+    label.delete(lbl_adr)
+    lbl_adr := label.new(bar_index, high, "ADR%: " + str.tostring(adr_pct, "#.#") + "%", yloc=yloc.abovebar, color=color.new(color.gray, 50), textcolor=color.white, style=label.style_label_down, size=size.small)
 
 
 // --- Stage 3: ATR Expansion Logic ---
@@ -3230,11 +3300,11 @@ else
 // Update Panel (Moved Up)
 if eff_regime_panel and not na(info_panel) and barstate.islast
     color c_reg_bg = regime_state == "SQUEEZE" ? color.new(color.yellow, 30) : regime_state == "TREND" ? color.new(color.blue, 30) : color.new(color.gray, 100)
-    table.cell(info_panel, 0, 12, "REG", text_size=size.small, text_color=color.silver)
-    table.cell(info_panel, 1, 12, regime_state, text_size=size.small, text_color=color.white, bgcolor=c_reg_bg)
-    table.merge_cells(info_panel, 1, 12, 2, 12)
+    table.cell(info_panel, 0, 11, "REG", text_size=size.small, text_color=color.silver)
+    table.cell(info_panel, 1, 11, regime_state, text_size=size.small, text_color=color.white, bgcolor=c_reg_bg)
+    table.merge_cells(info_panel, 1, 11, 2, 11)
 
-    // Row 13: RVOL
+    // Row 12: RVOL
     if eff_rvol_enabled
         string rv_code = rvol_val < rvol_th_1 ? "L" : rvol_val < rvol_th_2 ? "M" : rvol_val < rvol_th_3 ? "H" : "E"
         string rvol_txt = str.tostring(rvol_val, "#.##") + "x " + rv_code
@@ -3244,11 +3314,11 @@ if eff_regime_panel and not na(info_panel) and barstate.islast
         else if rvol_state == "2"
             c_rv_p := color.new(color.orange, 30)
 
-        table.cell(info_panel, 0, 13, "VOL", text_size=size.small, text_color=color.silver)
-        table.cell(info_panel, 1, 13, rvol_txt, text_size=size.small, text_color=color.white, bgcolor=c_rv_p)
-        table.merge_cells(info_panel, 1, 13, 2, 13)
+        table.cell(info_panel, 0, 12, "VOL", text_size=size.small, text_color=color.silver)
+        table.cell(info_panel, 1, 12, rvol_txt, text_size=size.small, text_color=color.white, bgcolor=c_rv_p)
+        table.merge_cells(info_panel, 1, 12, 2, 12)
 
-    // Row 14: VWAP Z
+    // Row 13: VWAP Z
     if eff_vwap_enabled and eff_vwap_z and not na(z_val)
         float abs_z = math.abs(z_val)
         string z_code = abs_z < z_th_entry ? "N" : abs_z < z_th_tp ? "S" : abs_z < z_th_ext ? "T" : "E"
@@ -3260,9 +3330,9 @@ if eff_regime_panel and not na(info_panel) and barstate.islast
         else if str.contains(stretch_state, "TP")
             c_z_p := color.new(color.orange, 30)
 
-        table.cell(info_panel, 0, 14, "VWP", text_size=size.small, text_color=color.silver)
-        table.cell(info_panel, 1, 14, z_txt, text_size=size.small, text_color=color.white, bgcolor=c_z_p)
-        table.merge_cells(info_panel, 1, 14, 2, 14)
+        table.cell(info_panel, 0, 13, "VWP", text_size=size.small, text_color=color.silver)
+        table.cell(info_panel, 1, 13, z_txt, text_size=size.small, text_color=color.white, bgcolor=c_z_p)
+        table.merge_cells(info_panel, 1, 13, 2, 13)
 
 
 //------------------------------------------------------- Squeeze Box Module -------------------------------------------------------
@@ -3341,62 +3411,6 @@ float W_KAMA_CORE = 2.0
 var int conf_state_engine = 0 // 0=Neut, 1=Bull, -1=Bear
 
 if eff_calc_conf
-    // --- 0. VWAP Quality Data Prep (Lightweight) ---
-    float conf_vwap_val = na
-    float conf_z_val = na
-    bool conf_aligned_flag = na
-
-    if conf_use_vwap_quality
-        // Determine Mode
-        bool use_weekly_conf = conf_vwap_mode == "Weekly VWAP"
-        if conf_vwap_mode == "Auto"
-            // Auto: Session <= 60m (3600s), Weekly > 60m
-            use_weekly_conf := tf_sec > 3600
-
-        // Check if we can reuse Display VWAP (Optimization)
-        bool reuse_display = eff_vwap_enabled and (eff_vwap_anchor == "Weekly") == use_weekly_conf
-
-        if reuse_display and not na(vwap_val)
-            conf_vwap_val := vwap_val
-            // Reuse Z if available
-            if eff_vwap_z and not na(z_val)
-                conf_z_val := z_val
-            else
-                // Compute Z using display VWAP but own sigma? Or reuse sigma?
-                // If Z not enabled but VWAP is, compute Z here
-                float dev_c = close - conf_vwap_val
-                // Use input len or default 100
-                float sig_c = ta.stdev(dev_c, vwap_stdev_len)
-                if sig_c > 0
-                    conf_z_val := dev_c / sig_c
-        else
-            // Independent Calculation (Lightweight) - PRIMITIVES to avoid struct issues
-            var float vs_c_cumVol = 0.0
-            var float vs_c_cumPV = 0.0
-            var float vs_c_vwap = na
-
-            bool new_anchor_c = use_weekly_conf ? ta.change(time("W")) : ta.change(time("D"))
-
-            if new_anchor_c
-                vs_c_cumVol := 0.0
-                vs_c_cumPV := 0.0
-                vs_c_vwap := na
-
-            // HLC3 standard
-            vs_c_cumVol += volume
-            vs_c_cumPV += (volume * hlc3)
-
-            if vs_c_cumVol > 0
-                vs_c_vwap := vs_c_cumPV / vs_c_cumVol
-                conf_vwap_val := vs_c_vwap
-
-            // Compute Z
-            if not na(conf_vwap_val)
-                float dev_c = close - conf_vwap_val
-                float sig_c = ta.stdev(dev_c, vwap_stdev_len) // Reuse length input
-                if sig_c > 0
-                    conf_z_val := dev_c / sig_c
-
     // --- 1. Core Score Calculation ---
     float core_w_sum = 0.0
     float core_raw_sum = 0.0
@@ -3566,88 +3580,31 @@ if eff_calc_conf
     float magnitude = math.abs(final_raw)
 
     string quality = "L"
-    int q_score = 0 // 0=L, 1=M, 2=H, 3=E (internal)
-
-    // Base Mapping
     if magnitude >= 0.35 and agreement >= 0.66 and regime_state != "SQUEEZE"
-        q_score := 2 // H
+        quality := "H"
     else if magnitude >= 0.20 and agreement >= 0.50
-        q_score := 1 // M
+        quality := "M"
     else
-        q_score := 0 // L
-
-    // VWAP Quality Gate
-    if conf_use_vwap_quality and not na(conf_vwap_val) and conf_state_engine != 0
-        // A. Alignment
-        bool is_bull = conf_state_engine == 1
-        bool aligned = (is_bull and close > conf_vwap_val) or (not is_bull and close < conf_vwap_val)
-        conf_aligned_flag := aligned
-
-        if aligned
-            q_score := math.min(q_score + 1, 3) // Boost, max E
-        else
-            q_score := math.max(q_score - 1, 0) // Penalty, min L
-
-        // B. Stretch Penalty
-        if not na(conf_z_val)
-            float abs_z = math.abs(conf_z_val)
-            int penalty = 0
-
-            // Thresholds
-            // NORMAL: < EntryTh
-            // STRETCH: >= EntryTh & < TPTh
-            // TP: >= TPTh & < ExtTh
-            // EXTREME: >= ExtTh
-
-            bool is_stretch = abs_z >= z_th_entry and abs_z < z_th_tp
-            bool is_tp      = abs_z >= z_th_tp and abs_z < z_th_ext
-            bool is_ext     = abs_z >= z_th_ext
-
-            if conf_z_penalty_mode == "Default"
-                if is_tp
-                    penalty := 1
-                else if is_ext
-                    penalty := 2
-            else if conf_z_penalty_mode == "Conservative"
-                if is_stretch
-                    penalty := 1
-                else if is_tp
-                    penalty := 2
-                else if is_ext
-                    penalty := 3
-            else if conf_z_penalty_mode == "Aggressive"
-                if is_tp
-                    penalty := 1
-                else if is_ext
-                    penalty := 1
-
-            q_score := math.max(q_score - penalty, 0)
+        quality := "L"
 
     // --- Stage 9: Quality Degrade (ADR/ATR) ---
     if adr_warn
-        if q_score == 2 // H -> M
-            q_score := 1
-        else if q_score == 1 // M -> L
-            q_score := 0
+        if quality == "H"
+            quality := "M"
+        else if quality == "M"
+            quality := "L"
 
     if adr_hard
-        q_score := 0 // L
+        quality := "L"
 
     // Optional: Low ATR in Non-Trend degrade
-    if atr_is_low and regime_state != "TREND" and q_score == 2
-        q_score := 1
-
-    // Backmap
-    quality := q_score == 3 ? "E" : q_score == 2 ? "H" : q_score == 1 ? "M" : "L"
+    if atr_is_low and regime_state != "TREND" and quality == "H"
+        quality := "M"
 
     // --- 6. Visualization (Panel) ---
     // BULL 72 H / NEUT 50 L
     if barstate.islast and eff_show_conf_meter and not na(info_panel)
-        string q_flag = ""
-        if conf_use_vwap_quality and not na(conf_aligned_flag)
-            q_flag := conf_aligned_flag ? " A" : " X"
-
-        string panel_txt = conf_bias + " " + str.tostring(math.round(conf_score)) + " " + quality + q_flag
+        string panel_txt = conf_bias + " " + str.tostring(math.round(conf_score)) + " " + quality
 
         color c_conf = color.new(color.gray, 100) // Default Transp
         if conf_state_engine == 1 // Bull
@@ -3657,9 +3614,9 @@ if eff_calc_conf
 
         // Neutral remains transparent
 
-        table.cell(info_panel, 0, 11, "CONF", text_size=size.small, text_color=color.silver)
-        table.cell(info_panel, 1, 11, panel_txt, text_size=size.small, text_color=color.white, bgcolor=c_conf)
-        table.merge_cells(info_panel, 1, 11, 2, 11)
+        table.cell(info_panel, 0, 10, "CONF", text_size=size.small, text_color=color.silver)
+        table.cell(info_panel, 1, 10, panel_txt, text_size=size.small, text_color=color.white, bgcolor=c_conf)
+        table.merge_cells(info_panel, 1, 10, 2, 10)
 
 // --- CENTRALIZED BACKGROUND ROUTING (Fix Bug #2) ---
 color bg_final = na
