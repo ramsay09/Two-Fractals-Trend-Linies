@@ -1,8 +1,8 @@
 # Two Fractals Trend Lines (Pine Script v5)
 
-A multi-tool market structure overlay for TradingView that combines **Bill Williams fractals**, **two-fractal trend lines**, **divergence arrows**, **bar-pattern markers**, **segments**, **Bollinger Bands**, **pivot points**, **trading sessions**, **MTF candle overlay**, **Fair Value Gaps**, **previous candle / last fractal S/R**, **volume spikes**, an optional **gradient volume profile**, and a **multi-timeframe trend info panel**.
+A multi-tool market structure overlay for TradingView that combines **Bill Williams fractals**, **two-fractal trend lines**, **divergence arrows**, **bar-pattern markers**, **segments**, **Bollinger Bands**, **pivot points**, **trading sessions**, **MTF candle overlay**, **Fair Value Gaps**, **Key Levels (PDH/PDL/PDC + Weekly/Monthly Open)**, **VWAP + Bands + Z-Score**, **RVOL (Relative Volume)**, **Opening Range / Initial Balance (OR/IB)**, an optional **Squeeze Box**, and a compact **CONF/REG + MTF trend info panel**.
 
-> **Intent:** Use the signals in **confluence** (not as standalone entries). Most elements aim to visualize **market structure**, **tension**, and **potential breakout / pullback zones**.
+> **Intent:** Use the signals in **confluence** (not as standalone entries). Most elements aim to visualize **market structure**, **tension**, and **potential breakout / pullback zones**, while helping to avoid **low-participation moves** and **late (stretched) entries**.
 
 ---
 
@@ -36,21 +36,57 @@ A multi-tool market structure overlay for TradingView that combines **Bill Willi
 
 ### 4) Segments (Subtle Trend Change Detection)
 - Draws up to **3 “segment” lines** for highs and lows, using a maximum bar distance (`Max Segment Bars`).
-- Useful as a subtle confirmation layer and for background filters.
+- Useful as a subtle confirmation layer and for background filters *(if you use them externally)*.
 
 ---
 
 ## Context & Confluence Tools
 
+### Strategy Lense (Focused Presets)
+A **Strategy Lense** applies focused defaults to reduce clutter and align the toolset with a style.  
+- **Custom**: manual control (no automatic switching)
+- **Session Map**: structure + sessions + key levels + ATR/ADR context
+- **ORB**: OR/IB + RVOL participation
+- **Mean Reversion**: VWAP + Bands/Z (optionally divergences)
+- **Breakout**: participation + structure framing
+- **Squeeze Breakout**: squeeze box + RVOL confirmation
+- **Trend Continuation**: CONF/REG + FVG + continuation framing
+
+> **Note:** Lenses are intentionally limited to a handful of defaults so they don’t constantly override your personal layout.
+
+### Key Levels (Origin-Anchored)
+- **PDH / PDL / PDC** (Previous Day High/Low/Close)
+- **Weekly Open / Monthly Open**
+- Levels are designed as **clean reference lines** (origin-anchored when available) and extend right for consistent context.
+
+### VWAP (Fair Value) + Bands + Z-Score
+- **Session VWAP (daily reset)** and/or **Weekly VWAP**
+- **VWAP Bands** (K1/K2/K3) for stretch zones
+- **VWAP Z-Score** (distance to VWAP in σ units) for “don’t chase” and MR framing
+
+### RVOL (Relative Volume)
+- RVOL = `volume / SMA(volume, N)` to measure **participation**
+- Optional marker points (recommended: show only **high/extreme** participation to reduce noise)
+- Works well as a confirmation layer for ORB, squeeze releases, breakouts, and reclaims
+
+### Opening Range / Initial Balance (OR/IB)
+- **OR**: first X minutes
+- **IB**: first ~60 minutes (common in futures)
+- “Lock after window” for stable break/fail logic
+
+### Squeeze Box (Optional)
+- Builds a range box during squeeze regime and tracks release/break events.
+- Best used with RVOL confirmation to reduce false breaks.
+
 ### Bollinger Bands
 - Standard or exponential calculation toggle.
 - Optional “Touched BBs only” for cleaner charts.
-- Displays BB1 and BB3 envelopes with filled zones.
+- Displays BB envelopes with filled zones (depending on configuration).
 
 ### Pivot Points (Classic)
 - 1H, 4H, Daily, Weekly, Monthly, 3M, 12M.
-- Uses optimized `request.security()` tuple fetches to stay within limits.
-- Drawn as lines to the right of the current price (offset varies by timeframe).
+- Calculated from the **previous period’s OHLC** (standard method).
+- Designed to update **on period changes** and remain stable during chart navigation.
 
 ### Trading Sessions
 - London / New York / Tokyo / Sydney
@@ -72,14 +108,20 @@ A multi-tool market structure overlay for TradingView that combines **Bill Willi
   - **MTF mode** using time-based coordinates (`xloc.bar_time`) for reliable placement.
 
 ### Additional Context
-- **Previous Candle High/Low** lines (selectable timeframe)
 - **Last Fractal S/R** (selectable timeframe)
 - **High Volume Spikes** marker `v` when volume exceeds `x * SMA(volume, 20)`
+- *(If enabled in your build)* optional **Gradient Volume Profile** for the visible range
 
-### Gradient Volume Profile (Optional)
-- Draws a **vertical gradient** profile on the right side of the chart for the visible range.
-- Smart contrast mode clips extreme peaks so normal nodes remain visible.
-- Replay-aware scan depth protection.
+---
+
+## Panel Legend (Compact Pro Readout)
+The panel is intended to be readable at a glance (numbers + classification):
+
+- **RVOL**: `VOL 0.14x L`  
+  - `L/M/H/E` = low / moderate / high / extreme participation
+- **VWAP Z**: `VWP -4.1σ E`  
+  - `N/S/T/E` = normal / stretched / TP zone / extreme
+- **CONF / REG**: regime + confluence bias/quality context (not a standalone entry)
 
 ---
 
@@ -94,27 +136,10 @@ An optional alert that triggers **while the 5th candle is still forming** (real-
 
 ---
 
-## Background Color Filters (Quick Visual Backtest Layer)
-
-You can route many internal signals into the background as a quick “state” visualization. Examples include:
-- Bill Williams fractal breaks
-- Anticipated fractals
-- Last 12 Bar triggers
-- Parabolic SAR state
-- DMI/ADX trend state
-- HMA slope state
-- MACD slow slope state / events
-- Trendline/fractal break combinations (OR/AND variants)
-- Segments combinations (OR/AND variants)
-- MA1/MA2 cross background
-
-The background calculation is wrapped in an MTF function and executed via `request.security()` using the selected background timeframe.
-
----
-
 ## Inputs Overview (Practical)
 
 ### Core toggles
+- **Strategy Lense** / **Custom**
 - **Bill Williams Fractals**
 - **Fractal Trend Lines**
 - **SR Lines** (horizontal fractal S/R + ATH line)
@@ -122,21 +147,23 @@ The background calculation is wrapped in an MTF function and executed via `reque
 - **Bar signals** (L12, NR7, inside/outside/sandwich/fakey)
 - **Segments**
 - **Bollinger Bands**
+- **Key Levels** (PDH/PDL/PDC + Weekly/Monthly Open)
+- **VWAP** (Anchor, Bands K1/K2/K3, Z-Score)
+- **RVOL**
+- **OR/IB**
 - **Pivot Points**
 - **Trading Sessions**
 - **MTF Candle Overlay**
 - **FVG**
-- **Additional Context (PCH/PCL, last fractal S/R, volume spikes)**
-- **Gradient Volume Profile**
+- **Additional Context** (last fractal S/R, volume spikes, squeeze box, optional volume profile)
 
 ### Timeframe-heavy modules
 - SR lines fractal timeframe (manual or auto-adapted)
-- Background filter timeframe
-- Previous candle timeframe
 - Last fractal timeframe
 - FVG timeframe
 - MTF candle overlay timeframe
 - Pivot point base timeframes (fixed)
+- VWAP anchor selection (session vs weekly)
 
 ---
 
@@ -144,23 +171,23 @@ The background calculation is wrapped in an MTF function and executed via `reque
 
 1. **Start with structure**
    - Enable **fractals**, **last fractal S/R**, optionally **SR lines**.
-2. **Add breakout framing**
+2. **Add context levels**
+   - Enable **Key Levels** (PDH/PDL/WOpen) and/or **VWAP**.
+3. **Add breakout framing**
    - Enable **fractal trend lines** and/or **FVG**.
-3. **Add tension + trigger hints**
-   - Enable **NR7**, **L12**, **volume spikes**.
-4. **Add trend context**
-   - Enable **EMA cloud** or MA1/MA2, plus optional **MTF info panel**.
-5. **Use background filter as confirmation**
-   - Pick one filter (e.g., “Fractals Trend Lines” or “MACD Slope/Fractal Break BG (OR)”) to avoid clutter.
+4. **Add participation**
+   - Enable **RVOL** (consider showing points only for high/extreme).
+5. **Add session structure**
+   - Enable **sessions** and optionally **OR/IB** for intraday.
 
 ---
 
 ## Performance Notes
 - The script uses multiple `request.security()` calls and can draw many objects (lines/boxes).
 - If you hit performance issues:
-  - Disable **Gradient Volume Profile**
+  - Disable optional heavy visuals (e.g., volume profile, extra overlays)
   - Reduce visible complexity (segments, pivots, sessions, MTF overlay)
-  - Keep scan depth (`vp_maxScan`) reasonable for your chart usage
+  - Keep scan depth (if applicable) reasonable for your chart usage
 
 ---
 
@@ -168,13 +195,12 @@ The background calculation is wrapped in an MTF function and executed via `reque
 - **White triangles**: Bill Williams fractals
 - **Blue trend lines**: fractal trend lines (upper/lower)
 - **Arrows**: divergence signals (green up / red down)
-- **L**: Last-12 bar trigger points
-- **n**: Narrow range bar (NR7-like compression)
-- **i / o / s / F**: inside / outside / sandwich / fakey patterns
-- **Dashed gray lines**: previous candle high/low, last fractal high/low
-- **v (bottom)**: high volume spike
-- **Boxes**: FVG zones, MTF candle overlay, and (optional) sessions in “Box” style
-- **Background tint**: selected background filter state
+- **L / n / i / o / s / F**: bar pattern markers
+- **Key level lines**: PDH/PDL/PDC + Weekly/Monthly Open (style may differ)
+- **VWAP line + bands**: fair value + stretch zones (K1/K2/K3)
+- **VOL markers**: RVOL participation points (optional)
+- **Boxes**: FVG zones, MTF candle overlay, sessions (Box style), squeeze box (if enabled)
+- **Panel**: compact context readout (CONF/REG, VWAP Z, RVOL, ATR/ADR%)
 
 ---
 
@@ -186,7 +212,7 @@ The background calculation is wrapped in an MTF function and executed via `reque
 ---
 
 ## Changelog (Optional)
-- Add your version notes here (e.g., “Replay fix for Volume Profile scan depth”, “MTF FVG time-based placement”, etc.).
+- Add your version notes here (e.g., “Strategy Lense presets”, “Key Levels origin-anchored”, “VWAP bands + Z panel codes”, “Pivot stability pass”, “CONF VWAP quality gate”, etc.).
 
 ---
 
