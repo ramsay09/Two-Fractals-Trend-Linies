@@ -304,7 +304,7 @@ z_th_ext            = input.float(3.0, "Ext Th", step=0.1, group=grp_vwap, inlin
 
 // OR/IB Inputs
 grp_or              = "Opening Range / Initial Balance"
-or_enabled          = input.bool(true, "OR/IB Enabled", group=grp_or, tooltip="Defines the first battle zone; key for trend vs range days.")
+or_enabled          = input.bool(false, "OR/IB Enabled", group=grp_or, tooltip="Defines the first battle zone; key for trend vs range days.")
 or_type             = input.string("Opening Range", "Type", options=["Opening Range", "Initial Balance"], group=grp_or, inline="or_1", tooltip="OR: User defined minutes. \nIB: First 60 minutes.")
 or_sess             = input.string("New York", "⠀Session", options=["London", "New York", "Custom"], group=grp_or, inline="or_1", tooltip="Market open context.")
 or_cust             = input.session("0930-1600", "Custom Sess", group=grp_or, inline="or_2")
@@ -314,7 +314,7 @@ or_lock             = input.bool(true, "Lock after Window", group=grp_or, inline
 
 // Squeeze Box
 grp_sq              = "Squeeze Box"
-sq_box_enabled      = input.bool(true, "Squeeze Box⠀", inline="sq_b", group=grp_sq, tooltip="Visualizes price range during a Squeeze. \n• Breakout: Wait for release + trend confirm. \n• False Break: Watch for trap/reversal.")
+sq_box_enabled      = input.bool(false, "Squeeze Box⠀", inline="sq_b", group=grp_sq, tooltip="Visualizes price range during a Squeeze. \n• Breakout: Wait for release + trend confirm. \n• False Break: Watch for trap/reversal.")
 sq_lock             = input.bool(true, "Lock on Release", inline="sq_b", group=grp_sq, tooltip="Locks the box levels when the squeeze ends to provide breakout references.")
 sq_source           = input.string("REG=SQUEEZE", "Source", options=["REG=SQUEEZE"], group=grp_sq, tooltip="Source of the squeeze state (Regime Engine).")
 
