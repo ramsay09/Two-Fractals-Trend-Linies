@@ -3386,7 +3386,7 @@ if eff_sq_box_enabled
 
     else if sqs.locked
         if barstate.islast
-             box.set_right(sqs.id_box, bar_index + 5)
+            box.set_right(sqs.id_box, bar_index + 5)
 
         // Break Events
         if close > sqs.hi and close[1] <= sqs.hi
