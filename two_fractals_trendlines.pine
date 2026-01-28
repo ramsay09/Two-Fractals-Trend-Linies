@@ -29,7 +29,7 @@ int W_O     = 1
 // --- TOP LEVEL UI ---
 auto_tuning     = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Auto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
 
-trading_approach = input.string("Custom", "Trading Approach", options=["Custom", "Session Map", "ORB", "Mean Reversion", "Breakout", "Squeeze Breakout", "Trend Continuation"], tooltip="Presets for specific trading workflows. \n• Custom: Full manual control.\n• Session Map: Structure, Key Levels, ADR.\n• ORB: Opening Range, RVOL.\n• Mean Reversion: VWAP, Bands, Divergences.\n• Breakout/Squeeze: RVOL, Structure, Momentum.\n• Trend Continuation: CONF/REG, FVG.")
+trading_approach = input.string("Custom", "Strategy Lense", options=["Custom", "Session Map", "ORB", "Mean Reversion", "Breakout", "Squeeze Breakout", "Trend Continuation"], tooltip="Presets for specific trading workflows. \n• Custom: Full manual control.\n• Session Map: Structure, Key Levels, ADR.\n• ORB: Opening Range, RVOL.\n• Mean Reversion: VWAP, Bands, Divergences.\n• Breakout/Squeeze: RVOL, Structure, Momentum.\n• Trend Continuation: CONF/REG, FVG.")
 
 // adx, hma and ema1 x ema2 mtf trend info panel
 panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
@@ -51,8 +51,7 @@ show_conf_bg        = input.bool(false, "Confluence Meter BG", inline="conf_ui",
                      \n• NEUT is fully transparent (panel + chart background).
                      \n\nPlots the Confluence Signal background color.")
 
-show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. 
-                      \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n• Independent Controls: Toggle Panel and Background separately.")
+show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)")
 regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
 
 show_adr_info       = input.bool(true, "Show ADR20 %", inline="REGIME_UI", tooltip="ADR% (ADR20) shows how much of today’s typical daily range has already been used.
@@ -239,8 +238,6 @@ mtf_opacity       = input.int(15, "Opacity %", minval=0, maxval=100, group=grp_m
 grp_add         = "Additional Context"
 use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", group=grp_add, inline="sess_1st", tooltip="")
 sess_1st_tf     = input.timeframe("5", "", group=grp_add, inline="sess_1st", tooltip="Lines remain at the high and low of the first candle of the running trading session. \nSelect the timeframe for the 1st Session Candle calculation.")
-show_pch_pcl    = input.bool(true, "Previous Candle High/Low", group=grp_add, inline="add_1", tooltip="")
-pch_pcl_tf      = input.timeframe("D", "", group=grp_add, inline="add_1", tooltip="Draws lines at the High and Low of the previous completed candle of the selected timeframe. \nSelect the timeframe for the Previous Candle High/Low calculation.")
 
 show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀", group=grp_add, inline="l_rf", tooltip="")
 last_frac_tf    = input.timeframe("240", "", group=grp_add, inline="l_rf", tooltip="Draws lines at the last confirmed Up/Down Fractals. Every new trend begins with the breaking of a fractal. (Time Frame dependent). \nSelect the timeframe for the Last Fractal calculation.")
@@ -267,60 +264,60 @@ col_fvg2_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀�
 
 // Key Levels Inputs
 grp_key             = "Key Levels"
-key_levels_enabled  = input.bool(true, "Key Levels ⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_key, tooltip="Displays Previous Daily High/Low and Open levels.")
-show_pdh            = input.bool(true, "PDH", inline="kl_1", group=grp_key)
-show_pdl            = input.bool(true, "PDL", inline="kl_1", group=grp_key)
-show_pdc            = input.bool(false, "PDC", inline="kl_1", group=grp_key)
-show_wopen          = input.bool(true, "Weekly Open", inline="kl_2", group=grp_key)
-show_mopen          = input.bool(false, "Monthly Open", inline="kl_2", group=grp_key)
-key_style           = input.string("Lines", "Style", options=["Lines", "Labels", "Both"], inline="kl_3", group=grp_key)
-key_extend          = input.bool(true, "Extend", inline="kl_3", group=grp_key)
+key_levels_enabled  = input.bool(true, "Key Levels", group=grp_key, tooltip="Previous Day High/Low/Close, Weekly/Monthly Open. \nKey reference levels for intraday structure, targets, and invalidation. \n\n• PDH/PDL: Liquidity Magnets; Break/Reject helps Bias. \n• PDC: Mean-reversion reference. \n• Weekly/Monthly Open: Trend-Bias; Market above = Bull, below = Bear. \n\nOrigin-anchored: Lines start at the bar where the level formed.")
+show_pdh            = input.bool(true, "PDH⠀", inline="kl_1", group=grp_key, tooltip="Prior Day High = liquidity pool; break+hold → continuation, sweep+reclaim → trap.")
+show_pdl            = input.bool(true, "PDL⠀", inline="kl_1", group=grp_key, tooltip="Prior Day Low = liquidity pool; break+hold → continuation, sweep+reclaim → trap.")
+show_pdc            = input.bool(false, "PDC⠀", inline="kl_1", group=grp_key, tooltip="Reversion target / magnet on range days.")
+show_wopen          = input.bool(true, "Weekly Open⠀", inline="kl_1", group=grp_key, tooltip="Higher timeframe bias line; watch reclaim/hold for continuation days.")
+show_mopen          = input.bool(false, "Monthly Open", inline="kl_1", group=grp_key, tooltip="Higher timeframe bias line; watch reclaim/hold for continuation days.")
+key_style           = input.string("Lines", "Style", options=["Lines", "Labels", "Both"], inline="kl_3", group=grp_key, tooltip="Visual style for levels.")
+key_extend          = input.bool(true, "Extend", inline="kl_3", group=grp_key, tooltip="Extend projects the level into the future; turn off to keep chart clean.")
 
 // RVOL Inputs
 grp_rvol            = "Relative Volume (RVOL)"
-rvol_enabled        = input.bool(true, "RVOL Enabled ⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_rvol, tooltip="Relative Volume: Current Volume / Average Volume.")
-rvol_len            = input.int(20, "Length", minval=1, group=grp_rvol, inline="rv_1")
-rvol_display        = input.string("Marker", "Display", options=["None", "Marker", "Label", "Both"], group=grp_rvol, inline="rv_1")
-rvol_th_1           = input.float(1.2, "Low", step=0.1, group=grp_rvol, inline="rv_2")
-rvol_th_2           = input.float(2.0, "Med", step=0.1, group=grp_rvol, inline="rv_2")
-rvol_th_3           = input.float(3.0, "High", step=0.1, group=grp_rvol, inline="rv_2")
-tod_rvol_enabled    = input.bool(false, "ToD RVOL (Heavy)", group=grp_rvol, tooltip="⚠ Experimental: Uses Time-of-Day specific averages. Uses arrays.")
+rvol_enabled        = input.bool(true, "RVOL Enabled", group=grp_rvol, tooltip="Relative Volume = Current Vol / Avg Vol. \nMeasures participation; confirms breakouts and reclaims. \n• ORB/Breakout: RVOL > 2.0 signals expansion. \n• Reclaim: RVOL pickup confirms strength.")
+rvol_len            = input.int(20, "Length", minval=1, group=grp_rvol, inline="rv_1", tooltip="Average window; 20 is common.")
+rvol_display        = input.string("Marker", "⠀Display", options=["None", "Marker", "Label", "Both"], group=grp_rvol, inline="rv_1", tooltip="Visual style.")
+rvol_points_enabled = input.bool(true, "Points", group=grp_rvol, inline="rv_1", tooltip="Show colored dots at bottom for RVOL intensity.")
+rvol_th_1           = input.float(1.2, "Low", step=0.1, group=grp_rvol, inline="rv_2", tooltip="1.2x: Slightly elevated.")
+rvol_th_2           = input.float(2.0, "⠀Med", step=0.1, group=grp_rvol, inline="rv_2", tooltip="2.0x: Event / Breakout fuel.")
+rvol_th_3           = input.float(3.0, "⠀High", step=0.1, group=grp_rvol, inline="rv_2", tooltip="3.0x: Strong trend / News.")
 
 // VWAP Inputs
 grp_vwap            = "VWAP"
-vwap_enabled        = input.bool(true, "VWAP Enabled ⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_vwap)
-vwap_anchor         = input.string("Session (Daily Reset)", "Anchor", options=["Session (Daily Reset)", "Weekly"], group=grp_vwap, inline="vw_1")
-vwap_src            = input.source(hlc3, "Source", group=grp_vwap, inline="vw_1")
-vwap_show_line      = input.bool(true, "Show Line", group=grp_vwap, inline="vw_2")
-vwap_only_sess      = input.bool(false, "Calc Only in Sessions", group=grp_vwap, inline="vw_2", tooltip="Pauses accumulation outside configured trading sessions.")
+vwap_enabled        = input.bool(false, "VWAP Enabled", group=grp_vwap, tooltip="Volume-weighted fair value. \n• Trend: Above=Bull, Below=Bear. \n• Reversion: Far from VWAP = Stretched.")
+vwap_anchor         = input.string("Session (Daily Reset)", "Anchor", options=["Session (Daily Reset)", "Weekly"], group=grp_vwap, inline="vw_1", tooltip="Session: Intraday fair value. \nWeekly: Swing bias filter.")
+vwap_src            = input.source(hlc3, "⠀Source", group=grp_vwap, inline="vw_1", tooltip="Standard: hlc3.")
+vwap_show_line      = input.bool(true, "Show Line⠀", group=grp_vwap, inline="vw_2")
+vwap_only_sess      = input.bool(false, "Calc Only in Sessions", group=grp_vwap, inline="vw_2", tooltip="If enabled, VWAP pauses outside selected sessions.")
 
-vwap_bands_enabled  = input.bool(true, "Bands Enabled", group=grp_vwap, inline="vw_3")
-vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_3")
-vwap_stdev_len      = input.int(100, "Rolling Len", minval=2, group=grp_vwap, inline="vw_3")
-band_k1             = input.float(1.0, "K1", step=0.5, group=grp_vwap, inline="vw_4")
-band_k2             = input.float(2.0, "K2", step=0.5, group=grp_vwap, inline="vw_4")
-band_k3             = input.float(3.0, "K3", step=0.5, group=grp_vwap, inline="vw_4")
+vwap_bands_enabled  = input.bool(true, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="Standard Deviation Bands. \nUsage: 'Don't chase' zones and Take Profit targets.")
+vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "⠀Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_3", tooltip="Rolling: Last N bars (Stable). \nWelford: Session-cumulative (Precise).")
+vwap_stdev_len      = input.int(100, "⠀Len", inline="vw_3", minval=2, group=grp_vwap, inline="vw_3")
+band_k1             = input.float(1.0, "K1", step=0.5, group=grp_vwap, inline="vw_4", tooltip="1st Band Multiplier.")
+band_k2             = input.float(2.0, "⠀K2", step=0.5, group=grp_vwap, inline="vw_4", tooltip="2nd Band Multiplier.")
 
-vwap_z_enabled      = input.bool(true, "Z-Score Enabled", group=grp_vwap, inline="vw_5")
-z_th_entry          = input.float(2.0, "Entry Th", step=0.1, group=grp_vwap, inline="vw_5")
-z_th_tp             = input.float(2.5, "TP Th", step=0.1, group=grp_vwap, inline="vw_5")
-z_th_ext            = input.float(3.0, "Ext Th", step=0.1, group=grp_vwap, inline="vw_5")
+vwap_z_enabled      = input.bool(true, "Z-Score Enabled", group=grp_vwap, inline="vw_5", tooltip="Z-Score = Distance to VWAP in Sigmas. \nUsed for Mean Reversion signals.")
+z_th_entry          = input.float(2.0, "⠀Entry Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="Avoid entries when stretched > Entry Th.")
+z_th_tp             = input.float(2.5, "⠀TP Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="Scale out when Z reaches TP Th.")
+z_th_ext            = input.float(3.0, "Ext Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="Extreme extension; look for reversals.")
 
 // OR/IB Inputs
 grp_or              = "Opening Range / Initial Balance"
-or_enabled          = input.bool(true, "OR/IB Enabled ⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_or)
-or_type             = input.string("Opening Range", "Type", options=["Opening Range", "Initial Balance"], group=grp_or, inline="or_1")
-or_sess             = input.string("New York", "Session", options=["London", "New York", "Custom"], group=grp_or, inline="or_1")
+or_enabled          = input.bool(true, "OR/IB Enabled", group=grp_or, tooltip="Defines the first battle zone; key for trend vs range days.")
+or_type             = input.string("Opening Range", "Type", options=["Opening Range", "Initial Balance"], group=grp_or, inline="or_1", tooltip="OR: User defined minutes. \nIB: First 60 minutes.")
+or_sess             = input.string("New York", "⠀Session", options=["London", "New York", "Custom"], group=grp_or, inline="or_1", tooltip="Market open context.")
 or_cust             = input.session("0930-1600", "Custom Sess", group=grp_or, inline="or_2")
-or_min              = input.int(15, "Duration (Min)", minval=1, group=grp_or, inline="or_2")
-or_display          = input.string("Box+Lines", "Display", options=["Box+Lines", "Box", "Lines"], group=grp_or, inline="or_3")
-or_lock             = input.bool(true, "Lock after Window", group=grp_or, inline="or_3")
+or_min              = input.int(15, "Duration", inline="or_2", minval=1, group=grp_or, inline="or_2", tooltip="Window size in minutes (for OR).")
+or_display          = input.string("Box+Lines", "Display", options=["Box+Lines", "Box", "Lines"], group=grp_or, inline="or_3", tooltip="Visual style.")
+or_lock             = input.bool(true, "Lock after Window", group=grp_or, inline="or_3", tooltip="Freeze levels after window ends (required for breakouts).")
 
 // Squeeze Box
 grp_sq              = "Squeeze Box"
-sq_box_enabled      = input.bool(true, "Squeeze Box ⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_sq)
-sq_source           = input.string("REG=SQUEEZE", "Source", options=["REG=SQUEEZE"], group=grp_sq)
-sq_lock             = input.bool(true, "Lock on Release", group=grp_sq)
+sq_box_enabled      = input.bool(true, "Squeeze Box⠀", inline="sq_b", group=grp_sq, tooltip="Visualizes price range during a Squeeze. \n• Breakout: Wait for release + trend confirm. \n• False Break: Watch for trap/reversal.")
+sq_lock             = input.bool(true, "Lock on Release", inline="sq_b", group=grp_sq, tooltip="Locks the box levels when the squeeze ends to provide breakout references.")
+sq_source           = input.string("REG=SQUEEZE", "Source", options=["REG=SQUEEZE"], group=grp_sq, tooltip="Source of the squeeze state (Regime Engine).")
+
 
 // Smart MTF S&R
 grp_psr             = "Smart S&R (Support & Resistance)"
@@ -573,7 +570,6 @@ eff_vp_smart        = f_approach_bool(vp_smart,           vp_smart, false, false
 eff_show_mtf_candles= f_approach_bool(show_mtf_candles,   false,    false, false, false, false,  false)
 
 eff_use_sess_1st    = f_approach_bool(use_sess_1st,       false,    false, false, false, false,  false)
-eff_show_pch_pcl    = f_approach_bool(show_pch_pcl,       false,    false, false, false, false,  false)
 eff_show_last_frac  = f_approach_bool(show_last_frac,     false,    false, false, false, false,  false)
 eff_show_vol        = f_approach_bool(show_vol,           true,     false, false, false, false,  false) // Legacy spike, prefer RVOL in new modes
 
@@ -645,7 +641,6 @@ eff_sq_box_enabled = f_approach_bool(sq_box_enabled, false, false, false, false,
 int active_sec_calls = 0
 // Performance Counters (Per Bar)
 int ops_trend = 0
-int ops_pch = 0
 int ops_vp_scan = 0
 int ops_vp_draw = 0
 int ops_div = 0
@@ -657,7 +652,6 @@ var int peak_ops_vp = 0
 
 var table tbl_dbg = na
 
-ON_PCH          = eff_show_pch_pcl
 ON_FVG1         = eff_plot_fvg1
 ON_FVG2         = eff_plot_fvg2
 ON_MTF_OV       = eff_show_mtf_candles
@@ -725,76 +719,178 @@ f_label_get_or_create(_lb, _x, _y, _txt, _col) =>
 
 
 //------------------------------------------------------- Key Levels Module -------------------------------------------------------
-// Stage 1: PDH/PDL + Weekly/Monthly Open
+// Stage 1: PDH/PDL/PDC + Weekly/Monthly Open (Origin-Anchored)
 
 // 1. Data Fetching (O(1))
-[d_h, d_l, d_c] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]], lookahead=barmerge.lookahead_on)
-w_o = request.security(syminfo.tickerid, "W", open, lookahead=barmerge.lookahead_on)
-m_o = request.security(syminfo.tickerid, "M", open, lookahead=barmerge.lookahead_on)
+float d_h = na, float d_l = na, float d_c = na, int d_start = na, int d_end = na
+float w_o = na, int w_start = na
+float m_o = na, int m_start = na
 
 if eff_key_levels_enabled
+    [t_dh, t_dl, t_dc, t_ds, t_de] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1], time[1], time], lookahead=barmerge.lookahead_on)
+    d_h := t_dh, d_l := t_dl, d_c := t_dc, d_start := t_ds, d_end := t_de
+
+    [t_wo, t_ws] = request.security(syminfo.tickerid, "W", [open, time], lookahead=barmerge.lookahead_on)
+    w_o := t_wo, w_start := t_ws
+
+    [t_mo, t_ms] = request.security(syminfo.tickerid, "M", [open, time], lookahead=barmerge.lookahead_on)
+    m_o := t_mo, m_start := t_ms
+
     active_sec_calls += 3
 
-// 2. Objects
+// 2. Scan & State Management
+var int idx_pdh = na
+var int idx_pdl = na
+var int idx_pdc = na
+var int idx_wo = na
+var int idx_mo = na
+
+// State to detect new day/week/month
+var int last_d_start = 0
+var int last_w_start = 0
+var int last_m_start = 0
+
+// Objects
 var line l_pdh = na, var label lb_pdh = na
 var line l_pdl = na, var label lb_pdl = na
 var line l_pdc = na, var label lb_pdc = na
 var line l_wo  = na, var label lb_wo  = na
 var line l_mo  = na, var label lb_mo  = na
 
-// Helper
-f_draw_key_level(_l, _lb, _val, _txt, _col, _en, _style, _extend) =>
+// Helper for Drawing (Global Scope)
+f_draw_kl(_l, _lb, _idx, _val, _txt, _col, _en, _style, _ext) =>
     line ret_l = _l
     label ret_lb = _lb
 
-    // Check Visibility: Current TF < Target TF (Daily/Weekly) to avoid clutter
-    // Simple heuristic: Key Levels always visible intraday
-
-    if eff_key_levels_enabled and _en and not na(_val) and barstate.islast
-        // Create or Update Line
+    if _en and not na(_val) and not na(_idx)
+        // Line
         if key_style != "Labels"
-            ret_l := f_line_get_or_create(ret_l, bar_index, _val, bar_index + 10, _val, _col, _style)
-            if _extend
-                line.set_extend(ret_l, extend.right)
-            else
-                line.set_extend(ret_l, extend.none)
+            ret_l := f_line_get_or_create(ret_l, _idx, _val, bar_index, _val, _col, _style)
+            line.set_extend(ret_l, _ext ? extend.right : extend.none)
         else
             line.delete(ret_l)
             ret_l := na
 
-        // Create or Update Label
+        // Label
         if key_style != "Lines"
-            ret_lb := f_label_get_or_create(ret_lb, bar_index + 10, _val, _txt, _col)
+            ret_lb := f_label_get_or_create(ret_lb, bar_index + 5, _val, _txt, _col)
         else
             label.delete(ret_lb)
             ret_lb := na
     else
         line.delete(ret_l)
-        ret_l := na
         label.delete(ret_lb)
+        ret_l := na
         ret_lb := na
 
     [ret_l, ret_lb]
 
-// 3. Execution
-[t_l_pdh, t_lb_pdh] = f_draw_key_level(l_pdh, lb_pdh, d_h, "PDH", color.new(color.red, 30), eff_show_pdh, line.style_dashed, key_extend)
-l_pdh := t_l_pdh, lb_pdh := t_lb_pdh
+// Scan Limits
+int SCAN_LIMIT = 4000 // Max bars back
 
-[t_l_pdl, t_lb_pdl] = f_draw_key_level(l_pdl, lb_pdl, d_l, "PDL", color.new(color.green, 30), eff_show_pdl, line.style_dashed, key_extend)
-l_pdl := t_l_pdl, lb_pdl := t_lb_pdl
+if eff_key_levels_enabled and barstate.islast
+    // PDH/PDL/PDC Scan
+    if d_start != last_d_start
+        idx_pdh := na
+        idx_pdl := na
+        idx_pdc := na
+        int found_h = na
+        int found_l = na
+        int found_c = na
+        int fallback_start_idx = na
 
-[t_l_pdc, t_lb_pdc] = f_draw_key_level(l_pdc, lb_pdc, d_c, "PDC", color.new(color.gray, 30), eff_show_pdc, line.style_dotted, key_extend)
-l_pdc := t_l_pdc, lb_pdc := t_lb_pdc
+        for i = 1 to SCAN_LIMIT
+            int t = time[i]
+            if t < d_start
+                break
 
-[t_l_wo, t_lb_wo] = f_draw_key_level(l_wo, lb_wo, w_o, "W.Open", color.new(color.orange, 0), eff_show_wopen, line.style_solid, key_extend)
-l_wo := t_l_wo, lb_wo := t_lb_wo
+            if t >= d_start
+                fallback_start_idx := bar_index - i
 
-[t_l_mo, t_lb_mo] = f_draw_key_level(l_mo, lb_mo, m_o, "M.Open", color.new(color.white, 0), eff_show_mopen, line.style_solid, key_extend)
-l_mo := t_l_mo, lb_mo := t_lb_mo
+            if t >= d_start and t < d_end
+                if high[i] == d_h and na(found_h)
+                    found_h := bar_index - i
+                if low[i] == d_l and na(found_l)
+                    found_l := bar_index - i
+                if na(found_c)
+                    found_c := bar_index - i
+
+        int fb_idx = not na(fallback_start_idx) ? fallback_start_idx : (bar_index - SCAN_LIMIT)
+        idx_pdh := not na(found_h) ? found_h : fb_idx
+        idx_pdl := not na(found_l) ? found_l : fb_idx
+        idx_pdc := not na(found_c) ? found_c : fb_idx
+        last_d_start := d_start
+
+    // WOpen Scan
+    if w_start != last_w_start
+        idx_wo := na
+        for i = 0 to SCAN_LIMIT
+            if time[i] < w_start
+                break
+            if time[i] == w_start
+                idx_wo := bar_index - i
+                break
+        if na(idx_wo)
+            idx_wo := bar_index - SCAN_LIMIT
+        last_w_start := w_start
+
+    // MOpen Scan
+    if m_start != last_m_start
+        idx_mo := na
+        for i = 0 to SCAN_LIMIT
+            if time[i] < m_start
+                break
+            if time[i] == m_start
+                idx_mo := bar_index - i
+                break
+        if na(idx_mo)
+            idx_mo := bar_index - SCAN_LIMIT
+        last_m_start := m_start
+
+    // Drawing
+    // Execute Draws
+    [t_l_pdh, t_lb_pdh] = f_draw_kl(l_pdh, lb_pdh, idx_pdh, d_h, "PDH", color.new(color.red, 30), eff_show_pdh, line.style_dashed, key_extend)
+    l_pdh := t_l_pdh, lb_pdh := t_lb_pdh
+
+    [t_l_pdl, t_lb_pdl] = f_draw_kl(l_pdl, lb_pdl, idx_pdl, d_l, "PDL", color.new(color.green, 30), eff_show_pdl, line.style_dashed, key_extend)
+    l_pdl := t_l_pdl, lb_pdl := t_lb_pdl
+
+    [t_l_pdc, t_lb_pdc] = f_draw_kl(l_pdc, lb_pdc, idx_pdc, d_c, "PDC", color.new(color.gray, 30), eff_show_pdc, line.style_dotted, key_extend)
+    l_pdc := t_l_pdc, lb_pdc := t_lb_pdc
+
+    [t_l_wo, t_lb_wo] = f_draw_kl(l_wo, lb_wo, idx_wo, w_o, "W.Open", color.new(color.orange, 0), eff_show_wopen, line.style_solid, key_extend)
+    l_wo := t_l_wo, lb_wo := t_lb_wo
+
+    [t_l_mo, t_lb_mo] = f_draw_kl(l_mo, lb_mo, idx_mo, m_o, "M.Open", color.new(color.white, 0), eff_show_mopen, line.style_solid, key_extend)
+    l_mo := t_l_mo, lb_mo := t_lb_mo
+
+else
+    // Cleanup if disabled
+    line.delete(l_pdh)
+    label.delete(lb_pdh)
+    line.delete(l_pdl)
+    label.delete(lb_pdl)
+    line.delete(l_pdc)
+    label.delete(lb_pdc)
+    line.delete(l_wo)
+    label.delete(lb_wo)
+    line.delete(l_mo)
+    label.delete(lb_mo)
+
+    l_pdh:=na
+    lb_pdh:=na
+    l_pdl:=na
+    lb_pdl:=na
+    l_pdc:=na
+    lb_pdc:=na
+    l_wo:=na
+    lb_wo:=na
+    l_mo:=na
+    lb_mo:=na
 
 
 //------------------------------------------------------- RVOL Module -------------------------------------------------------
-// Stage 2: Standard RVOL + Optional ToD
+// Stage 2: Standard RVOL
 
 float rvol_val = na
 string rvol_state = "0"
@@ -802,10 +898,6 @@ string rvol_state = "0"
 if eff_rvol_enabled
     // Standard RVOL
     float v_avg = ta.sma(volume, rvol_len)
-
-    // Optional ToD RVOL (Placeholder / Basic Implementation)
-    // If ToD enabled, we could switch v_avg logic here.
-    // For now, standard SMA is robust.
 
     if v_avg > 0
         rvol_val := volume / v_avg
@@ -821,7 +913,7 @@ if eff_rvol_enabled
 // Visuals
 bool show_rvol_visuals = eff_rvol_enabled and rvol_display != "None" and rvol_state != "0"
 color c_rv = rvol_state == "3" ? color.red : rvol_state == "2" ? color.orange : color.yellow
-bool show_marker = show_rvol_visuals and (rvol_display == "Marker" or rvol_display == "Both")
+bool show_marker = show_rvol_visuals and (rvol_display == "Marker" or rvol_display == "Both") and rvol_points_enabled
 
 plotshape(show_marker, style=shape.circle, location=location.bottom, color=c_rv, size=size.tiny, title="RVOL Marker")
 
@@ -2382,8 +2474,6 @@ plot(eff_vwap_bands and not na(sigma_val) ? vwap_val + band_k1 * sigma_val : na,
 plot(eff_vwap_bands and not na(sigma_val) ? vwap_val - band_k1 * sigma_val : na, "B1 Dn", color.new(color.gray, 80))
 plot(eff_vwap_bands and not na(sigma_val) ? vwap_val + band_k2 * sigma_val : na, "B2 Up", color.new(color.gray, 60))
 plot(eff_vwap_bands and not na(sigma_val) ? vwap_val - band_k2 * sigma_val : na, "B2 Dn", color.new(color.gray, 60))
-plot(eff_vwap_bands and not na(sigma_val) ? vwap_val + band_k3 * sigma_val : na, "B3 Up", color.new(color.gray, 40))
-plot(eff_vwap_bands and not na(sigma_val) ? vwap_val - band_k3 * sigma_val : na, "B3 Dn", color.new(color.gray, 40))
 
 // Label for Z
 var label lb_vwap_z = na
@@ -2462,7 +2552,8 @@ if eff_or_enabled
 
     else if ors.building
         // Check Duration
-        float dur_sec = or_min * 60
+        int eff_min = or_type == "Initial Balance" ? 60 : or_min
+        float dur_sec = eff_min * 60
         float elapsed_sec = (bar_index - ors.start_bar + 1) * tf_sec // Estimation via bars, simpler
 
         if elapsed_sec <= dur_sec
@@ -2475,10 +2566,10 @@ if eff_or_enabled
             box.set_right(ors.id_box, bar_index + 1)
 
             line.set_y1(ors.l_hi, ors.hi)
-            line.set_y2(ors.l_hi, bar_index + 1)
+            line.set_xy2(ors.l_hi, bar_index + 1, ors.hi)
 
             line.set_y1(ors.l_lo, ors.lo)
-            line.set_y2(ors.l_lo, bar_index + 1)
+            line.set_xy2(ors.l_lo, bar_index + 1, ors.lo)
         else
             // Finish
             ors.building := false
@@ -2821,118 +2912,6 @@ else
     lb_s1_l := na
 
 
-/// --- 2. Previous Candle High/Low (Lines & Labels) ---
-// Fetch High/Low of the previous completed candle + its exact time window (start/end)
-float pc_h_val = na
-float pc_l_val = na
-int pc_start_time = na
-int pc_end_time = na
-
-if ON_PCH
-    [t_h, t_l, t_s, t_e] = request.security(syminfo.tickerid, pch_pcl_tf, [high[1], low[1], time[1], time], lookahead=barmerge.lookahead_on)
-    pc_h_val := t_h
-    pc_l_val := t_l
-    pc_start_time := t_s
-    pc_end_time := t_e
-    active_sec_calls += 1
-
-// Variables for Lines and Labels
-var line  l_pch  = na
-var line  l_pcl  = na
-var label lb_pch = na
-var label lb_pcl = na
-
-// Stage 2: PCH/PCL Object Reuse & Dirty Scan
-
-// State for Dirty Check
-var int last_pc_start = 0
-var int last_pc_end = 0
-
-// Cached Scan Results
-var int   c_pch_idx = na
-var int   c_pcl_idx = na
-var float c_max_h   = na
-var float c_min_l   = na
-
-
-if barstate.islast
-    // Check Visibility & Enable
-    is_valid_pch_tf = timeframe.in_seconds(timeframe.period) <= timeframe.in_seconds(pch_pcl_tf)
-
-    if ON_PCH and is_valid_pch_tf
-        // Dirty Logic
-        bool pch_dirty = (pc_start_time != last_pc_start) or (pc_end_time != last_pc_end)
-
-        if pch_dirty
-            // Heavy Scan Loop (Runs only when HTF candle changes)
-            int lookback_limit = math.min(2000, bar_index) // Adaptive Limit
-            float max_h_scan = na
-            float min_l_scan = na
-            int pch_idx_scan = na
-            int pcl_idx_scan = na
-
-            for i = 0 to lookback_limit
-                ops_pch += 1 // Count Ops
-
-                // Early Break Optimization
-                if time[i] < pc_start_time
-                    break
-
-                if not na(pc_start_time) and not na(pc_end_time) and time[i] >= pc_start_time and time[i] < pc_end_time
-                    if na(max_h_scan) or high[i] > max_h_scan
-                        max_h_scan := high[i]
-                        pch_idx_scan := bar_index - i
-                    if na(min_l_scan) or low[i] < min_l_scan
-                        min_l_scan := low[i]
-                        pcl_idx_scan := bar_index - i
-
-            // Update Cache
-            c_max_h   := max_h_scan
-            c_min_l   := min_l_scan
-            c_pch_idx := pch_idx_scan
-            c_pcl_idx := pcl_idx_scan
-
-            // Update State
-            last_pc_start := pc_start_time
-            last_pc_end   := pc_end_time
-
-        // Determine Y Values (Fallback to cached scan if security returns na)
-        float pch_y = not na(pc_h_val) ? pc_h_val : c_max_h
-        float pcl_y = not na(pc_l_val) ? pc_l_val : c_min_l
-
-        // Use cached indices (ensure not na)
-        int pch_index = na(c_pch_idx) ? bar_index : c_pch_idx
-        int pcl_index = na(c_pcl_idx) ? bar_index : c_pcl_idx
-
-        // Draw/Update Objects (Reuse)
-        if not na(pch_y)
-            l_pch  := f_line_get_or_create(l_pch, pch_index, pch_y, bar_index, pch_y, color.new(color.gray, 50), line.style_dashed)
-            lb_pch := f_label_get_or_create(lb_pch, bar_index + 10, pch_y, "Prev High", color.new(color.gray, 30))
-
-        if not na(pcl_y)
-            l_pcl  := f_line_get_or_create(l_pcl, pcl_index, pcl_y, bar_index, pcl_y, color.new(color.gray, 50), line.style_dashed)
-            lb_pcl := f_label_get_or_create(lb_pcl, bar_index + 10, pcl_y, "Prev Low", color.new(color.gray, 30))
-
-    else
-        // Cleanup if disabled or invalid TF
-        line.delete(l_pch)
-        l_pch := na
-        line.delete(l_pcl)
-        l_pcl := na
-        label.delete(lb_pch)
-        lb_pch := na
-        label.delete(lb_pcl)
-        lb_pcl := na
-else
-    // Cleanup if disabled (Hard Gating)
-    line.delete(l_pch)
-    l_pch := na
-    line.delete(l_pcl)
-    l_pcl := na
-    label.delete(lb_pch)
-    lb_pch := na
-    label.delete(lb_pcl)
-    lb_pcl := na
 
 
 // --- 2. Last Fractal S/R (Lines & Labels) ---
@@ -3183,9 +3162,6 @@ if debug_on and barstate.islast
     table.cell(tbl_dbg, 0, 2, "Ops Trend (Peak)", text_color=color.white, text_size=size.small)
     table.cell(tbl_dbg, 1, 2, str.tostring(ops_trend) + " (" + str.tostring(peak_ops_trend) + ")", text_color=ops_trend > 0 ? color.orange : color.green, text_size=size.small)
 
-    table.cell(tbl_dbg, 0, 3, "Ops PCH", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 3, str.tostring(ops_pch), text_color=ops_pch > 500 ? color.red : color.green, text_size=size.small)
-
     table.cell(tbl_dbg, 0, 4, "Ops VP (Peak)", text_color=color.white, text_size=size.small)
     table.cell(tbl_dbg, 1, 4, str.tostring(ops_vp_scan + ops_vp_draw) + " (" + str.tostring(peak_ops_vp) + ")", text_color=(ops_vp_scan + ops_vp_draw) > 1000 ? color.red : color.green, text_size=size.small)
 
@@ -3207,9 +3183,6 @@ if debug_on and barstate.islast
 
     table.cell(tbl_dbg, 0, 11, "ON_SESS_1ST", text_color=color.white, text_size=size.small)
     table.cell(tbl_dbg, 1, 11, str.tostring(ON_SESS_1ST), text_color=ON_SESS_1ST ? color.green : color.red, text_size=size.small)
-
-    table.cell(tbl_dbg, 0, 12, "ON_PCH", text_color=color.white, text_size=size.small)
-    table.cell(tbl_dbg, 1, 12, str.tostring(ON_PCH), text_color=ON_PCH ? color.green : color.red, text_size=size.small)
 else
     if not na(tbl_dbg)
         table.delete(tbl_dbg)
@@ -3311,7 +3284,8 @@ if eff_regime_panel and not na(info_panel) and barstate.islast
 
     // Row 12: RVOL
     if eff_rvol_enabled
-        string rvol_txt = "RVOL " + str.tostring(rvol_val, "#.##")
+        string rv_code = rvol_val < rvol_th_1 ? "L" : rvol_val < rvol_th_2 ? "M" : rvol_val < rvol_th_3 ? "H" : "E"
+        string rvol_txt = str.tostring(rvol_val, "#.##") + "x " + rv_code
         color c_rv_p = color.new(color.gray, 100)
         if rvol_state == "3"
             c_rv_p := color.new(color.red, 30)
@@ -3324,7 +3298,10 @@ if eff_regime_panel and not na(info_panel) and barstate.islast
 
     // Row 13: VWAP Z
     if eff_vwap_enabled and eff_vwap_z and not na(z_val)
-        string z_txt = "Z " + str.tostring(z_val, "#.1")
+        float abs_z = math.abs(z_val)
+        string z_code = abs_z < z_th_entry ? "N" : abs_z < z_th_tp ? "S" : abs_z < z_th_ext ? "T" : "E"
+        string z_txt = str.tostring(z_val, "#.1") + "σ " + z_code
+
         color c_z_p = color.new(color.gray, 100)
         if str.contains(stretch_state, "EXTREME")
             c_z_p := color.new(color.red, 30)
