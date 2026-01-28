@@ -27,7 +27,7 @@ int W_O     = 1
 
 
 // --- TOP LEVEL UI ---
-auto_tuning     = input.string("Balanced", "Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Auto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
+auto_tuning     = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Auto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
 
 profile_mode    = input.string("Custom", "Profile Mode", options=["Session Open","ORB","Price Action","Range","S&R","Long Term","Custom"], tooltip="Opinionated Defaults for specific trading styles. \n• Custom: Full manual control of all checkboxes.")
 
@@ -55,8 +55,12 @@ show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tool
                       \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n• Independent Controls: Toggle Panel and Background separately.")
 regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
 
-show_adr_info       = input.bool(true, "Show ADR%", inline="REGIME_UI", tooltip="Displays ADR% statistics.")
-
+show_adr_info       = input.bool(true, "Show ADR20 %", inline="REGIME_UI", tooltip="ADR% (ADR20) shows how much of today’s typical daily range has already been used.
+                      \n\nADR20 = average daily range (High–Low) over the last 20 days\nToday Range = today’s (developing) High–Low
+                      \nADR% = 100 × (Today Range / ADR20)
+                      \n\nLow ADR% → more “room” left for movement today
+                      \nHigh ADR% (e.g., 85–110%+) → price is extended; breakouts are more likely late/mature
+                      \n\nNote: ADR% is a context filter (expectation), not a directional signal.")
 
 // --- STAGE 2: CONFIGURATION & AUTO-SCALING ---
 
@@ -302,7 +306,7 @@ type ActiveSD
 grp_bb              = 'Bollinger Bands'
 BB_plot             = input.bool(true, title='Bollinger Bands⠀', inline="bb_t", group=grp_bb, tooltip='')
 near_bb             = input.bool(true, title='Touched BBs only', inline="bb_t", group=grp_bb, tooltip='This maintains a better chart overview and works as reversal zone indicator. 
-                      n\Works as support and resistence, as reversal zone and as squeeze indicator.')
+                      \nWorks as support and resistence, as reversal zone and as squeeze indicator.')
 // BB_length_1 & BB_sdev_1 moved to Advanced: REG
 BB_sdev_2           = 3
 BB_sdev_3           = 4
