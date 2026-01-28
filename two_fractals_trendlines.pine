@@ -29,7 +29,7 @@ int W_O     = 1
 // --- TOP LEVEL UI ---
 auto_tuning     = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Auto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
 
-trading_approach = input.string("Custom", "Strategy Lense", options=["Custom", "Session Map", "ORB", "Mean Reversion", "Breakout", "Squeeze Breakout", "Trend Continuation"], tooltip="Presets for specific trading workflows. \n• Custom: Full manual control.\n• Session Map: Structure, Key Levels, ADR.\n• ORB: Opening Range, RVOL.\n• Mean Reversion: VWAP, Bands, Divergences.\n• Breakout/Squeeze: RVOL, Structure, Momentum.\n• Trend Continuation: CONF/REG, FVG.")
+trading_approach = input.string("Custom", "Strategy Lense", options=["Custom", "Session Map", "ORB", "Mean Reversion", "Breakout", "Squeeze Breakout", "Trend Continuation"], tooltip="Applies focused defaults for a trading lens. Custom = fully manual. \n• Custom: Full manual control.\n• Session Map: Structure, Key Levels, ADR.\n• ORB: Opening Range, RVOL.\n• Mean Reversion: VWAP, Bands, Divergences.\n• Breakout/Squeeze: RVOL, Structure, Momentum.\n• Trend Continuation: CONF/REG, FVG.")
 
 // adx, hma and ema1 x ema2 mtf trend info panel
 panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
@@ -278,7 +278,7 @@ grp_rvol            = "Relative Volume (RVOL)"
 rvol_enabled        = input.bool(true, "RVOL Enabled", group=grp_rvol, tooltip="Relative Volume = Current Vol / Avg Vol. \nMeasures participation; confirms breakouts and reclaims. \n• ORB/Breakout: RVOL > 2.0 signals expansion. \n• Reclaim: RVOL pickup confirms strength.")
 rvol_len            = input.int(20, "Length", minval=1, group=grp_rvol, inline="rv_1", tooltip="Average window; 20 is common.")
 rvol_display        = input.string("Marker", "⠀Display", options=["None", "Marker", "Label", "Both"], group=grp_rvol, inline="rv_1", tooltip="Visual style.")
-rvol_points_enabled = input.bool(true, "Points", group=grp_rvol, inline="rv_1", tooltip="Show colored dots at bottom for RVOL intensity.")
+rvol_points_enabled = input.bool(false, "Points", group=grp_rvol, inline="rv_1", tooltip="H/E only markers to reduce noise. \nEnabled by default in Breakout/ORB lenses.")
 rvol_th_1           = input.float(1.2, "Low", step=0.1, group=grp_rvol, inline="rv_2", tooltip="1.2x: Slightly elevated.")
 rvol_th_2           = input.float(2.0, "⠀Med", step=0.1, group=grp_rvol, inline="rv_2", tooltip="2.0x: Event / Breakout fuel.")
 rvol_th_3           = input.float(3.0, "⠀High", step=0.1, group=grp_rvol, inline="rv_2", tooltip="3.0x: Strong trend / News.")
@@ -287,15 +287,16 @@ rvol_th_3           = input.float(3.0, "⠀High", step=0.1, group=grp_rvol, inli
 grp_vwap            = "VWAP"
 vwap_enabled        = input.bool(false, "VWAP Enabled", group=grp_vwap, tooltip="Volume-weighted fair value. \n• Trend: Above=Bull, Below=Bear. \n• Reversion: Far from VWAP = Stretched.")
 vwap_anchor         = input.string("Session (Daily Reset)", "Anchor", options=["Session (Daily Reset)", "Weekly"], group=grp_vwap, inline="vw_1", tooltip="Session: Intraday fair value. \nWeekly: Swing bias filter.")
-vwap_src            = input.source(hlc3, "⠀Source", group=grp_vwap, inline="vw_1", tooltip="Standard: hlc3.")
+vwap_src_opt        = input.string("HLC3", "⠀Source", options=["HLC3", "HL2", "Close", "OHLC4"], group=grp_vwap, inline="vw_1", tooltip="HLC3 standard for fair value, HL2 for range focus, Close simplest; choose one—avoid overfitting.")
 vwap_show_line      = input.bool(true, "Show Line⠀", group=grp_vwap, inline="vw_2")
 vwap_only_sess      = input.bool(false, "Calc Only in Sessions", group=grp_vwap, inline="vw_2", tooltip="If enabled, VWAP pauses outside selected sessions.")
 
-vwap_bands_enabled  = input.bool(true, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="Standard Deviation Bands. \nUsage: 'Don't chase' zones and Take Profit targets.")
+vwap_bands_enabled  = input.bool(true, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="Standard Deviation Bands (K1/K2/K3). \nUsage: 'Don't chase' zones and Take Profit targets.")
 vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "⠀Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_3", tooltip="Rolling: Last N bars (Stable). \nWelford: Session-cumulative (Precise).")
 vwap_stdev_len      = input.int(100, "⠀Len", inline="vw_3", minval=2, group=grp_vwap, inline="vw_3")
-band_k1             = input.float(1.0, "K1", step=0.5, group=grp_vwap, inline="vw_4", tooltip="1st Band Multiplier.")
-band_k2             = input.float(2.0, "⠀K2", step=0.5, group=grp_vwap, inline="vw_4", tooltip="2nd Band Multiplier.")
+band_k1             = input.float(1.0, "K1", step=0.5, group=grp_vwap, inline="vw_4", tooltip="1st Band Multiplier (1σ).")
+band_k2             = input.float(2.0, "⠀K2", step=0.5, group=grp_vwap, inline="vw_4", tooltip="2nd Band Multiplier (2σ).")
+band_k3             = input.float(3.0, "⠀K3", step=0.5, group=grp_vwap, inline="vw_4", tooltip="3rd Band Multiplier (3σ).")
 
 vwap_z_enabled      = input.bool(true, "Z-Score Enabled", group=grp_vwap, inline="vw_5", tooltip="Z-Score = Distance to VWAP in Sigmas. \nUsed for Mean Reversion signals.")
 z_th_entry          = input.float(2.0, "⠀Entry Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="Avoid entries when stretched > Entry Th.")
@@ -314,9 +315,8 @@ or_lock             = input.bool(true, "Lock after Window", group=grp_or, inline
 
 // Squeeze Box
 grp_sq              = "Squeeze Box"
-sq_box_enabled      = input.bool(false, "Squeeze Box⠀", inline="sq_b", group=grp_sq, tooltip="Visualizes price range during a Squeeze. \n• Breakout: Wait for release + trend confirm. \n• False Break: Watch for trap/reversal.")
+sq_box_enabled      = input.bool(false, "Squeeze Box⠀", inline="sq_b", group=grp_sq, tooltip="Builds a box during squeeze regime. Trade release/break with RVOL confirmation.")
 sq_lock             = input.bool(true, "Lock on Release", inline="sq_b", group=grp_sq, tooltip="Locks the box levels when the squeeze ends to provide breakout references.")
-sq_source           = input.string("REG=SQUEEZE", "Source", options=["REG=SQUEEZE"], group=grp_sq, tooltip="Source of the squeeze state (Regime Engine).")
 
 
 // Smart MTF S&R
@@ -613,18 +613,19 @@ eff_tokyo_show      = f_approach_bool(tokyo_show,         true,     true,  false
 eff_sydney_show     = f_approach_bool(sydney_show,        true,     true,  false, false, false,  false)
 
 // Session BG Flag
-eff_sess_bg_enable  = f_approach_bool(true,               false,    false, false, false, false,  false)
+eff_sess_bg_enable  = f_approach_bool(true,               true,     false, false, false, false,  false)
 
 // Key Levels Flags
 eff_key_levels_enabled = f_approach_bool(key_levels_enabled, true, true, true, true, true, true)
-eff_show_pdh    = f_approach_bool(show_pdh, true, true, true, true, true, false)
-eff_show_pdl    = f_approach_bool(show_pdl, true, true, true, true, true, false)
+eff_show_pdh    = f_approach_bool(show_pdh, true, true, true, true, true, true)
+eff_show_pdl    = f_approach_bool(show_pdl, true, true, true, true, true, true)
 eff_show_pdc    = f_approach_bool(show_pdc, false, false, false, false, false, false)
 eff_show_wopen  = f_approach_bool(show_wopen, true, false, true, false, false, true)
 eff_show_mopen  = f_approach_bool(show_mopen, false, false, false, false, false, false)
 
 // RVOL Flags
 eff_rvol_enabled = f_approach_bool(rvol_enabled, false, true, false, true, true, false)
+eff_rvol_points_enabled = f_approach_bool(rvol_points_enabled, false, true, false, true, true, false)
 
 // VWAP Flags
 eff_vwap_enabled = f_approach_bool(vwap_enabled, false, false, true, false, false, true)
@@ -633,7 +634,7 @@ eff_vwap_bands   = f_approach_bool(vwap_bands_enabled, false, false, true, false
 eff_vwap_z       = f_approach_bool(vwap_z_enabled, false, false, true, false, false, false)
 
 // OR/IB Flags
-eff_or_enabled   = f_approach_bool(or_enabled, false, true, false, false, false, false)
+eff_or_enabled   = f_approach_bool(or_enabled, false, true, false, true, false, false)
 
 // Squeeze Box Flags
 eff_sq_box_enabled = f_approach_bool(sq_box_enabled, false, false, false, false, true, false)
@@ -794,10 +795,14 @@ if eff_key_levels_enabled and barstate.islast
         idx_pdh := na
         idx_pdl := na
         idx_pdc := na
-        int found_h = na
-        int found_l = na
-        int found_c = na
-        int fallback_start_idx = na
+
+        float scan_max_h = -1.0e10
+        int   scan_max_h_idx = na
+        float scan_min_l = 1.0e10
+        int   scan_min_l_idx = na
+
+        int   scan_last_idx = na
+        int   fallback_idx = na
 
         for i = 1 to SCAN_LIMIT
             int t = time[i]
@@ -805,20 +810,27 @@ if eff_key_levels_enabled and barstate.islast
                 break
 
             if t >= d_start
-                fallback_start_idx := bar_index - i
+                fallback_idx := bar_index - i
 
             if t >= d_start and t < d_end
-                if high[i] == d_h and na(found_h)
-                    found_h := bar_index - i
-                if low[i] == d_l and na(found_l)
-                    found_l := bar_index - i
-                if na(found_c)
-                    found_c := bar_index - i
+                // Track High (>= to find earliest/left-most in backward scan)
+                if high[i] >= scan_max_h
+                    scan_max_h := high[i]
+                    scan_max_h_idx := bar_index - i
 
-        int fb_idx = not na(fallback_start_idx) ? fallback_start_idx : (bar_index - SCAN_LIMIT)
-        idx_pdh := not na(found_h) ? found_h : fb_idx
-        idx_pdl := not na(found_l) ? found_l : fb_idx
-        idx_pdc := not na(found_c) ? found_c : fb_idx
+                // Track Low (<= to find earliest/left-most in backward scan)
+                if low[i] <= scan_min_l
+                    scan_min_l := low[i]
+                    scan_min_l_idx := bar_index - i
+
+                // Track Close (first encountered going backwards is the latest/close)
+                if na(scan_last_idx)
+                    scan_last_idx := bar_index - i
+
+        int fb_final = not na(fallback_idx) ? fallback_idx : (bar_index - SCAN_LIMIT)
+        idx_pdh := not na(scan_max_h_idx) ? scan_max_h_idx : fb_final
+        idx_pdl := not na(scan_min_l_idx) ? scan_min_l_idx : fb_final
+        idx_pdc := not na(scan_last_idx) ? scan_last_idx : fb_final
         last_d_start := d_start
 
     // WOpen Scan
@@ -858,10 +870,10 @@ if eff_key_levels_enabled and barstate.islast
     [t_l_pdc, t_lb_pdc] = f_draw_kl(l_pdc, lb_pdc, idx_pdc, d_c, "PDC", color.new(color.gray, 30), eff_show_pdc, line.style_dotted, key_extend)
     l_pdc := t_l_pdc, lb_pdc := t_lb_pdc
 
-    [t_l_wo, t_lb_wo] = f_draw_kl(l_wo, lb_wo, idx_wo, w_o, "W.Open", color.new(color.orange, 0), eff_show_wopen, line.style_solid, key_extend)
+    [t_l_wo, t_lb_wo] = f_draw_kl(l_wo, lb_wo, idx_wo, w_o, "W.Open", color.new(color.orange, 0), eff_show_wopen, line.style_dashed, key_extend)
     l_wo := t_l_wo, lb_wo := t_lb_wo
 
-    [t_l_mo, t_lb_mo] = f_draw_kl(l_mo, lb_mo, idx_mo, m_o, "M.Open", color.new(color.white, 0), eff_show_mopen, line.style_solid, key_extend)
+    [t_l_mo, t_lb_mo] = f_draw_kl(l_mo, lb_mo, idx_mo, m_o, "M.Open", color.new(color.white, 0), eff_show_mopen, line.style_dotted, key_extend)
     l_mo := t_l_mo, lb_mo := t_lb_mo
 
 else
@@ -913,7 +925,8 @@ if eff_rvol_enabled
 // Visuals
 bool show_rvol_visuals = eff_rvol_enabled and rvol_display != "None" and rvol_state != "0"
 color c_rv = rvol_state == "3" ? color.red : rvol_state == "2" ? color.orange : color.yellow
-bool show_marker = show_rvol_visuals and (rvol_display == "Marker" or rvol_display == "Both") and rvol_points_enabled
+// Marker only for H/E (State 2 or 3) if enabled
+bool show_marker = show_rvol_visuals and (rvol_display == "Marker" or rvol_display == "Both") and eff_rvol_points_enabled and (rvol_state == "3" or rvol_state == "2")
 
 plotshape(show_marker, style=shape.circle, location=location.bottom, color=c_rv, size=size.tiny, title="RVOL Marker")
 
@@ -2424,9 +2437,12 @@ if eff_vwap_enabled
         ws.m2 := 0.0
 
     // Core Calc
+    // Source Mapping
+    float src = vwap_src_opt == "HL2" ? hl2 : vwap_src_opt == "Close" ? close : vwap_src_opt == "OHLC4" ? ohlc4 : hlc3
+
     if in_calc_window
         vs.cumVol += volume
-        vs.cumPV += (volume * vwap_src)
+        vs.cumPV += (volume * src)
 
     if vs.cumVol > 0
         vwap_val := vs.cumPV / vs.cumVol
@@ -2474,6 +2490,8 @@ plot(eff_vwap_bands and not na(sigma_val) ? vwap_val + band_k1 * sigma_val : na,
 plot(eff_vwap_bands and not na(sigma_val) ? vwap_val - band_k1 * sigma_val : na, "B1 Dn", color.new(color.gray, 80))
 plot(eff_vwap_bands and not na(sigma_val) ? vwap_val + band_k2 * sigma_val : na, "B2 Up", color.new(color.gray, 60))
 plot(eff_vwap_bands and not na(sigma_val) ? vwap_val - band_k2 * sigma_val : na, "B2 Dn", color.new(color.gray, 60))
+plot(eff_vwap_bands and not na(sigma_val) ? vwap_val + band_k3 * sigma_val : na, "B3 Up", color.new(color.gray, 40))
+plot(eff_vwap_bands and not na(sigma_val) ? vwap_val - band_k3 * sigma_val : na, "B3 Dn", color.new(color.gray, 40))
 
 // Label for Z
 var label lb_vwap_z = na
