@@ -6,7 +6,7 @@ general_info   = input.bool(title='General Description', defval=false, tooltip='
                  Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
 
 // Constants for Panel & Weights (Centralized)
-int PANEL_ROWS = 14
+int PANEL_ROWS = 15
 int PANEL_COLS = 3
 
 // Confluence Weights
@@ -51,10 +51,14 @@ show_conf_bg        = input.bool(false, "Confluence Meter BG", inline="conf_ui",
                      \n• NEUT is fully transparent (panel + chart background).
                      \n\nPlots the Confluence Signal background color.")
 
+conf_use_vwap_quality = input.bool(true, "CONF: VWAP Quality Gate", tooltip="Adjusts CONF quality using VWAP alignment + stretch (anti-chase). State remains unchanged.")
+conf_vwap_mode        = input.string("Auto", "CONF VWAP Anchor", options=["Auto","Session VWAP","Weekly VWAP"], tooltip="Which VWAP anchor CONF uses for quality. Auto: Session ≤ 60m, Weekly > 60m.")
+conf_z_penalty_mode   = input.string("Default", "CONF Stretch Penalty", options=["Default","Conservative","Aggressive"], tooltip="How strongly VWAP stretch reduces CONF quality.")
+
 show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)")
 regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
 
-show_adr_info       = input.bool(true, "Show ADR20 %", inline="REGIME_UI", tooltip="ADR% (ADR20) shows how much of today’s typical daily range has already been used.
+show_adr_panel      = input.bool(true, "Show ADR% in Panel", inline="REGIME_UI", tooltip="ADR% (ADR20) shows how much of today’s typical daily range has already been used.
                       \n\nADR20 = average daily range (High–Low) over the last 20 days\nToday Range = today’s (developing) High–Low
                       \nADR% = 100 × (Today Range / ADR20)
                       \n\nLow ADR% → more “room” left for movement today
@@ -1929,10 +1933,14 @@ if panel_pos != "None"
         table.cell(table_id=info_panel, column=0, row=8, text="ATR14 " + str.tostring(atr14_val, "#.#####"), text_size= size.small, text_color=color.silver)
         table.merge_cells(info_panel, 0, 8, 2, 8)
 
-        // HEADER (Row 9: Current)
-        table.cell(table_id=info_panel, column=0, row=9, text="C", text_size= size.small, text_color=color.silver, bgcolor=is_custom_tf ? col_tf_highlight : na)
-        table.cell(table_id=info_panel, column=1, row=9, bgcolor=(Intra_D_W_M) ? fvg_color_c : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=9, bgcolor=(Intra_D_W_M) ? fr_color_c : na, width=2)
+        // ADR% (Row 9) - Initial Placeholder (Filled later)
+        table.cell(table_id=info_panel, column=0, row=9, text="ADR%", text_size= size.small, text_color=color.silver)
+        table.merge_cells(info_panel, 0, 9, 2, 9)
+
+        // HEADER (Row 10: Current)
+        table.cell(table_id=info_panel, column=0, row=10, text="C", text_size= size.small, text_color=color.silver, bgcolor=is_custom_tf ? col_tf_highlight : na)
+        table.cell(table_id=info_panel, column=1, row=10, bgcolor=(Intra_D_W_M) ? fvg_color_c : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=10, bgcolor=(Intra_D_W_M) ? fr_color_c : na, width=2)
 else
     if not na(info_panel)
         table.delete(info_panel)
@@ -3216,7 +3224,7 @@ float d_range = na
 float adr = na
 float adr_pct = na
 
-if eff_use_adr_gate or show_adr_info
+if eff_use_adr_gate or show_adr_panel
     // 1. Daily Range (Developing) - Uses lookahead to capture current developing range on intraday
     d_range := request.security(syminfo.tickerid, "D", high - low, lookahead=barmerge.lookahead_on)
 
@@ -3229,12 +3237,17 @@ if eff_use_adr_gate or show_adr_info
         adr_pct := (d_range / adr) * 100
 
 // Optional Debug Info
-plot(show_adr_info ? adr_pct : na, title="ADR %", color=color.new(color.white, 100), display=display.data_window + display.status_line)
+plot(show_adr_panel ? adr_pct : na, title="ADR %", color=color.new(color.white, 100), display=display.data_window + display.status_line)
 
+// ADR Label removed as per design requirements (Panel only)
 var label lbl_adr = na
-if eff_use_adr_gate and show_adr_info and barstate.islast
-    label.delete(lbl_adr)
-    lbl_adr := label.new(bar_index, high, "ADR%: " + str.tostring(adr_pct, "#.#") + "%", yloc=yloc.abovebar, color=color.new(color.gray, 50), textcolor=color.white, style=label.style_label_down, size=size.small)
+label.delete(lbl_adr)
+
+// Update Panel Row 9 (ADR%)
+if not na(info_panel) and barstate.islast
+    string adr_txt = "ADR% " + (not na(adr_pct) ? str.tostring(adr_pct, "#.#") + "%" : "n/a")
+    table.cell(table_id=info_panel, column=0, row=9, text=adr_txt, text_size=size.small, text_color=color.silver, tooltip="ADR% = progress within Average Daily Range; helps avoid entering near exhaustion.")
+    table.merge_cells(info_panel, 0, 9, 2, 9)
 
 
 // --- Stage 3: ATR Expansion Logic ---
@@ -3300,11 +3313,11 @@ else
 // Update Panel (Moved Up)
 if eff_regime_panel and not na(info_panel) and barstate.islast
     color c_reg_bg = regime_state == "SQUEEZE" ? color.new(color.yellow, 30) : regime_state == "TREND" ? color.new(color.blue, 30) : color.new(color.gray, 100)
-    table.cell(info_panel, 0, 11, "REG", text_size=size.small, text_color=color.silver)
-    table.cell(info_panel, 1, 11, regime_state, text_size=size.small, text_color=color.white, bgcolor=c_reg_bg)
-    table.merge_cells(info_panel, 1, 11, 2, 11)
+    table.cell(info_panel, 0, 12, "REG", text_size=size.small, text_color=color.silver)
+    table.cell(info_panel, 1, 12, regime_state, text_size=size.small, text_color=color.white, bgcolor=c_reg_bg)
+    table.merge_cells(info_panel, 1, 12, 2, 12)
 
-    // Row 12: RVOL
+    // Row 13: RVOL
     if eff_rvol_enabled
         string rv_code = rvol_val < rvol_th_1 ? "L" : rvol_val < rvol_th_2 ? "M" : rvol_val < rvol_th_3 ? "H" : "E"
         string rvol_txt = str.tostring(rvol_val, "#.##") + "x " + rv_code
@@ -3314,11 +3327,11 @@ if eff_regime_panel and not na(info_panel) and barstate.islast
         else if rvol_state == "2"
             c_rv_p := color.new(color.orange, 30)
 
-        table.cell(info_panel, 0, 12, "VOL", text_size=size.small, text_color=color.silver)
-        table.cell(info_panel, 1, 12, rvol_txt, text_size=size.small, text_color=color.white, bgcolor=c_rv_p)
-        table.merge_cells(info_panel, 1, 12, 2, 12)
+        table.cell(info_panel, 0, 13, "VOL", text_size=size.small, text_color=color.silver)
+        table.cell(info_panel, 1, 13, rvol_txt, text_size=size.small, text_color=color.white, bgcolor=c_rv_p)
+        table.merge_cells(info_panel, 1, 13, 2, 13)
 
-    // Row 13: VWAP Z
+    // Row 14: VWAP Z
     if eff_vwap_enabled and eff_vwap_z and not na(z_val)
         float abs_z = math.abs(z_val)
         string z_code = abs_z < z_th_entry ? "N" : abs_z < z_th_tp ? "S" : abs_z < z_th_ext ? "T" : "E"
@@ -3330,9 +3343,9 @@ if eff_regime_panel and not na(info_panel) and barstate.islast
         else if str.contains(stretch_state, "TP")
             c_z_p := color.new(color.orange, 30)
 
-        table.cell(info_panel, 0, 13, "VWP", text_size=size.small, text_color=color.silver)
-        table.cell(info_panel, 1, 13, z_txt, text_size=size.small, text_color=color.white, bgcolor=c_z_p)
-        table.merge_cells(info_panel, 1, 13, 2, 13)
+        table.cell(info_panel, 0, 14, "VWP", text_size=size.small, text_color=color.silver)
+        table.cell(info_panel, 1, 14, z_txt, text_size=size.small, text_color=color.white, bgcolor=c_z_p)
+        table.merge_cells(info_panel, 1, 14, 2, 14)
 
 
 //------------------------------------------------------- Squeeze Box Module -------------------------------------------------------
@@ -3392,6 +3405,66 @@ if eff_sq_box_enabled
             sq_break_up := true
         if close < sqs.lo and close[1] >= sqs.lo
             sq_break_dn := true
+
+
+//--------------------------------------------------------- CONF VWAP (Lightweight) ---------------------------------------------------------
+float conf_vwap_val = na
+float conf_z_val = na
+
+if conf_use_vwap_quality
+    bool use_sess = (conf_vwap_mode == "Session VWAP") or (conf_vwap_mode == "Auto" and tf_sec <= 3600)
+
+    // Session VWAP
+    var float vs_c_cumVol = 0.0
+    var float vs_c_cumPV  = 0.0
+    var float vwap_c_sess = na
+    bool c_new_day = ta.change(time("D"))
+
+    if use_sess
+        if c_new_day
+            vs_c_cumVol := 0.0
+            vs_c_cumPV  := 0.0
+
+        vs_c_cumVol += volume
+        vs_c_cumPV  += volume * hlc3
+
+        if vs_c_cumVol > 0
+            vwap_c_sess := vs_c_cumPV / vs_c_cumVol
+            conf_vwap_val := vwap_c_sess
+
+    // Weekly VWAP
+    var float vw_c_cumVol = 0.0
+    var float vw_c_cumPV  = 0.0
+    var float vwap_c_week = na
+    bool c_new_week = ta.change(time("W"))
+
+    if not use_sess
+        if c_new_week
+            vw_c_cumVol := 0.0
+            vw_c_cumPV  := 0.0
+
+        vw_c_cumVol += volume
+        vw_c_cumPV  += volume * hlc3
+
+        if vw_c_cumVol > 0
+            vwap_c_week := vw_c_cumPV / vw_c_cumVol
+            conf_vwap_val := vwap_c_week
+
+    // Z-Score Calculation
+    bool reuse_z = false
+    if eff_vwap_enabled and eff_vwap_z and not na(z_val)
+        if (use_sess and eff_vwap_anchor == "Session (Daily Reset)") or (not use_sess and eff_vwap_anchor == "Weekly")
+            reuse_z := true
+
+    if reuse_z
+        conf_z_val := z_val
+    else if not na(conf_vwap_val)
+        // Independent Calculation
+        // Reuse vwap_stdev_len (Default 100)
+        float dev_c = close - conf_vwap_val
+        float sigma_c = ta.stdev(dev_c, vwap_stdev_len)
+        if sigma_c > 0
+            conf_z_val := dev_c / sigma_c
 
 
 //--------------------------------------------------------- CONF Engine v2: Core + Confirm + Regime Gate ---------------------------------------------------------
@@ -3601,10 +3674,58 @@ if eff_calc_conf
     if atr_is_low and regime_state != "TREND" and quality == "H"
         quality := "M"
 
+    // --- Stage 10: VWAP Quality Gate (Option A) ---
+    string align_flag = ""
+    if conf_use_vwap_quality and not na(conf_vwap_val)
+        // 1. Map to Numeric (0=L, 1=M, 2=H, 3=E)
+        int q_num = quality == "H" ? 2 : quality == "M" ? 1 : 0
+
+        // 2. Alignment Logic (Bias != NEUT)
+        if conf_state_engine != 0
+            bool is_aligned = (conf_state_engine == 1 and close > conf_vwap_val) or (conf_state_engine == -1 and close < conf_vwap_val)
+
+            if is_aligned
+                q_num := math.min(q_num + 1, 3) // Cap at 3 (E)
+                align_flag := "A"
+            else
+                q_num := math.max(q_num - 1, 0) // Floor at 0 (L)
+                align_flag := "X"
+
+        // 3. Stretch Penalty (Anti-Chase via |Z|)
+        if not na(conf_z_val)
+            float abs_z = math.abs(conf_z_val)
+            int penalty = 0
+
+            // Thresholds: z_th_entry, z_th_tp, z_th_ext (Global Inputs)
+            if conf_z_penalty_mode == "Aggressive"
+                if abs_z >= z_th_ext
+                    penalty := -1
+                else if abs_z >= z_th_tp
+                    penalty := -1
+            else if conf_z_penalty_mode == "Conservative"
+                if abs_z >= z_th_ext
+                    penalty := -3
+                else if abs_z >= z_th_tp
+                    penalty := -2
+                else if abs_z >= z_th_entry
+                    penalty := -1
+            else // Default
+                if abs_z >= z_th_ext
+                    penalty := -2
+                else if abs_z >= z_th_tp
+                    penalty := -1
+
+            q_num := math.max(q_num + penalty, 0)
+
+        // 4. Backmap to L/M/H/E
+        quality := q_num == 3 ? "E" : q_num == 2 ? "H" : q_num == 1 ? "M" : "L"
+
     // --- 6. Visualization (Panel) ---
     // BULL 72 H / NEUT 50 L
     if barstate.islast and eff_show_conf_meter and not na(info_panel)
         string panel_txt = conf_bias + " " + str.tostring(math.round(conf_score)) + " " + quality
+        if align_flag != ""
+            panel_txt := panel_txt + " " + align_flag
 
         color c_conf = color.new(color.gray, 100) // Default Transp
         if conf_state_engine == 1 // Bull
@@ -3614,9 +3735,9 @@ if eff_calc_conf
 
         // Neutral remains transparent
 
-        table.cell(info_panel, 0, 10, "CONF", text_size=size.small, text_color=color.silver)
-        table.cell(info_panel, 1, 10, panel_txt, text_size=size.small, text_color=color.white, bgcolor=c_conf)
-        table.merge_cells(info_panel, 1, 10, 2, 10)
+        table.cell(info_panel, 0, 11, "CONF", text_size=size.small, text_color=color.silver)
+        table.cell(info_panel, 1, 11, panel_txt, text_size=size.small, text_color=color.white, bgcolor=c_conf)
+        table.merge_cells(info_panel, 1, 11, 2, 11)
 
 // --- CENTRALIZED BACKGROUND ROUTING (Fix Bug #2) ---
 color bg_final = na
