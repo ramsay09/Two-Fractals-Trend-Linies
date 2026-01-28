@@ -819,17 +819,17 @@ if eff_rvol_enabled
             rvol_state := "1"
 
 // Visuals
-if eff_rvol_enabled and rvol_display != "None" and rvol_state != "0"
-    color c_rv = rvol_state == "3" ? color.red : rvol_state == "2" ? color.orange : color.yellow
+bool show_rvol_visuals = eff_rvol_enabled and rvol_display != "None" and rvol_state != "0"
+color c_rv = rvol_state == "3" ? color.red : rvol_state == "2" ? color.orange : color.yellow
+bool show_marker = show_rvol_visuals and (rvol_display == "Marker" or rvol_display == "Both")
+
+plotshape(show_marker, style=shape.circle, location=location.bottom, color=c_rv, size=size.tiny, title="RVOL Marker")
+
+if show_rvol_visuals and (rvol_display == "Label" or rvol_display == "Both")
     string txt = "RVOL " + str.tostring(rvol_val, "#.#")
-
-    if rvol_display == "Marker" or rvol_display == "Both"
-        plotshape(true, style=shape.circle, location=location.bottom, color=c_rv, size=size.tiny, title="RVOL Marker")
-
-    if rvol_display == "Label" or rvol_display == "Both"
-        var label lb_rvol = na
-        label.delete(lb_rvol)
-        lb_rvol := label.new(bar_index, low, txt, yloc=yloc.belowbar, color=c_rv, style=label.style_label_up, textcolor=color.black, size=size.small)
+    var label lb_rvol = na
+    label.delete(lb_rvol)
+    lb_rvol := label.new(bar_index, low, txt, yloc=yloc.belowbar, color=c_rv, style=label.style_label_up, textcolor=color.black, size=size.small)
 
 
 //-------------------------------------------------------- williams fractals (Visuals for Chart) --------------------------------------------------------------
