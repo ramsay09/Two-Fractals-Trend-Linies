@@ -29,7 +29,7 @@ int W_O     = 1
 // --- TOP LEVEL UI ---
 auto_tuning     = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Auto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
 
-trading_approach = input.string("Custom", "Context Lense", options=["Custom", "Session Map", "ORB", "Mean Reversion", "Breakout", "Squeeze Breakout", "Trend Continuation"], tooltip="Applies focused defaults for a trading lens. Custom = fully manual. \n• Custom: Full manual control.\n• Session Map: Structure, Key Levels, ADR.\n• ORB: Opening Range, RVOL.\n• Mean Reversion: VWAP, Bands, Divergences.\n• Breakout/Squeeze: RVOL, Structure, Momentum.\n• Trend Continuation: CONF/REG, FVG.")
+trading_approach = input.string("Custom", "Context Lenses", options=["Custom", "Session Map", "ORB", "Mean Reversion", "Breakout", "Squeeze Breakout", "Trend Continuation"], tooltip="Applies focused defaults for a trading lens. Custom = fully manual. \n• Custom: Full manual control.\n• Session Map: Structure, Key Levels, ADR.\n• ORB: Opening Range, RVOL.\n• Mean Reversion: VWAP, Bands, Divergences.\n• Breakout/Squeeze: RVOL, Structure, Momentum.\n• Trend Continuation: CONF/REG, FVG.")
 
 // adx, hma and ema1 x ema2 mtf trend info panel
 panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
