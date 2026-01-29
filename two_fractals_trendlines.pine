@@ -52,8 +52,8 @@ show_conf_bg        = input.bool(false, "Confluence Meter BG", inline="conf_ui",
                      \n\nPlots the Confluence Signal background color.")
 
 conf_use_vwap_quality = input.bool(true, "CONF: VWAP Quality Gate", tooltip="Adjusts CONF quality using VWAP alignment + stretch (anti-chase). State remains unchanged.")
-conf_vwap_mode        = input.string("Auto", "CONF VWAP Anchor", options=["Auto","Session VWAP","Weekly VWAP"], tooltip="Which VWAP anchor CONF uses for quality. Auto: Session ≤ 60m, Weekly > 60m.")
-conf_z_penalty_mode   = input.string("Default", "CONF Stretch Penalty", options=["Default","Conservative","Aggressive"], tooltip="How strongly VWAP stretch reduces CONF quality.")
+conf_vwap_mode        = input.string("Auto", "VWAP Anchor", inline="conf", options=["Auto","Session VWAP","Weekly VWAP"], tooltip="")
+conf_z_penalty_mode   = input.string("Default", "⠀Stretch Penalty", inline="conf", options=["Default","Conservative","Aggressive"], tooltip="Which VWAP anchor CONF uses for quality. Auto: Session ≤ 60m, Weekly > 60m. n\How strongly VWAP stretch reduces CONF quality.")
 
 show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)")
 regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
@@ -234,7 +234,7 @@ vp_offset   = 15
 
 // MTF CANDLE OVERLAY INPUTS
 grp_mtf_candle    = "MTF Candle Overlay"
-show_mtf_candles  = input.bool(false, "MTF Candle Overlay ⠀⠀⠀⠀⠀⠀", group=grp_mtf_candle, inline="mtf_ov", tooltip="Two timelines at one glance. It's like looking inside a candle with X-rays.")
+show_mtf_candles  = input.bool(false, "MTF Candle Overlay ⠀⠀⠀⠀⠀", group=grp_mtf_candle, inline="mtf_ov", tooltip="Two timelines at one glance. It's like looking inside a candle with X-rays.")
 mtf_tf_sel        = input.string("1h", "", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], inline="mtf_ov", group=grp_mtf_candle)
 mtf_opacity       = input.int(15, "Opacity %", minval=0, maxval=100, group=grp_mtf_candle, tooltip="0% = Invisible, 100% = Solid")
 
@@ -326,14 +326,14 @@ sq_lock             = input.bool(true, "Lock on Release", inline="sq_b", group=g
 // Smart MTF S&R
 grp_psr             = "Smart S&R (Support & Resistance)"
 ps_mode             = input.string("None", title="Smart S&R", options=["None", "Manuell", "Auto"], group=grp_psr, inline="en_tf", tooltip="")
-ps_tf               = input.timeframe("D", title="⠀Pivot TF", inline="en_tf", group=grp_psr, tooltip="Activates the 'Smart Market Structure' system:
+ps_tf               = input.timeframe("D", title="⠀⠀⠀⠀Pivot TF⠀⠀", inline="en_tf", group=grp_psr, tooltip="Activates the 'Smart Market Structure' system:
                       \n• Multi-Timeframe Analysis: Identifies significant Swing Highs/Lows from a higher timeframe (e.g., 4H levels on a 15m chart).
                       \n• Noise Filtering: Uses adjustable pivot strength to ignore minor price fluctuations.
                       \n• Smart Zones: Automatically merges levels that are close together into a single 'Zone' (Box) to reduce clutter.
                       \n• Dynamic State: Tracks confirmed breakouts and can automatically flip Support to Resistance (Role Reversal) or remove broken levels.
                       \n• Clutter Control: Manages a fixed number of active levels, removing old or irrelevant ones automatically. \nSelect the Higher Timeframe to scan for significant Swing Highs/Lows. \nSmart S&R 'Auto' affects 'Pivot TF' only.")
-ps_left             = input.int(2, title="Pivot Strength (Left) ⠀⠀⠀⠀⠀⠀⠀⠀", minval=1, group=grp_psr, tooltip="Higher values filter out minor market noise. Left Standard=2 (Bill Williams Fractal).")
-ps_right            = input.int(2, title="Pivot Strength (Right) ⠀⠀⠀⠀⠀⠀⠀", minval=1, group=grp_psr, tooltip="Higher values filter out minor market noise. Right Standard=2 (Bill Williams Fractal).")
+ps_left             = input.int(2, title="Pivot Left", inline="pivot", minval=1, group=grp_psr, tooltip="Higher values filter out minor market noise. Left Standard=2 (Bill Williams Fractal).")
+ps_right            = input.int(2, title="⠀⠀⠀⠀Pivot Right", inline="pivot", minval=1, group=grp_psr, tooltip="Higher values filter out minor market noise. Right Standard=2 (Bill Williams Fractal).")
 ps_max              = input.int(20, title="Max Active Levels ⠀", minval=1, maxval=50, group=grp_psr, tooltip="Limits the number of visible lines to prevent chart clutter. FIFO (First In, First Out).")
 ps_break_act        = input.string("Role Reversal", title="On Break Action ", options=["Keep", "Delete", "Role Reversal"], group=grp_psr, tooltip="How the script handles a level when price crosses it. \nKeep: Do nothing. \nDelete: Remove line. \nRole Reversal: Support becomes Resistance (Color change).")
 ps_merge_en         = input.bool(true, title="Merge Nearby Levels (Zones) ", group=grp_psr, inline="ps_m")
@@ -434,7 +434,7 @@ grp_div             = 'Divergences'
 plot_div            = input.bool(true, title='Divergence Signal Arrow', group=grp_div, tooltip='These divergences are very early signals and must be used in confluence with other signals. Hidden and classic divergence are used')
 div_indi            = input.string('rsi', title='Divergence Indicator', options=['rsi', 'macd(fast_line)', 'macd(slow_line)'], tooltip='Select an Indicator for divergence calculation.', group=grp_div)
 rsi_length          = input.int(14, title='RSI Length', inline="rsi_p", minval=1, step=2, group=grp_div)
-bar_div_p           = input.int(25, title='⠀Bar Period', inline="rsi_p", minval=1, step=1, tooltip='RSI Length. n\The number of bars in which divergences are detected.', group=grp_div)
+bar_div_p           = input.int(25, title='⠀⠀⠀⠀Bar Period', inline="rsi_p", minval=1, step=1, tooltip='RSI Length. n\The number of bars in which divergences are detected.', group=grp_div)
 src_div             = input.string('high/low', title='Bar Divergence Source', options=['high/low', 'close'], tooltip='The bar source for divergence calculation.', group=grp_div)
 
 // bar signals inputs
@@ -1007,10 +1007,10 @@ f_get_mtf_pivots(_src_h, _src_l, _l, _r) =>
 // Helper to calculate Auto Timeframe
 f_calc_auto_tf() =>
     if timeframe.isseconds
-        "60" // Fallback
+        "30" // Fallback
     else if timeframe.isintraday
         if timeframe.multiplier <= 15
-            "240"
+            "120"
         else if timeframe.multiplier <= 240
             "D"
         else
