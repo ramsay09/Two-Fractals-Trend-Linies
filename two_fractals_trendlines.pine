@@ -211,12 +211,13 @@ eff_use_kc_squeeze := true
 
 // fractals input
 fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, tooltip='')
-sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, tooltip='Bill Williams Fractals (five Candles): white triangle. Works as support and resistance level. 
+sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, tooltip='Bill Williams Fractals (five Candles): white triangle. Works as support and resistance level.
                  \nSub Bill Williams Fractals (four Candles): Lightgray triangle. Works as support and resistance level. These are B. W. Fractals on a Lower Timeframe.')
 
 // Gradient Volume Profile
 vp_enable = input.bool(false, "Volume Profile ⠀⠀⠀⠀⠀", inline="line4")
-vp_mode = input.string("Full TF", "Volume Profile Mode", options = ["Visible Range", "Full TF"], tooltip = "Visible: computes only the visible chart range.\nFull TF: computes over all loaded bars in the current TF (complete).")
+vp_mode = input.string("Full TF", "VP Mode", options = ["Visible Range", "Full TF"], inline="vp_line", tooltip = "Visible: computes only the visible chart range.\nFull TF: computes over all loaded bars in the current TF (complete).")
+vp_style = input.string("Gradient", "", options = ["Gradient", "Bars"], inline="vp_line", tooltip="How Volume Profile is rendered.")
 vp_smart = input.bool(false, "Contrast Factor", inline="line4", tooltip="")
 vp_clip  = input.float(2.5, "", minval=1.0, step=0.1, inline="line4", tooltip="Visualizes trading volume distribution by price level.\nSmart Contrast adjusts saturation when peaks dominate.\n")
 
@@ -225,10 +226,14 @@ vp_clip  = input.float(2.5, "", minval=1.0, step=0.1, inline="line4", tooltip="V
 // Fixed, stable parameters for visible range scanning
 int vp_rows     = 120
 int vp_smooth   = 3
+int VP_BOX_BUDGET = 220
 
 // Basic Visuals
 vp_width    = 12
 vp_offset   = 15
+int vp_pivot_offset = 10
+int vp_bars_shift = 15
+int vp_bars_w = 19
 
 // MTF CANDLE OVERLAY INPUTS
 grp_mtf_candle    = "MTF Candle Overlay"
@@ -236,7 +241,7 @@ show_mtf_candles  = input.bool(false, "MTF Candle Overlay ⠀⠀⠀⠀⠀", grou
 mtf_tf_sel        = input.string("1h", "", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], inline="mtf_ov", group=grp_mtf_candle)
 mtf_opacity       = input.int(15, "Opacity %", minval=0, maxval=100, group=grp_mtf_candle, tooltip="0% = Invisible, 100% = Solid")
 
-// Additional Context Inputs 
+// Additional Context Inputs
 grp_add         = "Additional Context"
 use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", group=grp_add, inline="sess_1st", tooltip="")
 sess_1st_tf     = input.timeframe("5", "", group=grp_add, inline="sess_1st", tooltip="Lines remain at the high and low of the first candle of the running trading session. \nSelect the timeframe for the 1st Session Candle calculation.")
@@ -247,7 +252,7 @@ last_frac_tf    = input.timeframe("240", "", group=grp_add, inline="l_rf", toolt
 show_vol        = input.bool(true, "High Volume Spikes", group=grp_add, inline="vol_sp", tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
 vol_mult        = input.float(2.0, "Threshold (x Avg)", inline="vol_sp", group=grp_add)
 
-// FVG Inputs 
+// FVG Inputs
 grp_fvg1        = "Price Imbalance (Fair Value Gap) 1"
 plot_fvg1       = input.bool(true, title="FVG 1 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg1, inline="f1_1", tooltip="")
 fvg1_tf_sel     = input.timeframe("", title="TF", group=grp_fvg1, inline="f1_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement). Also reveals institutional interest (new trend). \nSelect the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
@@ -338,7 +343,7 @@ ps_merge_en         = input.bool(true, title="Merge Nearby Levels (Zones) ", gro
 ps_merge_pct        = input.float(0.1, title="Threshold %", minval=0.01, step=0.05, group=grp_psr, inline="ps_m", tooltip="If a new level appears within X% of an existing level, they are merged into a Zone.")
 ps_col_res          = input.color(color.new(color.red, 30), title="Res Color", group=grp_psr, inline="ps_c")
 ps_col_sup          = input.color(color.new(color.green, 30), title="⠀Sup Color", group=grp_psr, inline="ps_c")
-ps_col_zone         = input.color(color.new(color.blue, 85), title="⠀Zone Fill", group=grp_psr, inline="ps_c") 
+ps_col_zone         = input.color(color.new(color.blue, 85), title="⠀Zone Fill", group=grp_psr, inline="ps_c")
 
 // UDT for S&R Management
 type SRLevel
@@ -389,7 +394,7 @@ type SqState
 // Bollinger Bands
 grp_bb              = 'Bollinger Bands'
 BB_plot             = input.bool(true, title='Bollinger Bands⠀', inline="bb_t", group=grp_bb, tooltip='')
-near_bb             = input.bool(true, title='Touched BBs only', inline="bb_t", group=grp_bb, tooltip='This maintains a better chart overview and works as reversal zone indicator. 
+near_bb             = input.bool(true, title='Touched BBs only', inline="bb_t", group=grp_bb, tooltip='This maintains a better chart overview and works as reversal zone indicator.
                       \nWorks as support and resistence, as reversal zone and as squeeze indicator.')
 // BB_length_1 & BB_sdev_1 moved to Advanced: REG
 BB_sdev_2           = 3
@@ -400,7 +405,7 @@ BB_sdev_4           = 5
 // ema cloud and ma inputs
 grp_ma              = 'EMA cloud and MA'
 en_cloud            = input.bool(false, title='EMA Cloud⠀', inline="ema_c", group=grp_ma, tooltip='')
-sig_plot            = input.bool(true, title='Cloud Color Signal', inline="ema_c", group=grp_ma, tooltip='EMA1 cross EMA2 color signal. 
+sig_plot            = input.bool(true, title='Cloud Color Signal', inline="ema_c", group=grp_ma, tooltip='EMA1 cross EMA2 color signal.
                       n\This EMA cloud works as dynamic support and resistance and as trend indication. A wide cloud indicates high volatility, a narrow cloud indicates low volatility and breakout potential. Interesting pairs: 8/21, 40/97')
 
 ema_inp1            = input.int(8, title='EMA1 Length', inline="ema_l", minval=1, group=grp_ma, tooltip="")
@@ -424,12 +429,12 @@ kama_slow           = 30
 // two fractals trendlines inputs
 grp_fr              = 'Trend lines'
 plot_trendline      = input.bool(false, title='Fractal Trend Lines⠀', inline="fr_tr", group=grp_fr, tooltip='')
-fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group=grp_fr, tooltip="The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal. \nNumber of bars to the left and right of the fractal bar for trendlines. Default is 2 (5-bar fractal). 
+fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group=grp_fr, tooltip="The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal. \nNumber of bars to the left and right of the fractal bar for trendlines. Default is 2 (5-bar fractal).
                      Min=0 (Fractal(2) using anchored linear regression, follow the highs/lows of the subsequent candles to align with the current trend), Max=10 (21 bars).")
 
 // divergence signal inputs
 grp_div             = 'Divergences'
-plot_div            = input.bool(true, title='Divergence Signal Arrow', group=grp_div, tooltip='These divergences are very early signals and must be used in confluence with other signals. Hidden and classic divergence are used')
+plot_div            = input.bool(true, title='Divergences', group=grp_div, tooltip='These divergences are very early signals and must be used in confluence with other signals. Hidden and classic divergence are used')
 div_indi            = input.string('rsi', title='Divergence Indicator', options=['rsi', 'macd(fast_line)', 'macd(slow_line)'], tooltip='Select an Indicator for divergence calculation.', group=grp_div)
 rsi_length          = input.int(14, title='RSI Length', inline="rsi_p", minval=1, step=2, group=grp_div)
 bar_div_p           = input.int(25, title='⠀⠀⠀⠀Bar Period', inline="rsi_p", minval=1, step=1, tooltip='RSI Length. n\The number of bars in which divergences are detected.', group=grp_div)
@@ -448,7 +453,7 @@ plot_f_bar          = input.bool(true, title='Fakey', tooltip='Letter: F. An ins
 // segments inputs
 grp_seg             = 'Segment signal'
 plot_segments       = input.bool(false, title='Segments ⠀', inline="seg", tooltip='', group=grp_seg)
-sb                  = input.int(10 ,title='Max Bars', inline="seg", minval=0, step=1, tooltip='Gray lines that follow the highest highs and lowest lows. This is a subtle way to detect a new trend. The higher the timeframe the more reliable the signal. 
+sb                  = input.int(10 ,title='Max Bars', inline="seg", minval=0, step=1, tooltip='Gray lines that follow the highest highs and lowest lows. This is a subtle way to detect a new trend. The higher the timeframe the more reliable the signal.
                       \nMax bars between two segment highs or segment lows.', group=grp_seg)
 
 
@@ -1245,7 +1250,7 @@ if ON_DIV
     sig_div_bull := c_div_bull or h_div_bull
     sig_div_bear := c_div_bear or h_div_bear
 
-plotshape(plot_bear_combined, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,  textcolor=color.new(color.red, 0),  color=color.new(color.red, 0), title='Bear divergence') 
+plotshape(plot_bear_combined, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,  textcolor=color.new(color.red, 0),  color=color.new(color.red, 0), title='Bear divergence')
 plotshape(plot_bull_combined, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,  textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Bull divergence')
 
 
@@ -1316,7 +1321,7 @@ sig_kama_bear := kama_bear
 // Determine logic based on input
 use_special_trend = fractalBarsPerSide == 0
 // Force 2 (5-bar fractal) for special mode to ensure stability
-n_tl = use_special_trend ? 2 : fractalBarsPerSide 
+n_tl = use_special_trend ? 2 : fractalBarsPerSide
 
 // --- Detection using Pivot Functions ---
 ph_val = ta.pivothigh(high, n_tl, n_tl)
@@ -1442,10 +1447,10 @@ if eff_plot_trendline
     // --- UPPER LINE ---
     // Mode 0: Start=Newest(x0), Slope based calculation
     // Mode >0: Start=Old(x1), End=Newest(x0)
-    
+
     x1_u = use_special_trend ? x0_up : x1_up
     y1_u = use_special_trend ? y0_up : y1_up
-    
+
     x2_u = use_special_trend ? bar_index - 1 : x0_up
     // Calculate Y2 based on Slope for Mode 0, or plain value for Mode >0
     float y2_u = na
@@ -1469,7 +1474,7 @@ if eff_plot_trendline
     // --- LOWER LINE ---
     x1_d = use_special_trend ? x0_dn : x1_dn
     y1_d = use_special_trend ? y0_dn : y1_dn
-    
+
     x2_d = use_special_trend ? bar_index - 1 : x0_dn
     float y2_d = na
     if use_special_trend
@@ -1534,9 +1539,9 @@ l12_short = ta.lowest(high, L12_input)
 var bool long_plotted = na
 var bool short_plotted = na
 
-// Determine the actual signal trigger point 
-plot_l12_long = low == l12_long and (na(short_plotted) or short_plotted) 
-plot_l12_short = high == l12_short and (na(long_plotted) or long_plotted) 
+// Determine the actual signal trigger point
+plot_l12_long = low == l12_long and (na(short_plotted) or short_plotted)
+plot_l12_short = high == l12_short and (na(long_plotted) or long_plotted)
 
 if plot_l12_long
     long_plotted := true
@@ -1562,7 +1567,7 @@ bar_5 = high[5] - low[5]
 bar_6 = high[6] - low[6]
 bar_7 = high[7] - low[7]
 
-nr_bar = p_nr_bar < bar_1 and p_nr_bar < bar_2 and p_nr_bar < bar_3 and p_nr_bar < bar_4 and p_nr_bar < bar_5 and p_nr_bar < bar_6 
+nr_bar = p_nr_bar < bar_1 and p_nr_bar < bar_2 and p_nr_bar < bar_3 and p_nr_bar < bar_4 and p_nr_bar < bar_5 and p_nr_bar < bar_6
 
 plotchar(eff_plot_nr_bar and nr_bar, char='n', location=location.belowbar, color=color.new(color.gray, 0), title='NR bar')
 
@@ -1580,8 +1585,8 @@ bool plot_red_a_now = false
 if af_up and (last_af_state == 0 or last_af_state == -1)
     plot_blue_a_now := true
     last_af_state := 1
-        
-else if af_dn and (last_af_state == 0 or last_af_state == 1) 
+
+else if af_dn and (last_af_state == 0 or last_af_state == 1)
     plot_red_a_now := true
     last_af_state := -1
 
@@ -1592,7 +1597,7 @@ i_bar       = high < high[1] and low > low[1]
 
 o_bar       = high > high[1] and low < low[1]
 
-o_bar_color = close > high[1] ? color.new(color.red, 0) : close < low[1] ? color.new(color.green, 0) :color.new(color.gray, 0)                  
+o_bar_color = close > high[1] ? color.new(color.red, 0) : close < low[1] ? color.new(color.green, 0) :color.new(color.gray, 0)
 
 s_bar       = high[1] < high[2] and low[1] > low[2] and high > high[1] and low < low[1]
 
@@ -1735,7 +1740,7 @@ if eff_plot_segments and barstate.isconfirmed
 
 //-------------------------------------------------------------------- info panel -------------------------------------------------------------------------
 
-//indicator funktions for 4h, d, w, m 
+//indicator funktions for 4h, d, w, m
 
 // Helper function for Panel State
 f_panel_state() =>
@@ -2301,7 +2306,7 @@ var line[] sess_lines = array.new_line()
 // UPDATED: Added FIFO Logic
 f_draw_session(_show, _sess, _tz, _col, _style, _box, _high, _low, _start_t_state, _restrict, _restrict_time, _lines_array, _limit) =>
     is_weekend = dayofweek == dayofweek.saturday or dayofweek == dayofweek.sunday
-    
+
     // Calculate if session is active (Raw)
     bool is_sess_raw = _show and not is_weekend and not na(time(timeframe.period, _sess, _tz))
     bool is_start = is_sess_raw and not is_sess_raw[1]
@@ -2318,7 +2323,7 @@ f_draw_session(_show, _sess, _tz, _col, _style, _box, _high, _low, _start_t_stat
         ms_limit = _restrict_time * 60 * 1000
         if (time - start_t_cur) >= ms_limit
             is_sess := false
-    
+
     // Vertical Line Logic (FIFO)
     if _style == "Vertical Line" and is_start
         line new_l = line.new(x1=bar_index, y1=low, x2=bar_index, y2=high, extend=extend.both, color=color.new(_col, 70), style=line.style_solid, width=1)
@@ -2342,7 +2347,7 @@ f_draw_session(_show, _sess, _tz, _col, _style, _box, _high, _low, _start_t_stat
             box.set_top(b_cur, h_cur)
             box.set_bottom(b_cur, l_cur)
             box.set_right(b_cur, bar_index + 1)
-    
+
     [is_sess, b_cur, h_cur, l_cur, start_t_cur]
 
 // Check TF Constraint (Visible only if TF <= 1 Hour)
@@ -2662,15 +2667,15 @@ new_mtf_bar = timeframe.change(mtf_tf)
 t_val = 100 - mtf_opacity
 col_bull = color.new(color.green, t_val)
 col_bear = color.new(color.red, t_val)
-col_border_bull = color.new(color.green, 80) 
-col_border_bear = color.new(color.red, 80) 
+col_border_bull = color.new(color.green, 80)
+col_border_bear = color.new(color.red, 80)
 
 // Persistent Variables (Stage 4: Array FIFO)
 var box[] mtf_boxes = array.new_box()
 var box mtf_body = na
 
 if ON_MTF_OV and is_higher_tf
-    
+
     // Determine Bull/Bear state
     is_up = mtf_c >= mtf_o
     cur_fill = is_up ? col_bull : col_bear
@@ -2748,7 +2753,7 @@ if ON_FVG1
         sig_fvg_bear := high < low[2]
 
     // CASE B: Higher Timeframe (Security Source)
-    else 
+    else
         if t2_mtf1 != last_fvg_time1 and not na(t2_mtf1)
             t_left = t2_mtf1 - tf_ms1
             t_right = t2_mtf1 + (tf_ms1 * fvg1_len)
@@ -2760,7 +2765,7 @@ if ON_FVG1
             if h1_mtf1 < l3_mtf1 // Bearish
                 _border_bear = color.new(color.red, 90)
                 b_new := box.new(left=t_left, top=l3_mtf1, right=t_right, bottom=h1_mtf1, xloc=xloc.bar_time, border_color=_border_bear, bgcolor=col_fvg1_bear)
-            
+
             last_fvg_time1 := t2_mtf1
 
     // Manage Box Limit
@@ -2817,7 +2822,7 @@ if ON_FVG2
             if h1_mtf2 < l3_mtf2 // Bearish
                 _border_bear = color.new(color.red, 90)
                 b_new := box.new(left=t_left, top=l3_mtf2, right=t_right, bottom=h1_mtf2, xloc=xloc.bar_time, border_color=_border_bear, bgcolor=col_fvg2_bear)
-            
+
             last_fvg_time2 := t2_mtf2
 
     // Manage Box Limit
@@ -2852,7 +2857,7 @@ rt_up_frac = valid_up_structure and high < high[2]
 rt_dn_frac = valid_dn_structure and low > low[2]
 
 // --- Trigger Alert ---
-// Trigger only if enabled, in realtime, and condition is met. 
+// Trigger only if enabled, in realtime, and condition is met.
 // freq_once_per_bar avoids spamming the sound on every tick.
 if use_rt_alert and barstate.isrealtime and (rt_up_frac or rt_dn_frac)
     alert("Potential Fractal Forming (5th Candle Running)", alert.freq_once_per_bar)
@@ -3020,6 +3025,7 @@ sig_vol_spike := eff_show_vol and is_vol_spike
 
 // Mode flag
 bool vp_is_full = (vp_mode == "Full TF")
+bool vp_is_bars = (vp_style == "Bars")
 
 // Full TF Data Structures (range-independent bins)
 int vp_full_band_ticks = 10
@@ -3030,13 +3036,16 @@ var int full_max_k = na
 // Arrays / draw objects
 var float[] vp_volArray = array.new_float(vp_rows, 0.0)
 var float[] vp_smtArray = array.new_float(vp_rows, 0.0)
+var float[] vp_bars_render = array.new_float(0)
 var line[]  vp_lines    = array.new_line()
+var box[]   vp_boxes    = array.new_box()
 
 // Dirty tracking
 var int last_left  = na
 var int last_right = na
 var int last_full_bar = na
 var string last_vp_mode = na
+var string last_vp_style = na
 var bool vp_dirty = true
 
 // Helper: safe map add
@@ -3065,8 +3074,9 @@ if eff_vp_enable and vp_is_full and barstate.isconfirmed
 if barstate.islast
     // --- DIRTY LOGIC ---
     bool mode_changed = (vp_mode != last_vp_mode)
+    bool style_changed = (vp_style != last_vp_style)
 
-    if mode_changed
+    if mode_changed or style_changed
         vp_dirty := true
     else if vp_is_full
         // Full mode: redraw only when a new bar arrives (bar_index changes)
@@ -3078,11 +3088,15 @@ if barstate.islast
             vp_dirty := true
 
     // 1) CLEANUP (Only if dirty or disabled)
-    if (vp_dirty and eff_vp_enable) or (not eff_vp_enable and array.size(vp_lines) > 0)
+    if (vp_dirty and eff_vp_enable) or (not eff_vp_enable and (array.size(vp_lines) > 0 or array.size(vp_boxes) > 0))
         if array.size(vp_lines) > 0
             for i = 0 to array.size(vp_lines) - 1
                 line.delete(array.get(vp_lines, i))
             array.clear(vp_lines)
+        if array.size(vp_boxes) > 0
+            for i = 0 to array.size(vp_boxes) - 1
+                box.delete(array.get(vp_boxes, i))
+            array.clear(vp_boxes)
 
     // 2) CALCULATION
     if eff_vp_enable and vp_dirty
@@ -3236,27 +3250,93 @@ if barstate.islast
 
             // 5) Drawing
             int xLoc = bar_index + vp_offset
+            int xBarsStart = bar_index + vp_pivot_offset + vp_bars_shift
 
             if maxV > 0
-                for j = 0 to vp_rows - 1
-                    float val = array.get(vp_smtArray, j)
-                    if val > 0
-                        float y1 = lMin + (j * step)
-                        float y2 = lMin + ((j + 1) * step)
+                if vp_is_bars
+                    int vp_render_rows = math.min(VP_BOX_BUDGET, vp_rows * 2)
+                    vp_render_rows := math.max(vp_rows, vp_render_rows)
+                    if array.size(vp_bars_render) != vp_render_rows
+                        vp_bars_render := array.new_float(vp_render_rows, 0.0)
 
-                        float intens = val / thres
-                        if intens > 1.0
-                            intens := 1.0
+                    if vp_render_rows == vp_rows
+                        for r = 0 to vp_rows - 1
+                            array.set(vp_bars_render, r, array.get(vp_smtArray, r))
+                    else
+                        float denom = float(vp_render_rows - 1)
+                        float scale = float(vp_rows - 1) / denom
+                        for r = 0 to vp_render_rows - 1
+                            float u = float(r) * scale
+                            int a = int(math.floor(u))
+                            int b = math.min(a + 1, vp_rows - 1)
+                            float f = u - float(a)
+                            float va = array.get(vp_smtArray, a)
+                            float vb = array.get(vp_smtArray, b)
+                            array.set(vp_bars_render, r, va * (1.0 - f) + vb * f)
 
-                        float min_intens = vp_is_full ? 0.01 : 0.003
-                        if intens > min_intens
-                            ops_vp_draw += 1
-                            color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
-                            line ln = line.new(x1=xLoc, y1=y1, x2=xLoc, y2=y2, xloc=xloc.bar_index, color=col, width=vp_width)
-                            array.push(vp_lines, ln)
+                    float maxV_r = 0.0
+                    float sumV_r = 0.0
+                    int actB_r = 0
+                    for r = 0 to vp_render_rows - 1
+                        float vv = array.get(vp_bars_render, r)
+                        if vv > 0
+                            sumV_r += vv
+                            actB_r += 1
+                            if vv > maxV_r
+                                maxV_r := vv
+
+                    float avgV_r = (actB_r > 0) ? (sumV_r / actB_r) : 0.0
+                    float thres_r = maxV_r
+                    if eff_vp_smart and avgV_r > 0
+                        thres_r := avgV_r * vp_clip
+                        if thres_r == 0
+                            thres_r := maxV_r
+
+                    float step_render = (step * vp_rows) / vp_render_rows
+                    float min_intens = vp_is_full ? 0.006 : 0.0015
+
+                    if maxV_r > 0
+                        for r = 0 to vp_render_rows - 1
+                            float valr = array.get(vp_bars_render, r)
+                            if valr > 0
+                                float intens = valr / thres_r
+                                if intens > 1.0
+                                    intens := 1.0
+                                float intens_c = math.pow(intens, 0.65)
+                                if intens_c > min_intens
+                                    ops_vp_draw += 1
+                                    int len_bi = int(math.round(intens_c * vp_bars_w))
+                                    if len_bi < 2
+                                        len_bi := 2
+                                    float y1 = lMin + (r * step_render)
+                                    float y2 = lMin + ((r + 1) * step_render)
+                                    int alpha = 85 - int(math.round(intens_c * 75))
+                                    alpha := alpha < 0 ? 0 : alpha > 95 ? 95 : alpha
+                                    color fill_col = color.new(vp_color, alpha)
+                                    color border_col = color.new(vp_color, 92)
+                                    box bx = box.new(xBarsStart - len_bi, y2, xBarsStart, y1, xloc=xloc.bar_index, bgcolor=fill_col, border_color=border_col)
+                                    array.push(vp_boxes, bx)
+                else
+                    for j = 0 to vp_rows - 1
+                        float val = array.get(vp_smtArray, j)
+                        if val > 0
+                            float y1 = lMin + (j * step)
+                            float y2 = lMin + ((j + 1) * step)
+
+                            float intens = val / thres
+                            if intens > 1.0
+                                intens := 1.0
+
+                            float min_intens = vp_is_full ? 0.01 : 0.003
+                            if intens > min_intens
+                                ops_vp_draw += 1
+                                color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
+                                line ln = line.new(x1=xLoc, y1=y1, x2=xLoc, y2=y2, xloc=xloc.bar_index, color=col, width=vp_width)
+                                array.push(vp_lines, ln)
 
     // --- Update trackers ---
     last_vp_mode := vp_mode
+    last_vp_style := vp_style
     last_left    := chart.left_visible_bar_time
     last_right   := chart.right_visible_bar_time
     if vp_is_full
@@ -3314,7 +3394,7 @@ else
     if not na(tbl_dbg)
         table.delete(tbl_dbg)
         tbl_dbg := na
-        
+
 
 // --- Stage 2: ADR/Today Range Calculation ---
 float d_range = na
