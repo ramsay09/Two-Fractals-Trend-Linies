@@ -1753,6 +1753,7 @@ f_panel_state() =>
     bool bull_fvg_cond = low > high[2]
     bool bear_fvg_cond = high < low[2]
     fvg_state := bull_fvg_cond ? 1 : bear_fvg_cond ? -1 : fvg_state
+    int fvg_candidate_i = (not barstate.isconfirmed and (bull_fvg_cond or bear_fvg_cond)) ? 1 : 0
 
     // Bill Williams Fractals State
     // Standard 2,2 fractals
@@ -1764,18 +1765,16 @@ f_panel_state() =>
 
     var int fr_state = 1
     // Check breaks
-    fr_state := ta.crossover(high, last_up_lvl) ? 1 : ta.crossunder(low, last_dn_lvl) ? -1 : fr_state
+    bool fr_evt_up = ta.crossover(high, last_up_lvl)
+    bool fr_evt_dn = ta.crossunder(low, last_dn_lvl)
+    fr_state := fr_evt_up ? 1 : fr_evt_dn ? -1 : fr_state
 
     int tf_conf_i = barstate.isconfirmed ? 1 : 0
-    int fvg_candidate_i = (not barstate.isconfirmed and (bull_fvg_cond or bear_fvg_cond)) ? 1 : 0
-    bool brk_up_live = high > last_up_lvl
-    bool brk_dn_live = low < last_dn_lvl
-    int fr_break_live_i = (not barstate.isconfirmed and (brk_up_live or brk_dn_live)) ? 1 : 0
-    bool brk_up_close = close > last_up_lvl
-    bool brk_dn_close = close < last_dn_lvl
-    int fr_close_i = (barstate.isconfirmed and (brk_up_close or brk_dn_close)) ? 1 : 0
+    int fr_pending_i = ((fr_evt_up or fr_evt_dn) and not barstate.isconfirmed) ? 1 : 0
+    int fvg_last_conf = barstate.isconfirmed ? fvg_state : fvg_state[1]
+    int fr_last_conf = barstate.isconfirmed ? fr_state : fr_state[1]
 
-    [fvg_state, fr_state, tf_conf_i, fvg_candidate_i, fr_break_live_i, fr_close_i]
+    [fvg_state, fvg_last_conf, fr_state, fr_last_conf, tf_conf_i, fvg_candidate_i, fr_pending_i]
 
 //colors
 color_blue_1    = color.new(color.blue, 30)
@@ -1817,12 +1816,9 @@ if ta.crossover(high, last_up_lvl_inf)
     fr_state_inf := 1
 else if ta.crossunder(low, last_dn_lvl_inf)
     fr_state_inf := -1
-bool fr_brk_up_live_inf = high > last_up_lvl_inf
-bool fr_brk_dn_live_inf = low < last_dn_lvl_inf
-int fr_break_live_inf = (not barstate.isconfirmed and (fr_brk_up_live_inf or fr_brk_dn_live_inf)) ? 1 : 0
-bool fr_brk_up_close_inf = close > last_up_lvl_inf
-bool fr_brk_dn_close_inf = close < last_dn_lvl_inf
-int fr_close_inf = (barstate.isconfirmed and (fr_brk_up_close_inf or fr_brk_dn_close_inf)) ? 1 : 0
+bool fr_evt_up_inf = ta.crossover(high, last_up_lvl_inf)
+bool fr_evt_dn_inf = ta.crossunder(low, last_dn_lvl_inf)
+int fr_pending_inf = ((fr_evt_up_inf or fr_evt_dn_inf) and not barstate.isconfirmed) ? 1 : 0
 
 fvg_color_c     = fvg_state_inf == 1 ? color_blue_1 : fvg_state_inf == -1 ? color_red_1 : color_gray_1
 fr_color_c      = fr_state_inf == 1 ? color_blue_1 : fr_state_inf == -1 ? color_red_1 : color_gray_1
@@ -1849,84 +1845,25 @@ color fr_color_d   = na
 color fr_color_w   = na
 color fr_color_m   = na
 
-var int fvg_5m_conf = na
-var int fvg_15m_conf = na
-var int fvg_1h_conf = na
-var int fvg_4h_conf = na
-var int fvg_d_conf = na
-var int fvg_w_conf = na
-var int fvg_m_conf = na
-
-var int fr_5m_conf = na
-var int fr_15m_conf = na
-var int fr_1h_conf = na
-var int fr_4h_conf = na
-var int fr_d_conf = na
-var int fr_w_conf = na
-var int fr_m_conf = na
-
-var int fvg_c_conf = na
-var int fr_c_conf = na
-
 // 2. Gated HTF & Table Update
 if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Security & Logic
     // Optimization: Combine security calls for Info Panel (7 calls)
     // Using global input parameters for all timeframes as requested
-    [fvg_5m, fr_5m, conf_5m_i, fvgcand_5m_i, frbrk_5m_i, frclose_5m_i] = request.security(syminfo.tickerid, '5',   f_panel_state())
-    [fvg_15m, fr_15m, conf_15m_i, fvgcand_15m_i, frbrk_15m_i, frclose_15m_i] = request.security(syminfo.tickerid, '15',  f_panel_state())
-    [fvg_1h, fr_1h, conf_1h_i, fvgcand_1h_i, frbrk_1h_i, frclose_1h_i] = request.security(syminfo.tickerid, '60',  f_panel_state())
-    [fvg_4h, fr_4h, conf_4h_i, fvgcand_4h_i, frbrk_4h_i, frclose_4h_i] = request.security(syminfo.tickerid, '240', f_panel_state())
-    [fvg_d, fr_d, conf_d_i, fvgcand_d_i, frbrk_d_i, frclose_d_i]     = request.security(syminfo.tickerid, 'D',   f_panel_state())
-    [fvg_w, fr_w, conf_w_i, fvgcand_w_i, frbrk_w_i, frclose_w_i]     = request.security(syminfo.tickerid, 'W',   f_panel_state())
-    [fvg_m, fr_m, conf_m_i, fvgcand_m_i, frbrk_m_i, frclose_m_i]     = request.security(syminfo.tickerid, 'M',   f_panel_state())
+    [fvg_5m, fvg_5m_conf, fr_5m, fr_5m_conf, tfconf_5m_i, fvgcand_5m_i, frpend_5m_i] = request.security(syminfo.tickerid, '5',   f_panel_state())
+    [fvg_15m, fvg_15m_conf, fr_15m, fr_15m_conf, tfconf_15m_i, fvgcand_15m_i, frpend_15m_i] = request.security(syminfo.tickerid, '15',  f_panel_state())
+    [fvg_1h, fvg_1h_conf, fr_1h, fr_1h_conf, tfconf_1h_i, fvgcand_1h_i, frpend_1h_i] = request.security(syminfo.tickerid, '60',  f_panel_state())
+    [fvg_4h, fvg_4h_conf, fr_4h, fr_4h_conf, tfconf_4h_i, fvgcand_4h_i, frpend_4h_i] = request.security(syminfo.tickerid, '240', f_panel_state())
+    [fvg_d, fvg_d_conf, fr_d, fr_d_conf, tfconf_d_i, fvgcand_d_i, frpend_d_i]     = request.security(syminfo.tickerid, 'D',   f_panel_state())
+    [fvg_w, fvg_w_conf, fr_w, fr_w_conf, tfconf_w_i, fvgcand_w_i, frpend_w_i]     = request.security(syminfo.tickerid, 'W',   f_panel_state())
+    [fvg_m, fvg_m_conf, fr_m, fr_m_conf, tfconf_m_i, fvgcand_m_i, frpend_m_i]     = request.security(syminfo.tickerid, 'M',   f_panel_state())
 
     // Stage 6: Debug Instrument
     active_sec_calls += 7
 
-    bool conf_5m = conf_5m_i == 1
-    bool conf_15m = conf_15m_i == 1
-    bool conf_1h = conf_1h_i == 1
-    bool conf_4h = conf_4h_i == 1
-    bool conf_d = conf_d_i == 1
-    bool conf_w = conf_w_i == 1
-    bool conf_m = conf_m_i == 1
-
-    fvg_5m_conf := nz(fvg_5m_conf, fvg_5m)
-    fr_5m_conf := nz(fr_5m_conf, fr_5m)
-    fvg_15m_conf := nz(fvg_15m_conf, fvg_15m)
-    fr_15m_conf := nz(fr_15m_conf, fr_15m)
-    fvg_1h_conf := nz(fvg_1h_conf, fvg_1h)
-    fr_1h_conf := nz(fr_1h_conf, fr_1h)
-    fvg_4h_conf := nz(fvg_4h_conf, fvg_4h)
-    fr_4h_conf := nz(fr_4h_conf, fr_4h)
-    fvg_d_conf := nz(fvg_d_conf, fvg_d)
-    fr_d_conf := nz(fr_d_conf, fr_d)
-    fvg_w_conf := nz(fvg_w_conf, fvg_w)
-    fr_w_conf := nz(fr_w_conf, fr_w)
-    fvg_m_conf := nz(fvg_m_conf, fvg_m)
-    fr_m_conf := nz(fr_m_conf, fr_m)
-
-    fvg_5m_conf := conf_5m ? fvg_5m : fvg_5m_conf
-    fr_5m_conf := conf_5m ? fr_5m : fr_5m_conf
-    fvg_15m_conf := conf_15m ? fvg_15m : fvg_15m_conf
-    fr_15m_conf := conf_15m ? fr_15m : fr_15m_conf
-    fvg_1h_conf := conf_1h ? fvg_1h : fvg_1h_conf
-    fr_1h_conf := conf_1h ? fr_1h : fr_1h_conf
-    fvg_4h_conf := conf_4h ? fvg_4h : fvg_4h_conf
-    fr_4h_conf := conf_4h ? fr_4h : fr_4h_conf
-    fvg_d_conf := conf_d ? fvg_d : fvg_d_conf
-    fr_d_conf := conf_d ? fr_d : fr_d_conf
-    fvg_w_conf := conf_w ? fvg_w : fvg_w_conf
-    fr_w_conf := conf_w ? fr_w : fr_w_conf
-    fvg_m_conf := conf_m ? fvg_m : fvg_m_conf
-    fr_m_conf := conf_m ? fr_m : fr_m_conf
-
-    fvg_c_conf := nz(fvg_c_conf, fvg_state_inf)
-    fr_c_conf := nz(fr_c_conf, fr_state_inf)
     int ctf_conf_i = (barstate.isconfirmed or not barstate.isrealtime) ? 1 : 0
     bool ctf_conf = ctf_conf_i == 1
-    fvg_c_conf := ctf_conf ? fvg_state_inf : fvg_c_conf
-    fr_c_conf := ctf_conf ? fr_state_inf : fr_c_conf
+    int fvg_c_conf = ctf_conf ? fvg_state_inf : fvg_state_inf[1]
+    int fr_c_conf = ctf_conf ? fr_state_inf : fr_state_inf[1]
 
     string m_fvg_5m = panel_show_live ? (fvgcand_5m_i == 1 ? M_FORM : M_CONF) : M_CONF
     string m_fvg_15m = panel_show_live ? (fvgcand_15m_i == 1 ? M_FORM : M_CONF) : M_CONF
@@ -1937,14 +1874,14 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
     string m_fvg_m = panel_show_live ? (fvgcand_m_i == 1 ? M_FORM : M_CONF) : M_CONF
     string m_fvg_c = panel_show_live ? (fvg_candidate_inf == 1 ? M_FORM : M_CONF) : M_CONF
 
-    string m_fr_5m = panel_show_live ? (frbrk_5m_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_15m = panel_show_live ? (frbrk_15m_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_1h = panel_show_live ? (frbrk_1h_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_4h = panel_show_live ? (frbrk_4h_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_d = panel_show_live ? (frbrk_d_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_w = panel_show_live ? (frbrk_w_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_m = panel_show_live ? (frbrk_m_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_c = panel_show_live ? (fr_break_live_inf == 1 ? M_FORM : M_CONF) : M_CONF
+    string m_fr_5m = panel_show_live ? (frpend_5m_i == 1 ? M_FORM : M_CONF) : M_CONF
+    string m_fr_15m = panel_show_live ? (frpend_15m_i == 1 ? M_FORM : M_CONF) : M_CONF
+    string m_fr_1h = panel_show_live ? (frpend_1h_i == 1 ? M_FORM : M_CONF) : M_CONF
+    string m_fr_4h = panel_show_live ? (frpend_4h_i == 1 ? M_FORM : M_CONF) : M_CONF
+    string m_fr_d = panel_show_live ? (frpend_d_i == 1 ? M_FORM : M_CONF) : M_CONF
+    string m_fr_w = panel_show_live ? (frpend_w_i == 1 ? M_FORM : M_CONF) : M_CONF
+    string m_fr_m = panel_show_live ? (frpend_m_i == 1 ? M_FORM : M_CONF) : M_CONF
+    string m_fr_c = panel_show_live ? (fr_pending_inf == 1 ? M_FORM : M_CONF) : M_CONF
 
     int fvg_disp_5m = panel_show_live ? fvg_5m : fvg_5m_conf
     int fr_disp_5m = panel_show_live ? fr_5m : fr_5m_conf
