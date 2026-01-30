@@ -33,7 +33,9 @@ trading_approach = input.string("Custom", "Context Lenses", options=["Custom", "
 
 // adx, hma and ema1 x ema2 mtf trend info panel
 panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
-                 tooltip='Provides an overview of multi time frame trends: FVG Close state, and Fractal Break state. Displays for 5m, 15m, 1H, 4H, 1D, 1W, 1M. Select position to enable.')
+                 tooltip='Provides an overview of multi time frame trends: FVG Close state, and Fractal Break state. Displays for 5m, 15m, 1H, 4H, 1D, 1W, 1M. Select position to enable.\n○ = developing (current candle not closed), ● = confirmed (closed).')
+panel_update_mode = input.string("Realtime Preview", "Panel Update Mode", options=["Realtime Preview", "Strict Confirm"], tooltip="Realtime Preview: shows live/developing values (○). Strict Confirm: shows last confirmed close values only (●).")
+bool panel_show_live = panel_update_mode == "Realtime Preview"
 
 // Confluence & Regime Visuals
 show_conf_meter     = input.bool(true, "Confluence Meter⠀⠀⠀", inline="conf_ui", tooltip="")
@@ -55,8 +57,20 @@ conf_use_vwap_quality = input.bool(true, "CONF: VWAP Quality Gate", tooltip="Adj
 conf_vwap_mode        = input.string("Auto", "VWAP Anchor", inline="conf", options=["Auto","Session VWAP","Weekly VWAP"], tooltip="")
 conf_z_penalty_mode   = input.string("Default", "⠀Stretch Penalty", inline="conf", options=["Default","Conservative","Aggressive"], tooltip="Which VWAP anchor CONF uses for quality. Auto: Session ≤ 60m, Weekly > 60m. n\How strongly VWAP stretch reduces CONF quality.")
 
-show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)")
+show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
 regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
+
+string M_FORM = "○"
+string M_CONF = "●"
+
+f_marker_live(bool show_live, bool is_confirmed) =>
+    show_live and not is_confirmed ? M_FORM : M_CONF
+
+f_with_marker(string txt, string marker) =>
+    txt + " " + marker
+
+f_state_short(int s) =>
+    s == 1 ? "B" : s == -1 ? "S" : "-"
 
 // --- STAGE 2: CONFIGURATION & AUTO-SCALING ---
 
@@ -1756,7 +1770,9 @@ f_panel_state() =>
     else if ta.crossunder(low, last_dn_lvl)
         fr_state := -1
 
-    [fvg_state, fr_state]
+    bool tf_is_confirmed = barstate.isconfirmed
+
+    [fvg_state, fr_state, tf_is_confirmed]
 
 //colors
 color_blue_1    = color.new(color.blue, 30)
@@ -1821,21 +1837,142 @@ color fr_color_d   = na
 color fr_color_w   = na
 color fr_color_m   = na
 
+var int fvg_5m_conf = na
+var int fvg_15m_conf = na
+var int fvg_1h_conf = na
+var int fvg_4h_conf = na
+var int fvg_d_conf = na
+var int fvg_w_conf = na
+var int fvg_m_conf = na
+
+var int fr_5m_conf = na
+var int fr_15m_conf = na
+var int fr_1h_conf = na
+var int fr_4h_conf = na
+var int fr_d_conf = na
+var int fr_w_conf = na
+var int fr_m_conf = na
+
+var int fvg_c_conf = na
+var int fr_c_conf = na
+
 // 2. Gated HTF & Table Update
 if panel_pos != "None"
     if barstate.islast // Stage 5: Last-Bar Gating for Security & Logic
         // Optimization: Combine security calls for Info Panel (7 calls)
         // Using global input parameters for all timeframes as requested
-        [fvg_5m, fr_5m]     = request.security(syminfo.tickerid, '5',   f_panel_state())
-        [fvg_15m, fr_15m]   = request.security(syminfo.tickerid, '15',  f_panel_state())
-        [fvg_1h, fr_1h]     = request.security(syminfo.tickerid, '60',  f_panel_state())
-        [fvg_4h, fr_4h]     = request.security(syminfo.tickerid, '240', f_panel_state())
-        [fvg_d, fr_d]       = request.security(syminfo.tickerid, 'D',   f_panel_state())
-        [fvg_w, fr_w]       = request.security(syminfo.tickerid, 'W',   f_panel_state())
-        [fvg_m, fr_m]       = request.security(syminfo.tickerid, 'M',   f_panel_state())
+        [fvg_5m, fr_5m, conf_5m]   = request.security(syminfo.tickerid, '5',   f_panel_state())
+        [fvg_15m, fr_15m, conf_15m] = request.security(syminfo.tickerid, '15',  f_panel_state())
+        [fvg_1h, fr_1h, conf_1h]   = request.security(syminfo.tickerid, '60',  f_panel_state())
+        [fvg_4h, fr_4h, conf_4h]   = request.security(syminfo.tickerid, '240', f_panel_state())
+        [fvg_d, fr_d, conf_d]     = request.security(syminfo.tickerid, 'D',   f_panel_state())
+        [fvg_w, fr_w, conf_w]     = request.security(syminfo.tickerid, 'W',   f_panel_state())
+        [fvg_m, fr_m, conf_m]     = request.security(syminfo.tickerid, 'M',   f_panel_state())
 
         // Stage 6: Debug Instrument
         active_sec_calls += 7
+
+        if na(fvg_5m_conf)
+            fvg_5m_conf := fvg_5m
+        if na(fr_5m_conf)
+            fr_5m_conf := fr_5m
+        if na(fvg_15m_conf)
+            fvg_15m_conf := fvg_15m
+        if na(fr_15m_conf)
+            fr_15m_conf := fr_15m
+        if na(fvg_1h_conf)
+            fvg_1h_conf := fvg_1h
+        if na(fr_1h_conf)
+            fr_1h_conf := fr_1h
+        if na(fvg_4h_conf)
+            fvg_4h_conf := fvg_4h
+        if na(fr_4h_conf)
+            fr_4h_conf := fr_4h
+        if na(fvg_d_conf)
+            fvg_d_conf := fvg_d
+        if na(fr_d_conf)
+            fr_d_conf := fr_d
+        if na(fvg_w_conf)
+            fvg_w_conf := fvg_w
+        if na(fr_w_conf)
+            fr_w_conf := fr_w
+        if na(fvg_m_conf)
+            fvg_m_conf := fvg_m
+        if na(fr_m_conf)
+            fr_m_conf := fr_m
+
+        if conf_5m
+            fvg_5m_conf := fvg_5m
+            fr_5m_conf := fr_5m
+        if conf_15m
+            fvg_15m_conf := fvg_15m
+            fr_15m_conf := fr_15m
+        if conf_1h
+            fvg_1h_conf := fvg_1h
+            fr_1h_conf := fr_1h
+        if conf_4h
+            fvg_4h_conf := fvg_4h
+            fr_4h_conf := fr_4h
+        if conf_d
+            fvg_d_conf := fvg_d
+            fr_d_conf := fr_d
+        if conf_w
+            fvg_w_conf := fvg_w
+            fr_w_conf := fr_w
+        if conf_m
+            fvg_m_conf := fvg_m
+            fr_m_conf := fr_m
+
+        if na(fvg_c_conf)
+            fvg_c_conf := fvg_state_inf
+        if na(fr_c_conf)
+            fr_c_conf := fr_state_inf
+        if barstate.isconfirmed or not barstate.isrealtime
+            fvg_c_conf := fvg_state_inf
+            fr_c_conf := fr_state_inf
+
+        string m_5m = f_marker_live(panel_show_live, conf_5m)
+        string m_15m = f_marker_live(panel_show_live, conf_15m)
+        string m_1h = f_marker_live(panel_show_live, conf_1h)
+        string m_4h = f_marker_live(panel_show_live, conf_4h)
+        string m_d = f_marker_live(panel_show_live, conf_d)
+        string m_w = f_marker_live(panel_show_live, conf_w)
+        string m_m = f_marker_live(panel_show_live, conf_m)
+        string m_c = f_marker_live(panel_show_live and barstate.isrealtime, barstate.isconfirmed)
+
+        int fvg_disp_5m = panel_show_live ? fvg_5m : fvg_5m_conf
+        int fr_disp_5m = panel_show_live ? fr_5m : fr_5m_conf
+        int fvg_disp_15m = panel_show_live ? fvg_15m : fvg_15m_conf
+        int fr_disp_15m = panel_show_live ? fr_15m : fr_15m_conf
+        int fvg_disp_1h = panel_show_live ? fvg_1h : fvg_1h_conf
+        int fr_disp_1h = panel_show_live ? fr_1h : fr_1h_conf
+        int fvg_disp_4h = panel_show_live ? fvg_4h : fvg_4h_conf
+        int fr_disp_4h = panel_show_live ? fr_4h : fr_4h_conf
+        int fvg_disp_d = panel_show_live ? fvg_d : fvg_d_conf
+        int fr_disp_d = panel_show_live ? fr_d : fr_d_conf
+        int fvg_disp_w = panel_show_live ? fvg_w : fvg_w_conf
+        int fr_disp_w = panel_show_live ? fr_w : fr_w_conf
+        int fvg_disp_m = panel_show_live ? fvg_m : fvg_m_conf
+        int fr_disp_m = panel_show_live ? fr_m : fr_m_conf
+        int fvg_disp_c = panel_show_live ? fvg_state_inf : fvg_c_conf
+        int fr_disp_c = panel_show_live ? fr_state_inf : fr_c_conf
+
+        string fvg_txt_5m = f_with_marker(f_state_short(fvg_disp_5m), m_5m)
+        string fr_txt_5m = f_with_marker(f_state_short(fr_disp_5m), m_5m)
+        string fvg_txt_15m = f_with_marker(f_state_short(fvg_disp_15m), m_15m)
+        string fr_txt_15m = f_with_marker(f_state_short(fr_disp_15m), m_15m)
+        string fvg_txt_1h = f_with_marker(f_state_short(fvg_disp_1h), m_1h)
+        string fr_txt_1h = f_with_marker(f_state_short(fr_disp_1h), m_1h)
+        string fvg_txt_4h = f_with_marker(f_state_short(fvg_disp_4h), m_4h)
+        string fr_txt_4h = f_with_marker(f_state_short(fr_disp_4h), m_4h)
+        string fvg_txt_d = f_with_marker(f_state_short(fvg_disp_d), m_d)
+        string fr_txt_d = f_with_marker(f_state_short(fr_disp_d), m_d)
+        string fvg_txt_w = f_with_marker(f_state_short(fvg_disp_w), m_w)
+        string fr_txt_w = f_with_marker(f_state_short(fr_disp_w), m_w)
+        string fvg_txt_m = f_with_marker(f_state_short(fvg_disp_m), m_m)
+        string fr_txt_m = f_with_marker(f_state_short(fr_disp_m), m_m)
+        string fvg_txt_c = f_with_marker(f_state_short(fvg_disp_c), m_c)
+        string fr_txt_c = f_with_marker(f_state_short(fr_disp_c), m_c)
 
         // --- Color Logic ---
         // FVG
@@ -1889,38 +2026,38 @@ if panel_pos != "None"
 
         // 1M (Row 1)
         table.cell(table_id=info_panel, column=0, row=1, text="1M", text_size= size.small, text_color=color.silver, bgcolor=is_1m ? col_tf_highlight : na)
-        table.cell(table_id=info_panel, column=1, row=1, bgcolor=(Intra_D_W_M) ? fvg_color_m : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=1, bgcolor=(Intra_D_W_M) ? fr_color_m : na, width=2)
+        table.cell(table_id=info_panel, column=1, row=1, text=fvg_txt_m, text_size=size.small, text_color=color.white, bgcolor=(Intra_D_W_M) ? fvg_color_m : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=1, text=fr_txt_m, text_size=size.small, text_color=color.white, bgcolor=(Intra_D_W_M) ? fr_color_m : na, width=2)
 
         // 1W (Row 2)
         table.cell(table_id=info_panel, column=0, row=2, text="1W", text_size= size.small, text_color=color.silver, bgcolor=is_1w ? col_tf_highlight : na)
-        table.cell(table_id=info_panel, column=1, row=2, bgcolor=(Intra_D_W) ? fvg_color_w : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=2, bgcolor=(Intra_D_W) ? fr_color_w : na, width=2)
+        table.cell(table_id=info_panel, column=1, row=2, text=fvg_txt_w, text_size=size.small, text_color=color.white, bgcolor=(Intra_D_W) ? fvg_color_w : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=2, text=fr_txt_w, text_size=size.small, text_color=color.white, bgcolor=(Intra_D_W) ? fr_color_w : na, width=2)
 
         // 1D (Row 3)
         table.cell(table_id=info_panel, column=0, row=3, text="1D", text_size= size.small, text_color=color.silver, bgcolor=is_1d ? col_tf_highlight : na)
-        table.cell(table_id=info_panel, column=1, row=3, bgcolor=(Intra_D) ? fvg_color_d : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=3, bgcolor=(Intra_D) ? fr_color_d : na, width=2)
+        table.cell(table_id=info_panel, column=1, row=3, text=fvg_txt_d, text_size=size.small, text_color=color.white, bgcolor=(Intra_D) ? fvg_color_d : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=3, text=fr_txt_d, text_size=size.small, text_color=color.white, bgcolor=(Intra_D) ? fr_color_d : na, width=2)
 
         // 4H (Row 4)
         table.cell(table_id=info_panel, column=0, row=4, text="4H", text_size= size.small, text_color=color.silver, bgcolor=is_4h ? col_tf_highlight : na)
-        table.cell(table_id=info_panel, column=1, row=4, bgcolor=Intra ? fvg_color_4h : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=4, bgcolor=Intra ? fr_color_4h : na, width=2)
+        table.cell(table_id=info_panel, column=1, row=4, text=fvg_txt_4h, text_size=size.small, text_color=color.white, bgcolor=Intra ? fvg_color_4h : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=4, text=fr_txt_4h, text_size=size.small, text_color=color.white, bgcolor=Intra ? fr_color_4h : na, width=2)
 
         // 1H (Row 5)
         table.cell(table_id=info_panel, column=0, row=5, text="1H", text_size= size.small, text_color=color.silver, bgcolor=is_1h ? col_tf_highlight : na)
-        table.cell(table_id=info_panel, column=1, row=5, bgcolor=Intra ? fvg_color_1h : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=5, bgcolor=Intra ? fr_color_1h : na, width=2)
+        table.cell(table_id=info_panel, column=1, row=5, text=fvg_txt_1h, text_size=size.small, text_color=color.white, bgcolor=Intra ? fvg_color_1h : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=5, text=fr_txt_1h, text_size=size.small, text_color=color.white, bgcolor=Intra ? fr_color_1h : na, width=2)
 
         // 15m (Row 6)
         table.cell(table_id=info_panel, column=0, row=6, text="15m", text_size= size.small, text_color=color.silver, bgcolor=is_15m ? col_tf_highlight : na)
-        table.cell(table_id=info_panel, column=1, row=6, bgcolor=Intra ? fvg_color_15m : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=6, bgcolor=Intra ? fr_color_15m : na, width=2)
+        table.cell(table_id=info_panel, column=1, row=6, text=fvg_txt_15m, text_size=size.small, text_color=color.white, bgcolor=Intra ? fvg_color_15m : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=6, text=fr_txt_15m, text_size=size.small, text_color=color.white, bgcolor=Intra ? fr_color_15m : na, width=2)
 
         // 5m (Row 7)
         table.cell(table_id=info_panel, column=0, row=7, text="5m", text_size= size.small, text_color=color.silver, bgcolor=is_5m ? col_tf_highlight : na)
-        table.cell(table_id=info_panel, column=1, row=7, bgcolor=Intra ? fvg_color_5m : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=7, bgcolor=Intra ? fr_color_5m : na, width=2)
+        table.cell(table_id=info_panel, column=1, row=7, text=fvg_txt_5m, text_size=size.small, text_color=color.white, bgcolor=Intra ? fvg_color_5m : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=7, text=fr_txt_5m, text_size=size.small, text_color=color.white, bgcolor=Intra ? fr_color_5m : na, width=2)
 
         // ATR14 (Row 8)
         table.cell(table_id=info_panel, column=0, row=8, text="ATR14 " + str.tostring(atr14_val, "#.#####"), text_size= size.small, text_color=color.silver)
@@ -1932,8 +2069,8 @@ if panel_pos != "None"
 
         // HEADER (Row 10: Current)
         table.cell(table_id=info_panel, column=0, row=10, text="C", text_size= size.small, text_color=color.silver, bgcolor=is_custom_tf ? col_tf_highlight : na)
-        table.cell(table_id=info_panel, column=1, row=10, bgcolor=(Intra_D_W_M) ? fvg_color_c : na, width=2)
-        table.cell(table_id=info_panel, column=2, row=10, bgcolor=(Intra_D_W_M) ? fr_color_c : na, width=2)
+        table.cell(table_id=info_panel, column=1, row=10, text=fvg_txt_c, text_size=size.small, text_color=color.white, bgcolor=(Intra_D_W_M) ? fvg_color_c : na, width=2)
+        table.cell(table_id=info_panel, column=2, row=10, text=fr_txt_c, text_size=size.small, text_color=color.white, bgcolor=(Intra_D_W_M) ? fr_color_c : na, width=2)
 else
     if not na(info_panel)
         table.delete(info_panel)
@@ -3477,40 +3614,76 @@ else
     regime_bg := na
 
 // Update Panel (Moved Up)
+var string reg_conf = "RANGE"
+var color reg_bg_conf = color.new(color.gray, 100)
+var string rvol_conf = ""
+var color rvol_bg_conf = color.new(color.gray, 100)
+var string z_conf = ""
+var color z_bg_conf = color.new(color.gray, 100)
 if eff_regime_panel and not na(info_panel) and barstate.islast
-    color c_reg_bg = regime_state == "SQUEEZE" ? color.new(color.yellow, 30) : regime_state == "TREND" ? color.new(color.blue, 30) : color.new(color.gray, 100)
+    color c_reg_bg_live = regime_state == "SQUEEZE" ? color.new(color.yellow, 30) : regime_state == "TREND" ? color.new(color.blue, 30) : color.new(color.gray, 100)
+    string m_reg = f_marker_live(panel_show_live and barstate.isrealtime, barstate.isconfirmed)
+    if barstate.isconfirmed or not barstate.isrealtime
+        reg_conf := regime_state
+        reg_bg_conf := c_reg_bg_live
+
+    string reg_disp = panel_show_live ? regime_state : reg_conf
+    color reg_bg_disp = panel_show_live ? c_reg_bg_live : reg_bg_conf
+    reg_disp := f_with_marker(reg_disp, m_reg)
     table.cell(info_panel, 0, 12, "REG", text_size=size.small, text_color=color.silver)
-    table.cell(info_panel, 1, 12, regime_state, text_size=size.small, text_color=color.white, bgcolor=c_reg_bg)
+    table.cell(info_panel, 1, 12, reg_disp, text_size=size.small, text_color=color.white, bgcolor=reg_bg_disp)
     table.merge_cells(info_panel, 1, 12, 2, 12)
 
     // Row 13: RVOL
     if eff_rvol_enabled
         string rv_code = rvol_val < rvol_th_1 ? "L" : rvol_val < rvol_th_2 ? "M" : rvol_val < rvol_th_3 ? "H" : "E"
-        string rvol_txt = str.tostring(rvol_val, "#.##") + "x " + rv_code
-        color c_rv_p = color.new(color.gray, 100)
+        string rvol_txt_live = str.tostring(rvol_val, "#.##") + "x " + rv_code
+        color c_rv_p_live = color.new(color.gray, 100)
         if rvol_state == "3"
-            c_rv_p := color.new(color.red, 30)
+            c_rv_p_live := color.new(color.red, 30)
         else if rvol_state == "2"
-            c_rv_p := color.new(color.orange, 30)
+            c_rv_p_live := color.new(color.orange, 30)
+
+        if rvol_conf == ""
+            rvol_conf := rvol_txt_live
+            rvol_bg_conf := c_rv_p_live
+        if barstate.isconfirmed or not barstate.isrealtime
+            rvol_conf := rvol_txt_live
+            rvol_bg_conf := c_rv_p_live
+
+        string rvol_disp = panel_show_live ? rvol_txt_live : rvol_conf
+        color rvol_bg_disp = panel_show_live ? c_rv_p_live : rvol_bg_conf
+        rvol_disp := f_with_marker(rvol_disp, m_reg)
 
         table.cell(info_panel, 0, 13, "VOL", text_size=size.small, text_color=color.silver)
-        table.cell(info_panel, 1, 13, rvol_txt, text_size=size.small, text_color=color.white, bgcolor=c_rv_p)
+        table.cell(info_panel, 1, 13, rvol_disp, text_size=size.small, text_color=color.white, bgcolor=rvol_bg_disp)
         table.merge_cells(info_panel, 1, 13, 2, 13)
 
     // Row 14: VWAP Z
     if eff_vwap_enabled and eff_vwap_z and not na(z_val)
         float abs_z = math.abs(z_val)
         string z_code = abs_z < z_th_entry ? "N" : abs_z < z_th_tp ? "S" : abs_z < z_th_ext ? "T" : "E"
-        string z_txt = str.tostring(z_val, "#.1") + "σ " + z_code
+        string z_txt_live = str.tostring(z_val, "#.1") + "σ " + z_code
 
-        color c_z_p = color.new(color.gray, 100)
+        color c_z_p_live = color.new(color.gray, 100)
         if str.contains(stretch_state, "EXTREME")
-            c_z_p := color.new(color.red, 30)
+            c_z_p_live := color.new(color.red, 30)
         else if str.contains(stretch_state, "TP")
-            c_z_p := color.new(color.orange, 30)
+            c_z_p_live := color.new(color.orange, 30)
+
+        if z_conf == ""
+            z_conf := z_txt_live
+            z_bg_conf := c_z_p_live
+        if barstate.isconfirmed or not barstate.isrealtime
+            z_conf := z_txt_live
+            z_bg_conf := c_z_p_live
+
+        string z_disp = panel_show_live ? z_txt_live : z_conf
+        color z_bg_disp = panel_show_live ? c_z_p_live : z_bg_conf
+        z_disp := f_with_marker(z_disp, m_reg)
 
         table.cell(info_panel, 0, 14, "VWP", text_size=size.small, text_color=color.silver)
-        table.cell(info_panel, 1, 14, z_txt, text_size=size.small, text_color=color.white, bgcolor=c_z_p)
+        table.cell(info_panel, 1, 14, z_disp, text_size=size.small, text_color=color.white, bgcolor=z_bg_disp)
         table.merge_cells(info_panel, 1, 14, 2, 14)
 
 
@@ -3889,20 +4062,33 @@ if eff_calc_conf
     // --- 6. Visualization (Panel) ---
     // BULL 72 H / NEUT 50 L
     if barstate.islast and eff_show_conf_meter and not na(info_panel)
-        string panel_txt = conf_bias + " " + str.tostring(math.round(conf_score)) + " " + quality
+        string panel_txt_live = conf_bias + " " + str.tostring(math.round(conf_score)) + " " + quality
         if align_flag != ""
-            panel_txt := panel_txt + " " + align_flag
+            panel_txt_live := panel_txt_live + " " + align_flag
 
-        color c_conf = color.new(color.gray, 100) // Default Transp
+        color c_conf_live = color.new(color.gray, 100) // Default Transp
         if conf_state_engine == 1 // Bull
-            c_conf := color.new(color.green, 30)
+            c_conf_live := color.new(color.green, 30)
         else if conf_state_engine == -1 // Bear
-            c_conf := color.new(color.red, 30)
+            c_conf_live := color.new(color.red, 30)
 
         // Neutral remains transparent
+        var string conf_txt_conf = ""
+        var color conf_bg_conf = color.new(color.gray, 100)
+        if conf_txt_conf == ""
+            conf_txt_conf := panel_txt_live
+            conf_bg_conf := c_conf_live
+        if barstate.isconfirmed or not barstate.isrealtime
+            conf_txt_conf := panel_txt_live
+            conf_bg_conf := c_conf_live
+
+        string conf_txt_disp = panel_show_live ? panel_txt_live : conf_txt_conf
+        color conf_bg_disp = panel_show_live ? c_conf_live : conf_bg_conf
+        string m_conf = f_marker_live(panel_show_live and barstate.isrealtime, barstate.isconfirmed)
+        conf_txt_disp := f_with_marker(conf_txt_disp, m_conf)
 
         table.cell(info_panel, 0, 11, "CONF", text_size=size.small, text_color=color.silver)
-        table.cell(info_panel, 1, 11, panel_txt, text_size=size.small, text_color=color.white, bgcolor=c_conf)
+        table.cell(info_panel, 1, 11, conf_txt_disp, text_size=size.small, text_color=color.white, bgcolor=conf_bg_disp)
         table.merge_cells(info_panel, 1, 11, 2, 11)
 
 // --- CENTRALIZED BACKGROUND ROUTING (Fix Bug #2) ---
