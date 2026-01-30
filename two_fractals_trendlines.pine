@@ -434,7 +434,7 @@ fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, i
 
 // divergence signal inputs
 grp_div             = 'Divergences'
-plot_div            = input.bool(true, title='Divergence Signal Arrow', group=grp_div, tooltip='These divergences are very early signals and must be used in confluence with other signals. Hidden and classic divergence are used')
+plot_div            = input.bool(true, title='Divergences', group=grp_div, tooltip='These divergences are very early signals and must be used in confluence with other signals. Hidden and classic divergence are used')
 div_indi            = input.string('rsi', title='Divergence Indicator', options=['rsi', 'macd(fast_line)', 'macd(slow_line)'], tooltip='Select an Indicator for divergence calculation.', group=grp_div)
 rsi_length          = input.int(14, title='RSI Length', inline="rsi_p", minval=1, step=2, group=grp_div)
 bar_div_p           = input.int(25, title='⠀⠀⠀⠀Bar Period', inline="rsi_p", minval=1, step=1, tooltip='RSI Length. n\The number of bars in which divergences are detected.', group=grp_div)
