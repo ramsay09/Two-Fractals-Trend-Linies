@@ -1896,6 +1896,15 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
     fvg_c_conf := ctf_conf ? fvg_state_inf : fvg_c_conf
     fr_c_conf := ctf_conf ? fr_state_inf : fr_c_conf
 
+    string m_5m = f_marker(panel_show_live, conf_5m)
+    string m_15m = f_marker(panel_show_live, conf_15m)
+    string m_1h = f_marker(panel_show_live, conf_1h)
+    string m_4h = f_marker(panel_show_live, conf_4h)
+    string m_d = f_marker(panel_show_live, conf_d)
+    string m_w = f_marker(panel_show_live, conf_w)
+    string m_m = f_marker(panel_show_live, conf_m)
+    string m_c = f_marker(panel_show_live and barstate.isrealtime, ctf_conf)
+
     int fvg_disp_5m = panel_show_live ? fvg_5m : fvg_5m_conf
     int fr_disp_5m = panel_show_live ? fr_5m : fr_5m_conf
     int fvg_disp_15m = panel_show_live ? fvg_15m : fvg_15m_conf
@@ -1960,38 +1969,38 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
 
     // 1M (Row 1)
     table.cell(table_id=info_panel, column=0, row=1, text="1M", text_size= size.small, text_color=color.silver, bgcolor=is_1m ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=1, text="", bgcolor=(Intra_D_W_M) ? fvg_color_m : na)
-    table.cell(table_id=info_panel, column=2, row=1, text="", bgcolor=(Intra_D_W_M) ? fr_color_m : na)
+    table.cell(table_id=info_panel, column=1, row=1, text=m_m, text_size=size.small, text_color=MARKER_COLOR, bgcolor=(Intra_D_W_M) ? fvg_color_m : na, width=2)
+    table.cell(table_id=info_panel, column=2, row=1, text=m_m, text_size=size.small, text_color=MARKER_COLOR, bgcolor=(Intra_D_W_M) ? fr_color_m : na, width=2)
 
     // 1W (Row 2)
     table.cell(table_id=info_panel, column=0, row=2, text="1W", text_size= size.small, text_color=color.silver, bgcolor=is_1w ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=2, text="", bgcolor=(Intra_D_W) ? fvg_color_w : na)
-    table.cell(table_id=info_panel, column=2, row=2, text="", bgcolor=(Intra_D_W) ? fr_color_w : na)
+    table.cell(table_id=info_panel, column=1, row=2, text=m_w, text_size=size.small, text_color=MARKER_COLOR, bgcolor=(Intra_D_W) ? fvg_color_w : na, width=2)
+    table.cell(table_id=info_panel, column=2, row=2, text=m_w, text_size=size.small, text_color=MARKER_COLOR, bgcolor=(Intra_D_W) ? fr_color_w : na, width=2)
 
     // 1D (Row 3)
     table.cell(table_id=info_panel, column=0, row=3, text="1D", text_size= size.small, text_color=color.silver, bgcolor=is_1d ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=3, text="", bgcolor=(Intra_D) ? fvg_color_d : na)
-    table.cell(table_id=info_panel, column=2, row=3, text="", bgcolor=(Intra_D) ? fr_color_d : na)
+    table.cell(table_id=info_panel, column=1, row=3, text=m_d, text_size=size.small, text_color=MARKER_COLOR, bgcolor=(Intra_D) ? fvg_color_d : na, width=2)
+    table.cell(table_id=info_panel, column=2, row=3, text=m_d, text_size=size.small, text_color=MARKER_COLOR, bgcolor=(Intra_D) ? fr_color_d : na, width=2)
 
     // 4H (Row 4)
     table.cell(table_id=info_panel, column=0, row=4, text="4H", text_size= size.small, text_color=color.silver, bgcolor=is_4h ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=4, text="", bgcolor=Intra ? fvg_color_4h : na)
-    table.cell(table_id=info_panel, column=2, row=4, text="", bgcolor=Intra ? fr_color_4h : na)
+    table.cell(table_id=info_panel, column=1, row=4, text=m_4h, text_size=size.small, text_color=MARKER_COLOR, bgcolor=Intra ? fvg_color_4h : na, width=2)
+    table.cell(table_id=info_panel, column=2, row=4, text=m_4h, text_size=size.small, text_color=MARKER_COLOR, bgcolor=Intra ? fr_color_4h : na, width=2)
 
     // 1H (Row 5)
     table.cell(table_id=info_panel, column=0, row=5, text="1H", text_size= size.small, text_color=color.silver, bgcolor=is_1h ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=5, text="", bgcolor=Intra ? fvg_color_1h : na)
-    table.cell(table_id=info_panel, column=2, row=5, text="", bgcolor=Intra ? fr_color_1h : na)
+    table.cell(table_id=info_panel, column=1, row=5, text=m_1h, text_size=size.small, text_color=MARKER_COLOR, bgcolor=Intra ? fvg_color_1h : na, width=2)
+    table.cell(table_id=info_panel, column=2, row=5, text=m_1h, text_size=size.small, text_color=MARKER_COLOR, bgcolor=Intra ? fr_color_1h : na, width=2)
 
     // 15m (Row 6)
     table.cell(table_id=info_panel, column=0, row=6, text="15m", text_size= size.small, text_color=color.silver, bgcolor=is_15m ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=6, text="", bgcolor=Intra ? fvg_color_15m : na)
-    table.cell(table_id=info_panel, column=2, row=6, text="", bgcolor=Intra ? fr_color_15m : na)
+    table.cell(table_id=info_panel, column=1, row=6, text=m_15m, text_size=size.small, text_color=MARKER_COLOR, bgcolor=Intra ? fvg_color_15m : na, width=2)
+    table.cell(table_id=info_panel, column=2, row=6, text=m_15m, text_size=size.small, text_color=MARKER_COLOR, bgcolor=Intra ? fr_color_15m : na, width=2)
 
     // 5m (Row 7)
     table.cell(table_id=info_panel, column=0, row=7, text="5m", text_size= size.small, text_color=color.silver, bgcolor=is_5m ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=7, text="", bgcolor=Intra ? fvg_color_5m : na)
-    table.cell(table_id=info_panel, column=2, row=7, text="", bgcolor=Intra ? fr_color_5m : na)
+    table.cell(table_id=info_panel, column=1, row=7, text=m_5m, text_size=size.small, text_color=MARKER_COLOR, bgcolor=Intra ? fvg_color_5m : na, width=2)
+    table.cell(table_id=info_panel, column=2, row=7, text=m_5m, text_size=size.small, text_color=MARKER_COLOR, bgcolor=Intra ? fr_color_5m : na, width=2)
 
     // ATR14 (Row 8)
     table.cell(table_id=info_panel, column=0, row=8, text="ATR14 " + str.tostring(atr14_val, "#.#####"), text_size= size.small, text_color=color.silver)
@@ -2003,8 +2012,8 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
 
     // HEADER (Row 10: Current)
     table.cell(table_id=info_panel, column=0, row=10, text="C", text_size= size.small, text_color=color.silver, bgcolor=is_custom_tf ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=10, text="", bgcolor=(Intra_D_W_M) ? fvg_color_c : na)
-    table.cell(table_id=info_panel, column=2, row=10, text="", bgcolor=(Intra_D_W_M) ? fr_color_c : na)
+    table.cell(table_id=info_panel, column=1, row=10, text=m_c, text_size=size.small, text_color=MARKER_COLOR, bgcolor=(Intra_D_W_M) ? fvg_color_c : na, width=2)
+    table.cell(table_id=info_panel, column=2, row=10, text=m_c, text_size=size.small, text_color=MARKER_COLOR, bgcolor=(Intra_D_W_M) ? fr_color_c : na, width=2)
 else
     if not na(info_panel)
         table.delete(info_panel)
