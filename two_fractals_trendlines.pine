@@ -731,18 +731,18 @@ f_label_get_or_create(_lb, _x, _y, _txt, _col) =>
 
 // 1. Data Fetching (O(1))
 float d_h = na, float d_l = na, float d_c = na, int d_start = na, int d_end = na
-float w_o = na, int w_start = na
-float m_o = na, int m_start = na
+float w_o = na, int w_start = na, int w_end = na
+float m_o = na, int m_start = na, int m_end = na
 
 if eff_key_levels_enabled
     [t_dh, t_dl, t_dc, t_ds, t_de] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1], time[1], time], lookahead=barmerge.lookahead_off)
     d_h := t_dh, d_l := t_dl, d_c := t_dc, d_start := t_ds, d_end := t_de
 
-    [t_wo, t_ws] = request.security(syminfo.tickerid, "W", [open, time], lookahead=barmerge.lookahead_on)
-    w_o := t_wo, w_start := t_ws
+    [t_wo, t_ws, t_we] = request.security(syminfo.tickerid, "W", [open, time, time_close], lookahead=barmerge.lookahead_on)
+    w_o := t_wo, w_start := t_ws, w_end := t_we
 
-    [t_mo, t_ms] = request.security(syminfo.tickerid, "M", [open, time], lookahead=barmerge.lookahead_on)
-    m_o := t_mo, m_start := t_ms
+    [t_mo, t_ms, t_me] = request.security(syminfo.tickerid, "M", [open, time, time_close], lookahead=barmerge.lookahead_on)
+    m_o := t_mo, m_start := t_ms, m_end := t_me
 
     active_sec_calls += 3
 
@@ -774,33 +774,6 @@ f_draw_kl(_l, _lb, _idx, _val, _txt, _col, _en, _style, _ext) =>
         // Line
         if key_style != "Labels"
             ret_l := f_line_get_or_create(ret_l, _idx, _val, bar_index, _val, _col, _style)
-            line.set_extend(ret_l, _ext ? extend.right : extend.none)
-        else
-            line.delete(ret_l)
-            ret_l := na
-
-        // Label
-        if key_style != "Lines"
-            ret_lb := f_label_get_or_create(ret_lb, bar_index + 5, _val, _txt, _col)
-        else
-            label.delete(ret_lb)
-            ret_lb := na
-    else
-        line.delete(ret_l)
-        label.delete(ret_lb)
-        ret_l := na
-        ret_lb := na
-
-    [ret_l, ret_lb]
-
-f_draw_kl_time(_l, _lb, _t_start, _val, _txt, _col, _en, _style, _ext) =>
-    line ret_l = _l
-    label ret_lb = _lb
-
-    if _en and not na(_val) and not na(_t_start)
-        // Line
-        if key_style != "Labels"
-            ret_l := f_line_get_or_create(ret_l, _t_start, _val, time, _val, _col, _style, xloc.bar_time)
             line.set_extend(ret_l, _ext ? extend.right : extend.none)
         else
             line.delete(ret_l)
@@ -871,14 +844,32 @@ if eff_key_levels_enabled and barstate.islast and bar_index > 100
         idx_pdc := not na(scan_last_idx) ? scan_last_idx : fb_final
         last_d_start := d_start
 
-    // WOpen Anchor (bar_time)
+    // WOpen Scan
     if w_start != last_w_start
-        idx_wo := w_start
+        idx_wo := na
+        if scan_limit >= 1 and not na(w_end)
+            for i = 0 to scan_limit
+                int t = time[i]
+                if t < w_start
+                    break
+                if t >= w_start and t < w_end
+                    idx_wo := bar_index - i
+        if na(idx_wo)
+            idx_wo := bar_index - scan_limit
         last_w_start := w_start
 
-    // MOpen Anchor (bar_time)
+    // MOpen Scan
     if m_start != last_m_start
-        idx_mo := m_start
+        idx_mo := na
+        if scan_limit >= 1 and not na(m_end)
+            for i = 0 to scan_limit
+                int t = time[i]
+                if t < m_start
+                    break
+                if t >= m_start and t < m_end
+                    idx_mo := bar_index - i
+        if na(idx_mo)
+            idx_mo := bar_index - scan_limit
         last_m_start := m_start
 
     // Drawing
@@ -892,10 +883,10 @@ if eff_key_levels_enabled and barstate.islast and bar_index > 100
     [t_l_pdc, t_lb_pdc] = f_draw_kl(l_pdc, lb_pdc, idx_pdc, d_c, "PDC", color.new(color.gray, 30), eff_show_pdc, line.style_dotted, key_extend)
     l_pdc := t_l_pdc, lb_pdc := t_lb_pdc
 
-    [t_l_wo, t_lb_wo] = f_draw_kl_time(l_wo, lb_wo, idx_wo, w_o, "W.Open", color.new(color.orange, 0), eff_show_wopen, line.style_dashed, key_extend)
+    [t_l_wo, t_lb_wo] = f_draw_kl(l_wo, lb_wo, idx_wo, w_o, "W.Open", color.new(color.orange, 0), eff_show_wopen, line.style_dashed, key_extend)
     l_wo := t_l_wo, lb_wo := t_lb_wo
 
-    [t_l_mo, t_lb_mo] = f_draw_kl_time(l_mo, lb_mo, idx_mo, m_o, "M.Open", color.new(color.white, 0), eff_show_mopen, line.style_dashed, key_extend)
+    [t_l_mo, t_lb_mo] = f_draw_kl(l_mo, lb_mo, idx_mo, m_o, "M.Open", color.new(color.white, 0), eff_show_mopen, line.style_dashed, key_extend)
     l_mo := t_l_mo, lb_mo := t_lb_mo
 
 else
