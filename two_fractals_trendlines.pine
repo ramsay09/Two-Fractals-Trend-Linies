@@ -850,7 +850,8 @@ if eff_key_levels_enabled and barstate.islast and bar_index > 100
         for i = 0 to scan_limit
             if time[i] < w_start
                 break
-            if time[i] == w_start
+            bool is_period_start = time[i] >= w_start and (i == scan_limit or time[i + 1] < w_start)
+            if is_period_start
                 idx_wo := bar_index - i
                 break
         if na(idx_wo)
@@ -863,7 +864,8 @@ if eff_key_levels_enabled and barstate.islast and bar_index > 100
         for i = 0 to scan_limit
             if time[i] < m_start
                 break
-            if time[i] == m_start
+            bool is_period_start = time[i] >= m_start and (i == scan_limit or time[i + 1] < m_start)
+            if is_period_start
                 idx_mo := bar_index - i
                 break
         if na(idx_mo)
