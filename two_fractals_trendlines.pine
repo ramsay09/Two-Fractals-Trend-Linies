@@ -58,13 +58,6 @@ conf_z_penalty_mode   = input.string("Default", "⠀Stretch Penalty", inline="co
 show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)")
 regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
 
-show_adr_panel      = input.bool(true, "Show ADR% in Panel", inline="REGIME_UI", tooltip="ADR% (ADR20) shows how much of today’s typical daily range has already been used.
-                      \n\nADR20 = average daily range (High–Low) over the last 20 days\nToday Range = today’s (developing) High–Low
-                      \nADR% = 100 × (Today Range / ADR20)
-                      \n\nLow ADR% → more “room” left for movement today
-                      \nHigh ADR% (e.g., 85–110%+) → price is extended; breakouts are more likely late/mature
-                      \n\nNote: ADR% is a context filter (expectation), not a directional signal.")
-
 // --- STAGE 2: CONFIGURATION & AUTO-SCALING ---
 
 // 1. Timeframe Classification
@@ -3398,20 +3391,19 @@ float d_range = na
 float adr = na
 float adr_pct = na
 
-if eff_use_adr_gate or show_adr_panel
-    // 1. Daily Range (Developing) - Uses lookahead to capture current developing range on intraday
-    d_range := request.security(syminfo.tickerid, "D", high - low, lookahead=barmerge.lookahead_on)
+// 1. Daily Range (Developing) - Uses lookahead to capture current developing range on intraday
+d_range := request.security(syminfo.tickerid, "D", high - low, lookahead=barmerge.lookahead_on)
 
-    // 2. ADR (Historical/Stable)
-    adr := request.security(syminfo.tickerid, "D", ta.sma(high - low, eff_adr_len))
-    active_sec_calls += 2
+// 2. ADR (Historical/Stable)
+adr := request.security(syminfo.tickerid, "D", ta.sma(high - low, eff_adr_len))
+active_sec_calls += 2
 
-    // 3. ADR %
-    if not na(d_range) and not na(adr) and adr > 0
-        adr_pct := (d_range / adr) * 100
+// 3. ADR %
+if not na(d_range) and not na(adr) and adr > 0
+    adr_pct := (d_range / adr) * 100
 
 // Optional Debug Info
-plot(show_adr_panel ? adr_pct : na, title="ADR %", color=color.new(color.white, 100), display=display.data_window + display.status_line)
+plot(adr_pct, title="ADR %", color=color.new(color.white, 100), display=display.data_window + display.status_line)
 
 // ADR Label removed as per design requirements (Panel only)
 var label lbl_adr = na
