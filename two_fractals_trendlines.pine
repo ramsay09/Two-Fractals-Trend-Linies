@@ -63,8 +63,8 @@ regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", op
 string M_FORM = "○"
 string M_CONF = "●"
 color MARKER_COLOR = color.new(color.white, 50)
-marker_size_grid = size.large
-marker_size_inline = size.tiny
+marker_size_grid = size.normal
+marker_size_inline = size.small
 
 f_marker(bool show_live, bool is_confirmed) =>
     show_live and not is_confirmed ? M_FORM : M_CONF
@@ -1942,7 +1942,7 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
 
     // HEADER NAMES (Row 0)
     table.cell(table_id=info_panel, column=0, row=0, text="TF", text_size= size.small, text_color=color.silver)
-    table.cell(table_id=info_panel, column=1, row=0, text= "FVG", text_size= size.small, text_color=color.silver)
+    table.cell(table_id=info_panel, column=1, row=0, text= "FVG⠀", text_size= size.small, text_color=color.silver)
     table.cell(table_id=info_panel, column=2, row=0, text= "FR", text_size= size.small, text_color=color.silver)
 
     // 1M (Row 1)
