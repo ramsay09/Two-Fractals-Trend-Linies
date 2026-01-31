@@ -3170,6 +3170,7 @@ f_vp_ensure_boxes(int count) =>
 f_run_vp() =>
     var int full_min_k = na
     var int full_max_k = na
+    int vp_render_rows_dbg_local = na
     // --- Full TF incremental build (ONLY on confirmed bars to avoid double counting) ---
     if eff_vp_enable and vp_is_full and barstate.isconfirmed
         float band_f = syminfo.mintick * vp_full_band_ticks
@@ -3195,7 +3196,7 @@ f_run_vp() =>
         int vp_rows_eff = vp_rows
         int vp_render_rows = vp_is_bars ? math.max(vp_rows, math.min(VP_BOX_BUDGET, vp_rows * 2)) : vp_rows_eff
         if dbg_ops
-            vp_render_rows_dbg := vp_render_rows
+            vp_render_rows_dbg_local := vp_render_rows
         if na(vp_prev_enabled)
             vp_prev_enabled := eff_vp_enable
         bool vp_turning_off = vp_prev_enabled and not eff_vp_enable
@@ -3515,8 +3516,9 @@ f_run_vp() =>
             last_full_bar := bar_index
         vp_dirty := false
         vp_prev_enabled := eff_vp_enable
+    vp_render_rows_dbg_local
 
-f_run_vp()
+vp_render_rows_dbg := f_run_vp()
 
 
 // --- Stage 2: ADR/Today Range Calculation ---
