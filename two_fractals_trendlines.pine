@@ -1021,13 +1021,14 @@ f_run_ps_sr() =>
     float s_pl_val = na
     int s_pl_time = na
 
+    bool did_sec_call = false
     if ON_PS
         [t_ph, t_pht, t_pl, t_plt] = request.security(syminfo.tickerid, ps_tf_final, f_get_mtf_pivots(high, low, ps_left, ps_right))
         s_ph_val := t_ph
         s_ph_time := t_pht
         s_pl_val := t_pl
         s_pl_time := t_plt
-        active_sec_calls += 1
+        did_sec_call := true
 
     // --- 2. State Management (Arrays) ---
     var sr_levels = array.new<SRLevel>()
@@ -1172,8 +1173,9 @@ f_run_ps_sr() =>
                 line.delete(lvl.id_line)
                 box.delete(lvl.id_box)
             array.clear(sr_levels)
+    did_sec_call
 
-f_run_ps_sr()
+active_sec_calls += f_run_ps_sr() ? 1 : 0
 
 
 //---------------------------------------------------- macd and rsi divergences (Visuals for Chart) -------------------------------------------------------------
