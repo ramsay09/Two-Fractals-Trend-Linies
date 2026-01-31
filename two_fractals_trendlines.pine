@@ -3116,7 +3116,6 @@ var string last_vp_style = na
 var int last_vp_line_count = na
 var int last_vp_box_count = na
 var bool vp_dirty = true
-var bool vp_prev_enabled = na
 
 // Helper: safe map add
 f_vp_map_add(int k, float addv) =>
@@ -3170,6 +3169,7 @@ f_vp_ensure_boxes(int count) =>
 f_run_vp() =>
     var int full_min_k = na
     var int full_max_k = na
+    var bool vp_prev_enabled = na
     int vp_render_rows_dbg_local = na
     // --- Full TF incremental build (ONLY on confirmed bars to avoid double counting) ---
     if eff_vp_enable and vp_is_full and barstate.isconfirmed
