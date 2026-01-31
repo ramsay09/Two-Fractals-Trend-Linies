@@ -1007,170 +1007,173 @@ f_calc_auto_tf() =>
          timeframe.ismonthly ? (timeframe.multiplier <= 3 ? "12M" : "12M") :
          "12M"
 
-// Determine Effective TF
-ps_tf_final = eff_ps_mode == "Auto" ? f_calc_auto_tf() : ps_tf
-
-// Security call to get the data from the selected timeframe
-float s_ph_val = na
-int s_ph_time = na
-float s_pl_val = na
-int s_pl_time = na
-
-if ON_PS
-    [t_ph, t_pht, t_pl, t_plt] = request.security(syminfo.tickerid, ps_tf_final, f_get_mtf_pivots(high, low, ps_left, ps_right))
-    s_ph_val := t_ph
-    s_ph_time := t_pht
-    s_pl_val := t_pl
-    s_pl_time := t_plt
-    active_sec_calls += 1
-
-// --- 2. State Management (Arrays) ---
-var sr_levels = array.new<SRLevel>()
-var int last_ph_t = 0
-var int last_pl_t = 0
-
 // Helper to check proximity for Merging
 f_is_near(_p1, _p2, _pct) =>
     math.abs(_p1 - _p2) <= (_p1 * (_pct / 100))
 
-// Main Logic Loop (Runs on every bar, but updates state only on new pivots or close)
-if ON_PS
-    // A. Ingest New High Pivot
-    if not na(s_ph_val) and s_ph_time != last_ph_t
-        last_ph_t := s_ph_time
-        // Check for merge candidate (Iterate backwards to find newest nearby)
-        bool merged = false
-        if ps_merge_en and array.size(sr_levels) > 0
+f_run_ps_sr() =>
+    // Determine Effective TF
+    ps_tf_final = eff_ps_mode == "Auto" ? f_calc_auto_tf() : ps_tf
+
+    // Security call to get the data from the selected timeframe
+    float s_ph_val = na
+    int s_ph_time = na
+    float s_pl_val = na
+    int s_pl_time = na
+
+    if ON_PS
+        [t_ph, t_pht, t_pl, t_plt] = request.security(syminfo.tickerid, ps_tf_final, f_get_mtf_pivots(high, low, ps_left, ps_right))
+        s_ph_val := t_ph
+        s_ph_time := t_pht
+        s_pl_val := t_pl
+        s_pl_time := t_plt
+        active_sec_calls += 1
+
+    // --- 2. State Management (Arrays) ---
+    var sr_levels = array.new<SRLevel>()
+    var int last_ph_t = 0
+    var int last_pl_t = 0
+
+    // Main Logic Loop (Runs on every bar, but updates state only on new pivots or close)
+    if ON_PS
+        // A. Ingest New High Pivot
+        if not na(s_ph_val) and s_ph_time != last_ph_t
+            last_ph_t := s_ph_time
+            // Check for merge candidate (Iterate backwards to find newest nearby)
+            bool merged = false
+            if ps_merge_en and array.size(sr_levels) > 0
+                for i = array.size(sr_levels) - 1 to 0
+                    SRLevel lvl = array.get(sr_levels, i)
+                    // Only merge with same type (Resistance) and active lines
+                    if lvl.is_res and not lvl.is_broken and f_is_near(lvl.price, s_ph_val, ps_merge_pct)
+                        // CONVERT TO ZONE
+                        if not lvl.is_zone
+                            // Create Box
+                            float top = math.max(lvl.price, s_ph_val)
+                            float bot = math.min(lvl.price, s_ph_val)
+                            lvl.id_box := box.new(lvl.start_time, top, time, bot, xloc=xloc.bar_time, border_color=na, bgcolor=ps_col_zone)
+                            lvl.is_zone := true
+                            // Delete the old line
+                            line.delete(lvl.id_line)
+                        else
+                            // Extend Zone Price Range
+                            float cur_top = box.get_top(lvl.id_box)
+                            float cur_bot = box.get_bottom(lvl.id_box)
+                            box.set_top(lvl.id_box, math.max(cur_top, s_ph_val))
+                            box.set_bottom(lvl.id_box, math.min(cur_bot, s_ph_val))
+
+                        array.set(sr_levels, i, lvl)
+                        merged := true
+                        break
+
+            if not merged
+                // Add New Resistance Line
+                line new_l = line.new(s_ph_time, s_ph_val, time, s_ph_val, xloc=xloc.bar_time, color=ps_col_res, style=line.style_solid, width=1)
+                SRLevel new_lvl = SRLevel.new(s_ph_val, true, false, s_ph_time, new_l, na, false)
+                array.push(sr_levels, new_lvl)
+
+        // B. Ingest New Low Pivot
+        if not na(s_pl_val) and s_pl_time != last_pl_t
+            last_pl_t := s_pl_time
+            // Check for merge candidate
+            bool merged = false
+            if ps_merge_en and array.size(sr_levels) > 0
+                for i = array.size(sr_levels) - 1 to 0
+                    SRLevel lvl = array.get(sr_levels, i)
+                    if not lvl.is_res and not lvl.is_broken and f_is_near(lvl.price, s_pl_val, ps_merge_pct)
+                        // CONVERT TO ZONE
+                        if not lvl.is_zone
+                            float top = math.max(lvl.price, s_pl_val)
+                            float bot = math.min(lvl.price, s_pl_val)
+                            lvl.id_box := box.new(lvl.start_time, top, time, bot, xloc=xloc.bar_time, border_color=na, bgcolor=ps_col_zone)
+                            lvl.is_zone := true
+                            line.delete(lvl.id_line)
+                        else
+                            float cur_top = box.get_top(lvl.id_box)
+                            float cur_bot = box.get_bottom(lvl.id_box)
+                            box.set_top(lvl.id_box, math.max(cur_top, s_pl_val))
+                            box.set_bottom(lvl.id_box, math.min(cur_bot, s_pl_val))
+
+                        array.set(sr_levels, i, lvl)
+                        merged := true
+                        break
+
+            if not merged
+                line new_l = line.new(s_pl_time, s_pl_val, time, s_pl_val, xloc=xloc.bar_time, color=ps_col_sup, style=line.style_solid, width=1)
+                SRLevel new_lvl = SRLevel.new(s_pl_val, false, false, s_pl_time, new_l, na, false)
+                array.push(sr_levels, new_lvl)
+
+        // C. Pruning (FIFO)
+        while array.size(sr_levels) > ps_max
+            // Remove oldest (Index 0)
+            SRLevel old = array.shift(sr_levels)
+            line.delete(old.id_line)
+            box.delete(old.id_box)
+
+        // D. Update & Break Handling (Loop all active levels)
+        // We loop backwards to allow safe removal if "Delete" action is selected
+        if array.size(sr_levels) > 0
             for i = array.size(sr_levels) - 1 to 0
                 SRLevel lvl = array.get(sr_levels, i)
-                // Only merge with same type (Resistance) and active lines
-                if lvl.is_res and not lvl.is_broken and f_is_near(lvl.price, s_ph_val, ps_merge_pct)
-                    // CONVERT TO ZONE
-                    if not lvl.is_zone
-                        // Create Box
-                        float top = math.max(lvl.price, s_ph_val)
-                        float bot = math.min(lvl.price, s_ph_val)
-                        lvl.id_box := box.new(lvl.start_time, top, time, bot, xloc=xloc.bar_time, border_color=na, bgcolor=ps_col_zone)
-                        lvl.is_zone := true
-                        // Delete the old line
+
+                // 1. Check Break
+                // Use current close to detect break.
+                // Resistance Broken: Close > Price
+                // Support Broken: Close < Price
+                // For Zones: Check against Top/Bottom
+                bool broken_now = false
+
+                if not lvl.is_broken
+                    // Stage 6: Getter Caching (Micro-Opt)
+                    // Cache top/bottom to avoid double calling get_top/get_bottom in expressions
+                    float zone_top = na
+                    float zone_bot = na
+                    if lvl.is_zone
+                        zone_top := box.get_top(lvl.id_box)
+                        zone_bot := box.get_bottom(lvl.id_box)
+
+                    float check_price = lvl.is_zone ? (lvl.is_res ? zone_top : zone_bot) : lvl.price
+
+                    if lvl.is_res and close > check_price
+                        broken_now := true
+                    else if not lvl.is_res and close < check_price
+                        broken_now := true
+
+                if broken_now
+                    lvl.is_broken := true
+                    if ps_break_act == "Delete"
                         line.delete(lvl.id_line)
+                        box.delete(lvl.id_box)
+                        array.remove(sr_levels, i)
+                        continue // Skip to next iteration
+
+                    if ps_break_act == "Role Reversal"
+                        // Reset broken status for the new role
+                        lvl.is_broken := false
+                        // Flip Type
+                        lvl.is_res := not lvl.is_res
+                        // Update Color
+                        color new_c = lvl.is_res ? ps_col_res : ps_col_sup
+                        if not lvl.is_zone
+                            line.set_color(lvl.id_line, new_c)
+                            line.set_style(lvl.id_line, line.style_dashed)
+
+                // 2. Extend visual to current time (Stage 6: Micro-Opt)
+                if barstate.islast
+                    if not lvl.is_zone
+                        line.set_x2(lvl.id_line, time)
                     else
-                        // Extend Zone Price Range
-                        float cur_top = box.get_top(lvl.id_box)
-                        float cur_bot = box.get_bottom(lvl.id_box)
-                        box.set_top(lvl.id_box, math.max(cur_top, s_ph_val))
-                        box.set_bottom(lvl.id_box, math.min(cur_bot, s_ph_val))
-
-                    array.set(sr_levels, i, lvl)
-                    merged := true
-                    break
-
-        if not merged
-            // Add New Resistance Line
-            line new_l = line.new(s_ph_time, s_ph_val, time, s_ph_val, xloc=xloc.bar_time, color=ps_col_res, style=line.style_solid, width=1)
-            SRLevel new_lvl = SRLevel.new(s_ph_val, true, false, s_ph_time, new_l, na, false)
-            array.push(sr_levels, new_lvl)
-
-    // B. Ingest New Low Pivot
-    if not na(s_pl_val) and s_pl_time != last_pl_t
-        last_pl_t := s_pl_time
-        // Check for merge candidate
-        bool merged = false
-        if ps_merge_en and array.size(sr_levels) > 0
-            for i = array.size(sr_levels) - 1 to 0
+                        box.set_right(lvl.id_box, time)
+    else
+        // Cleanup when disabled
+        if array.size(sr_levels) > 0
+            for i = 0 to array.size(sr_levels) - 1
                 SRLevel lvl = array.get(sr_levels, i)
-                if not lvl.is_res and not lvl.is_broken and f_is_near(lvl.price, s_pl_val, ps_merge_pct)
-                    // CONVERT TO ZONE
-                    if not lvl.is_zone
-                        float top = math.max(lvl.price, s_pl_val)
-                        float bot = math.min(lvl.price, s_pl_val)
-                        lvl.id_box := box.new(lvl.start_time, top, time, bot, xloc=xloc.bar_time, border_color=na, bgcolor=ps_col_zone)
-                        lvl.is_zone := true
-                        line.delete(lvl.id_line)
-                    else
-                        float cur_top = box.get_top(lvl.id_box)
-                        float cur_bot = box.get_bottom(lvl.id_box)
-                        box.set_top(lvl.id_box, math.max(cur_top, s_pl_val))
-                        box.set_bottom(lvl.id_box, math.min(cur_bot, s_pl_val))
+                line.delete(lvl.id_line)
+                box.delete(lvl.id_box)
+            array.clear(sr_levels)
 
-                    array.set(sr_levels, i, lvl)
-                    merged := true
-                    break
-
-        if not merged
-            line new_l = line.new(s_pl_time, s_pl_val, time, s_pl_val, xloc=xloc.bar_time, color=ps_col_sup, style=line.style_solid, width=1)
-            SRLevel new_lvl = SRLevel.new(s_pl_val, false, false, s_pl_time, new_l, na, false)
-            array.push(sr_levels, new_lvl)
-
-    // C. Pruning (FIFO)
-    while array.size(sr_levels) > ps_max
-        // Remove oldest (Index 0)
-        SRLevel old = array.shift(sr_levels)
-        line.delete(old.id_line)
-        box.delete(old.id_box)
-
-    // D. Update & Break Handling (Loop all active levels)
-    // We loop backwards to allow safe removal if "Delete" action is selected
-    if array.size(sr_levels) > 0
-        for i = array.size(sr_levels) - 1 to 0
-            SRLevel lvl = array.get(sr_levels, i)
-
-            // 1. Check Break
-            // Use current close to detect break.
-            // Resistance Broken: Close > Price
-            // Support Broken: Close < Price
-            // For Zones: Check against Top/Bottom
-            bool broken_now = false
-
-            if not lvl.is_broken
-                // Stage 6: Getter Caching (Micro-Opt)
-                // Cache top/bottom to avoid double calling get_top/get_bottom in expressions
-                float zone_top = na
-                float zone_bot = na
-                if lvl.is_zone
-                    zone_top := box.get_top(lvl.id_box)
-                    zone_bot := box.get_bottom(lvl.id_box)
-
-                float check_price = lvl.is_zone ? (lvl.is_res ? zone_top : zone_bot) : lvl.price
-
-                if lvl.is_res and close > check_price
-                    broken_now := true
-                else if not lvl.is_res and close < check_price
-                    broken_now := true
-
-            if broken_now
-                lvl.is_broken := true
-                if ps_break_act == "Delete"
-                    line.delete(lvl.id_line)
-                    box.delete(lvl.id_box)
-                    array.remove(sr_levels, i)
-                    continue // Skip to next iteration
-
-                if ps_break_act == "Role Reversal"
-                    // Reset broken status for the new role
-                    lvl.is_broken := false
-                    // Flip Type
-                    lvl.is_res := not lvl.is_res
-                    // Update Color
-                    color new_c = lvl.is_res ? ps_col_res : ps_col_sup
-                    if not lvl.is_zone
-                        line.set_color(lvl.id_line, new_c)
-                        line.set_style(lvl.id_line, line.style_dashed)
-
-            // 2. Extend visual to current time (Stage 6: Micro-Opt)
-            if barstate.islast
-                if not lvl.is_zone
-                    line.set_x2(lvl.id_line, time)
-                else
-                    box.set_right(lvl.id_box, time)
-else
-    // Cleanup when disabled
-    if array.size(sr_levels) > 0
-        for i = 0 to array.size(sr_levels) - 1
-            SRLevel lvl = array.get(sr_levels, i)
-            line.delete(lvl.id_line)
-            box.delete(lvl.id_box)
-        array.clear(sr_levels)
+f_run_ps_sr()
 
 
 //---------------------------------------------------- macd and rsi divergences (Visuals for Chart) -------------------------------------------------------------
@@ -3164,351 +3167,354 @@ f_vp_ensure_boxes(int count) =>
     while array.size(vp_boxes) > count
         box.delete(array.pop(vp_boxes))
 
-// --- Full TF incremental build (ONLY on confirmed bars to avoid double counting) ---
-if eff_vp_enable and vp_is_full and barstate.isconfirmed
-    float band_f = syminfo.mintick * vp_full_band_ticks
-    float v3 = volume / 3.0
+f_run_vp() =>
+    // --- Full TF incremental build (ONLY on confirmed bars to avoid double counting) ---
+    if eff_vp_enable and vp_is_full and barstate.isconfirmed
+        float band_f = syminfo.mintick * vp_full_band_ticks
+        float v3 = volume / 3.0
 
-    int k_low  = int(math.floor(low  / band_f))
-    int k_mid  = int(math.floor(hlc3 / band_f))
-    int k_high = int(math.floor(high / band_f))
+        int k_low  = int(math.floor(low  / band_f))
+        int k_mid  = int(math.floor(hlc3 / band_f))
+        int k_high = int(math.floor(high / band_f))
 
-    f_vp_map_add(k_low,  v3)
-    f_vp_map_add(k_mid,  v3)
-    f_vp_map_add(k_high, v3)
+        f_vp_map_add(k_low,  v3)
+        f_vp_map_add(k_mid,  v3)
+        f_vp_map_add(k_high, v3)
 
-    if na(full_min_k) or k_low < full_min_k
-        full_min_k := k_low
-    if na(full_max_k) or k_high > full_max_k
-        full_max_k := k_high
+        if na(full_min_k) or k_low < full_min_k
+            full_min_k := k_low
+        if na(full_max_k) or k_high > full_max_k
+            full_max_k := k_high
 
-if barstate.islast
-    // --- DIRTY LOGIC ---
-    bool mode_changed = (eff_vp_mode != last_vp_mode)
-    bool style_changed = (vp_style != last_vp_style)
-    int vp_rows_eff = vp_rows
-    int vp_render_rows = vp_is_bars ? math.max(vp_rows, math.min(VP_BOX_BUDGET, vp_rows * 2)) : vp_rows_eff
-    if dbg_ops
-        vp_render_rows_dbg := vp_render_rows
-    if na(vp_prev_enabled)
-        vp_prev_enabled := eff_vp_enable
-    bool vp_turning_off = vp_prev_enabled and not eff_vp_enable
-    bool vp_turning_on = (not vp_prev_enabled) and eff_vp_enable
+    if barstate.islast
+        // --- DIRTY LOGIC ---
+        bool mode_changed = (eff_vp_mode != last_vp_mode)
+        bool style_changed = (vp_style != last_vp_style)
+        int vp_rows_eff = vp_rows
+        int vp_render_rows = vp_is_bars ? math.max(vp_rows, math.min(VP_BOX_BUDGET, vp_rows * 2)) : vp_rows_eff
+        if dbg_ops
+            vp_render_rows_dbg := vp_render_rows
+        if na(vp_prev_enabled)
+            vp_prev_enabled := eff_vp_enable
+        bool vp_turning_off = vp_prev_enabled and not eff_vp_enable
+        bool vp_turning_on = (not vp_prev_enabled) and eff_vp_enable
 
-    if mode_changed or style_changed
-        vp_dirty := true
-    else if vp_is_full
-        // Full mode: redraw only when a new bar arrives (bar_index changes)
-        if na(last_full_bar) or bar_index != last_full_bar
+        if mode_changed or style_changed
             vp_dirty := true
-    else
-        // Visible mode: redraw only when viewport changed
-        if (chart.left_visible_bar_time != last_left) or (chart.right_visible_bar_time != last_right)
-            vp_dirty := true
-
-    int target_line_count = vp_is_bars ? 0 : vp_rows_eff
-    int target_box_count = vp_is_bars ? vp_render_rows : 0
-    bool vp_pool_reset = mode_changed or style_changed or na(last_vp_line_count) or na(last_vp_box_count) or (target_line_count != last_vp_line_count) or (target_box_count != last_vp_box_count)
-    if eff_vp_enable and vp_pool_reset
-        f_vp_ensure_lines(target_line_count)
-        f_vp_ensure_boxes(target_box_count)
-        last_vp_line_count := target_line_count
-        last_vp_box_count := target_box_count
-    else if vp_turning_off
-        if array.size(vp_lines) > 0
-            for i = 0 to array.size(vp_lines) - 1
-                f_vp_turn_off_line(array.get(vp_lines, i))
-        if array.size(vp_boxes) > 0
-            for i = 0 to array.size(vp_boxes) - 1
-                f_vp_turn_off_box(array.get(vp_boxes, i))
-
-    if vp_turning_on
-        vp_dirty := true
-
-    // 2) CALCULATION
-    if eff_vp_enable and vp_dirty
-        int rows = vp_rows
-        if vp_is_full
-            array.fill(vp_volArray, 0.0)
-
-        float lMin = na
-        float step = na
-
-        if not vp_is_full
-            // =======================
-            // VISIBLE MODE (exact legacy window) + faster distribution
-            // =======================
-
-            int vStart = chart.left_visible_bar_time
-            int vEnd   = chart.right_visible_bar_time
-
-            float hMax_vis = na
-            float lMin_vis = na
-            bool  found = false
-
-            int LOOKBACK_CAP = 3999
-            int loopLimit = math.min(bar_index, LOOKBACK_CAP)
-
-            // SCAN 1: price range over visible window (legacy logic)
-            for ii = 0 to loopLimit
-                ops_vp_scan += dbg_ops ? 1 : 0
-                int t = time[ii]
-                if t < vStart
-                    break
-                if t <= vEnd
-                    if not found
-                        hMax_vis := high[ii]
-                        lMin_vis := low[ii]
-                        found := true
-                    else
-                        hMax_vis := math.max(hMax_vis, high[ii])
-                        lMin_vis := math.min(lMin_vis, low[ii])
-
-            if not found
-                hMax_vis := high
-                lMin_vis := low
-
-            // IMPORTANT: assign to OUTER lMin/step (no redeclare!)
-            lMin := lMin_vis
-            float rng_vis = hMax_vis - lMin_vis
-            if rng_vis == 0
-                rng_vis := syminfo.mintick * 100
-            step := rng_vis / rows
-            float inv_step = step != 0 ? (1.0 / step) : 0.0
-
-            f_vp_ensure_float_array(vp_diffArray, rows + 1)
-            array.fill(vp_diffArray, 0.0)
-
-            // SCAN 2: distribution via diff array (exact)
-            for ii = 0 to loopLimit
-                int t = time[ii]
-                if t < vStart
-                    break
-                if t <= vEnd
-                    float h = high[ii]
-                    float l = low[ii]
-                    float v = volume[ii]
-
-                    int iH = int(math.floor((h - lMin) * inv_step))
-                    int iL = int(math.floor((l - lMin) * inv_step))
-
-                    if iH >= rows
-                        iH := rows - 1
-                    if iH < 0
-                        iH := 0
-                    if iL < 0
-                        iL := 0
-                    if iL >= rows
-                        iL := rows - 1
-
-                    if iH < iL
-                        int tmp = iH
-                        iH := iL
-                        iL := tmp
-
-                    int bins = (iH - iL) + 1
-                    if bins > 0
-                        float vBin = v / bins
-                        array.set(vp_diffArray, iL, array.get(vp_diffArray, iL) + vBin)
-                        int iHp1 = iH + 1
-                        array.set(vp_diffArray, iHp1, array.get(vp_diffArray, iHp1) - vBin)
-
-            float running = 0.0
-            for j = 0 to rows - 1
-                running += array.get(vp_diffArray, j)
-                array.set(vp_volArray, j, running)
-
+        else if vp_is_full
+            // Full mode: redraw only when a new bar arrives (bar_index changes)
+            if na(last_full_bar) or bar_index != last_full_bar
+                vp_dirty := true
         else
-            // ---------------- Full TF (complete) ----------------
-            if not na(full_min_k) and not na(full_max_k)
-                float band_f = syminfo.mintick * vp_full_band_ticks
+            // Visible mode: redraw only when viewport changed
+            if (chart.left_visible_bar_time != last_left) or (chart.right_visible_bar_time != last_right)
+                vp_dirty := true
 
-                float f_min_p = full_min_k * band_f
-                float f_max_p = (full_max_k + 1) * band_f
+        int target_line_count = vp_is_bars ? 0 : vp_rows_eff
+        int target_box_count = vp_is_bars ? vp_render_rows : 0
+        bool vp_pool_reset = mode_changed or style_changed or na(last_vp_line_count) or na(last_vp_box_count) or (target_line_count != last_vp_line_count) or (target_box_count != last_vp_box_count)
+        if eff_vp_enable and vp_pool_reset
+            f_vp_ensure_lines(target_line_count)
+            f_vp_ensure_boxes(target_box_count)
+            last_vp_line_count := target_line_count
+            last_vp_box_count := target_box_count
+        else if vp_turning_off
+            if array.size(vp_lines) > 0
+                for i = 0 to array.size(vp_lines) - 1
+                    f_vp_turn_off_line(array.get(vp_lines, i))
+            if array.size(vp_boxes) > 0
+                for i = 0 to array.size(vp_boxes) - 1
+                    f_vp_turn_off_box(array.get(vp_boxes, i))
 
-                lMin := f_min_p
-                float rng = f_max_p - f_min_p
-                if rng == 0
-                    rng := syminfo.mintick * 100
-                step := rng / rows
+        if vp_turning_on
+            vp_dirty := true
 
-                float band_to_row = band_f / step
+        // 2) CALCULATION
+        if eff_vp_enable and vp_dirty
+            int rows = vp_rows
+            if vp_is_full
+                array.fill(vp_volArray, 0.0)
 
-                int[] keys = map.keys(vp_map)
-                if array.size(keys) > 0
-                    for ii = 0 to array.size(keys) - 1
-                        ops_vp_scan += dbg_ops ? 1 : 0
-                        int k = array.get(keys, ii)
-                        float vol = nz(map.get(vp_map, k), 0.0)
+            float lMin = na
+            float step = na
 
-                        int r_idx = int(math.floor((k - full_min_k) * band_to_row))
-                        r_idx := r_idx < 0 ? 0 : r_idx >= rows ? rows - 1 : r_idx
-                        array.set(vp_volArray, r_idx, array.get(vp_volArray, r_idx) + vol)
+            if not vp_is_full
+                // =======================
+                // VISIBLE MODE (exact legacy window) + faster distribution
+                // =======================
 
-        // If mapping failed, do nothing (avoid NaNs in draw)
-        if not na(lMin) and not na(step)
-            // 3) Smoothing (prefix-sum)
-            array.fill(vp_smtArray, 0.0)
-            float maxV = 0.0
-            float sumV = 0.0
-            int actB   = 0
+                int vStart = chart.left_visible_bar_time
+                int vEnd   = chart.right_visible_bar_time
 
-            if vp_smooth == 0
+                float hMax_vis = na
+                float lMin_vis = na
+                bool  found = false
+
+                int LOOKBACK_CAP = 3999
+                int loopLimit = math.min(bar_index, LOOKBACK_CAP)
+
+                // SCAN 1: price range over visible window (legacy logic)
+                for ii = 0 to loopLimit
+                    ops_vp_scan += dbg_ops ? 1 : 0
+                    int t = time[ii]
+                    if t < vStart
+                        break
+                    if t <= vEnd
+                        if not found
+                            hMax_vis := high[ii]
+                            lMin_vis := low[ii]
+                            found := true
+                        else
+                            hMax_vis := math.max(hMax_vis, high[ii])
+                            lMin_vis := math.min(lMin_vis, low[ii])
+
+                if not found
+                    hMax_vis := high
+                    lMin_vis := low
+
+                // IMPORTANT: assign to OUTER lMin/step (no redeclare!)
+                lMin := lMin_vis
+                float rng_vis = hMax_vis - lMin_vis
+                if rng_vis == 0
+                    rng_vis := syminfo.mintick * 100
+                step := rng_vis / rows
+                float inv_step = step != 0 ? (1.0 / step) : 0.0
+
+                f_vp_ensure_float_array(vp_diffArray, rows + 1)
+                array.fill(vp_diffArray, 0.0)
+
+                // SCAN 2: distribution via diff array (exact)
+                for ii = 0 to loopLimit
+                    int t = time[ii]
+                    if t < vStart
+                        break
+                    if t <= vEnd
+                        float h = high[ii]
+                        float l = low[ii]
+                        float v = volume[ii]
+
+                        int iH = int(math.floor((h - lMin) * inv_step))
+                        int iL = int(math.floor((l - lMin) * inv_step))
+
+                        if iH >= rows
+                            iH := rows - 1
+                        if iH < 0
+                            iH := 0
+                        if iL < 0
+                            iL := 0
+                        if iL >= rows
+                            iL := rows - 1
+
+                        if iH < iL
+                            int tmp = iH
+                            iH := iL
+                            iL := tmp
+
+                        int bins = (iH - iL) + 1
+                        if bins > 0
+                            float vBin = v / bins
+                            array.set(vp_diffArray, iL, array.get(vp_diffArray, iL) + vBin)
+                            int iHp1 = iH + 1
+                            array.set(vp_diffArray, iHp1, array.get(vp_diffArray, iHp1) - vBin)
+
+                float running = 0.0
                 for j = 0 to rows - 1
-                    float val = array.get(vp_volArray, j)
-                    array.set(vp_smtArray, j, val)
-                    if val > 0
-                        sumV += val
-                        actB += 1
-                        if val > maxV
-                            maxV := val
+                    running += array.get(vp_diffArray, j)
+                    array.set(vp_volArray, j, running)
+
             else
-                f_vp_ensure_float_array(vp_prefArray, rows + 1)
-                float runningPref = 0.0
-                array.set(vp_prefArray, 0, 0.0)
-                for j = 0 to rows - 1
-                    runningPref += array.get(vp_volArray, j)
-                    array.set(vp_prefArray, j + 1, runningPref)
+                // ---------------- Full TF (complete) ----------------
+                if not na(full_min_k) and not na(full_max_k)
+                    float band_f = syminfo.mintick * vp_full_band_ticks
 
-                for j = 0 to rows - 1
-                    int L = math.max(0, j - vp_smooth)
-                    int R = math.min(rows - 1, j + vp_smooth)
-                    float sum = array.get(vp_prefArray, R + 1) - array.get(vp_prefArray, L)
-                    int len = (R - L + 1)
-                    float val = len > 0 ? sum / len : 0.0
-                    array.set(vp_smtArray, j, val)
+                    float f_min_p = full_min_k * band_f
+                    float f_max_p = (full_max_k + 1) * band_f
 
-                    if val > 0
-                        sumV += val
-                        actB += 1
-                        if val > maxV
-                            maxV := val
+                    lMin := f_min_p
+                    float rng = f_max_p - f_min_p
+                    if rng == 0
+                        rng := syminfo.mintick * 100
+                    step := rng / rows
 
-            // 4) Threshold
-            float avgV = (actB > 0) ? sumV / actB : 0.0
-            float thres = maxV
+                    float band_to_row = band_f / step
 
-            if eff_vp_smart and avgV > 0
-                thres := avgV * vp_clip
-                if thres == 0
-                    thres := maxV
+                    int[] keys = map.keys(vp_map)
+                    if array.size(keys) > 0
+                        for ii = 0 to array.size(keys) - 1
+                            ops_vp_scan += dbg_ops ? 1 : 0
+                            int k = array.get(keys, ii)
+                            float vol = nz(map.get(vp_map, k), 0.0)
 
-            // 5) Drawing
-            int xLoc = bar_index + vp_offset
-            int xBarsStart = bar_index + vp_pivot_offset + vp_bars_shift
+                            int r_idx = int(math.floor((k - full_min_k) * band_to_row))
+                            r_idx := r_idx < 0 ? 0 : r_idx >= rows ? rows - 1 : r_idx
+                            array.set(vp_volArray, r_idx, array.get(vp_volArray, r_idx) + vol)
 
-            if maxV > 0
-                if vp_is_bars
-                    f_vp_ensure_float_array(vp_bars_render, vp_render_rows)
+            // If mapping failed, do nothing (avoid NaNs in draw)
+            if not na(lMin) and not na(step)
+                // 3) Smoothing (prefix-sum)
+                array.fill(vp_smtArray, 0.0)
+                float maxV = 0.0
+                float sumV = 0.0
+                int actB   = 0
 
-                    if vp_render_rows == rows
-                        for r = 0 to rows - 1
-                            array.set(vp_bars_render, r, array.get(vp_smtArray, r))
-                    else
-                        float denom = float(vp_render_rows - 1)
-                        float scale = float(rows - 1) / denom
+                if vp_smooth == 0
+                    for j = 0 to rows - 1
+                        float val = array.get(vp_volArray, j)
+                        array.set(vp_smtArray, j, val)
+                        if val > 0
+                            sumV += val
+                            actB += 1
+                            if val > maxV
+                                maxV := val
+                else
+                    f_vp_ensure_float_array(vp_prefArray, rows + 1)
+                    float runningPref = 0.0
+                    array.set(vp_prefArray, 0, 0.0)
+                    for j = 0 to rows - 1
+                        runningPref += array.get(vp_volArray, j)
+                        array.set(vp_prefArray, j + 1, runningPref)
+
+                    for j = 0 to rows - 1
+                        int L = math.max(0, j - vp_smooth)
+                        int R = math.min(rows - 1, j + vp_smooth)
+                        float sum = array.get(vp_prefArray, R + 1) - array.get(vp_prefArray, L)
+                        int len = (R - L + 1)
+                        float val = len > 0 ? sum / len : 0.0
+                        array.set(vp_smtArray, j, val)
+
+                        if val > 0
+                            sumV += val
+                            actB += 1
+                            if val > maxV
+                                maxV := val
+
+                // 4) Threshold
+                float avgV = (actB > 0) ? sumV / actB : 0.0
+                float thres = maxV
+
+                if eff_vp_smart and avgV > 0
+                    thres := avgV * vp_clip
+                    if thres == 0
+                        thres := maxV
+
+                // 5) Drawing
+                int xLoc = bar_index + vp_offset
+                int xBarsStart = bar_index + vp_pivot_offset + vp_bars_shift
+
+                if maxV > 0
+                    if vp_is_bars
+                        f_vp_ensure_float_array(vp_bars_render, vp_render_rows)
+
+                        if vp_render_rows == rows
+                            for r = 0 to rows - 1
+                                array.set(vp_bars_render, r, array.get(vp_smtArray, r))
+                        else
+                            float denom = float(vp_render_rows - 1)
+                            float scale = float(rows - 1) / denom
+                            for r = 0 to vp_render_rows - 1
+                                float u = float(r) * scale
+                                int a = int(math.floor(u))
+                                int b = math.min(a + 1, rows - 1)
+                                float f = u - float(a)
+                                float va = array.get(vp_smtArray, a)
+                                float vb = array.get(vp_smtArray, b)
+                                array.set(vp_bars_render, r, va * (1.0 - f) + vb * f)
+
+                        float maxV_r = 0.0
+                        float sumV_r = 0.0
+                        int actB_r = 0
                         for r = 0 to vp_render_rows - 1
-                            float u = float(r) * scale
-                            int a = int(math.floor(u))
-                            int b = math.min(a + 1, rows - 1)
-                            float f = u - float(a)
-                            float va = array.get(vp_smtArray, a)
-                            float vb = array.get(vp_smtArray, b)
-                            array.set(vp_bars_render, r, va * (1.0 - f) + vb * f)
+                            float vv = array.get(vp_bars_render, r)
+                            if vv > 0
+                                sumV_r += vv
+                                actB_r += 1
+                                if vv > maxV_r
+                                    maxV_r := vv
 
-                    float maxV_r = 0.0
-                    float sumV_r = 0.0
-                    int actB_r = 0
-                    for r = 0 to vp_render_rows - 1
-                        float vv = array.get(vp_bars_render, r)
-                        if vv > 0
-                            sumV_r += vv
-                            actB_r += 1
-                            if vv > maxV_r
-                                maxV_r := vv
+                        float avgV_r = (actB_r > 0) ? (sumV_r / actB_r) : 0.0
+                        float thres_r = maxV_r
+                        if eff_vp_smart and avgV_r > 0
+                            thres_r := avgV_r * vp_clip
+                            if thres_r == 0
+                                thres_r := maxV_r
 
-                    float avgV_r = (actB_r > 0) ? (sumV_r / actB_r) : 0.0
-                    float thres_r = maxV_r
-                    if eff_vp_smart and avgV_r > 0
-                        thres_r := avgV_r * vp_clip
-                        if thres_r == 0
-                            thres_r := maxV_r
+                        float step_render = (step * rows) / vp_render_rows
+                        float min_intens = vp_is_full ? 0.006 : 0.0015
 
-                    float step_render = (step * rows) / vp_render_rows
-                    float min_intens = vp_is_full ? 0.006 : 0.0015
-
-                    if maxV_r > 0
-                        for r = 0 to vp_render_rows - 1
-                            float valr = array.get(vp_bars_render, r)
-                            box bx = array.get(vp_boxes, r)
-                            if valr > 0
-                                float intens = valr / thres_r
-                                if intens > 1.0
-                                    intens := 1.0
-                                float intens_c = math.pow(intens, 0.65)
-                                if intens_c > min_intens
-                                    ops_vp_draw += dbg_ops ? 1 : 0
-                                    int len_bi = int(math.round(intens_c * vp_bars_w))
-                                    if len_bi < 2
-                                        len_bi := 2
-                                    float y1 = lMin + (r * step_render)
-                                    float y2 = lMin + ((r + 1) * step_render)
-                                    int alpha = 85 - int(math.round(intens_c * 75))
-                                    alpha := alpha < 0 ? 0 : alpha > 95 ? 95 : alpha
-                                    color fill_col = color.new(vp_color, alpha)
-                                    color border_col = color.new(vp_color, 92)
-                                    box.set_lefttop(bx, xBarsStart - len_bi, y2)
-                                    box.set_rightbottom(bx, xBarsStart, y1)
-                                    box.set_bgcolor(bx, fill_col)
-                                    box.set_border_color(bx, border_col)
+                        if maxV_r > 0
+                            for r = 0 to vp_render_rows - 1
+                                float valr = array.get(vp_bars_render, r)
+                                box bx = array.get(vp_boxes, r)
+                                if valr > 0
+                                    float intens = valr / thres_r
+                                    if intens > 1.0
+                                        intens := 1.0
+                                    float intens_c = math.pow(intens, 0.65)
+                                    if intens_c > min_intens
+                                        ops_vp_draw += dbg_ops ? 1 : 0
+                                        int len_bi = int(math.round(intens_c * vp_bars_w))
+                                        if len_bi < 2
+                                            len_bi := 2
+                                        float y1 = lMin + (r * step_render)
+                                        float y2 = lMin + ((r + 1) * step_render)
+                                        int alpha = 85 - int(math.round(intens_c * 75))
+                                        alpha := alpha < 0 ? 0 : alpha > 95 ? 95 : alpha
+                                        color fill_col = color.new(vp_color, alpha)
+                                        color border_col = color.new(vp_color, 92)
+                                        box.set_lefttop(bx, xBarsStart - len_bi, y2)
+                                        box.set_rightbottom(bx, xBarsStart, y1)
+                                        box.set_bgcolor(bx, fill_col)
+                                        box.set_border_color(bx, border_col)
+                                    else
+                                        f_vp_hide_box(bx)
                                 else
                                     f_vp_hide_box(bx)
-                            else
-                                f_vp_hide_box(bx)
+                        else
+                            for r = 0 to vp_render_rows - 1
+                                f_vp_hide_box(array.get(vp_boxes, r))
                     else
-                        for r = 0 to vp_render_rows - 1
-                            f_vp_hide_box(array.get(vp_boxes, r))
-                else
-                    for j = 0 to vp_rows - 1
-                        float val = array.get(vp_smtArray, j)
-                        line ln = array.get(vp_lines, j)
-                        if val > 0
-                            float y1 = lMin + (j * step)
-                            float y2 = lMin + ((j + 1) * step)
+                        for j = 0 to vp_rows - 1
+                            float val = array.get(vp_smtArray, j)
+                            line ln = array.get(vp_lines, j)
+                            if val > 0
+                                float y1 = lMin + (j * step)
+                                float y2 = lMin + ((j + 1) * step)
 
-                            float intens = val / thres
-                            if intens > 1.0
-                                intens := 1.0
+                                float intens = val / thres
+                                if intens > 1.0
+                                    intens := 1.0
 
-                            float min_intens = vp_is_full ? 0.01 : 0.003
-                            if intens > min_intens
-                                ops_vp_draw += dbg_ops ? 1 : 0
-                                color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
-                                line.set_xy1(ln, xLoc, y1)
-                                line.set_xy2(ln, xLoc, y2)
-                                line.set_color(ln, col)
-                                line.set_width(ln, vp_width)
+                                float min_intens = vp_is_full ? 0.01 : 0.003
+                                if intens > min_intens
+                                    ops_vp_draw += dbg_ops ? 1 : 0
+                                    color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
+                                    line.set_xy1(ln, xLoc, y1)
+                                    line.set_xy2(ln, xLoc, y2)
+                                    line.set_color(ln, col)
+                                    line.set_width(ln, vp_width)
+                                else
+                                    f_vp_hide_line(ln)
                             else
                                 f_vp_hide_line(ln)
-                        else
-                            f_vp_hide_line(ln)
-            else
-                if vp_is_bars
-                    for r = 0 to vp_render_rows - 1
-                        f_vp_hide_box(array.get(vp_boxes, r))
                 else
-                    for j = 0 to vp_rows - 1
-                        f_vp_hide_line(array.get(vp_lines, j))
+                    if vp_is_bars
+                        for r = 0 to vp_render_rows - 1
+                            f_vp_hide_box(array.get(vp_boxes, r))
+                    else
+                        for j = 0 to vp_rows - 1
+                            f_vp_hide_line(array.get(vp_lines, j))
 
-    // --- Update trackers ---
-    last_vp_mode := eff_vp_mode
-    last_vp_style := vp_style
-    last_left    := chart.left_visible_bar_time
-    last_right   := chart.right_visible_bar_time
-    if vp_is_full
-        last_full_bar := bar_index
-    vp_dirty := false
-    vp_prev_enabled := eff_vp_enable
+        // --- Update trackers ---
+        last_vp_mode := eff_vp_mode
+        last_vp_style := vp_style
+        last_left    := chart.left_visible_bar_time
+        last_right   := chart.right_visible_bar_time
+        if vp_is_full
+            last_full_bar := bar_index
+        vp_dirty := false
+        vp_prev_enabled := eff_vp_enable
+
+f_run_vp()
 
 
 // --- Stage 2: ADR/Today Range Calculation ---
