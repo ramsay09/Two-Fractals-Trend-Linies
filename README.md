@@ -42,17 +42,17 @@ A multi-tool market structure overlay for TradingView that combines **Bill Willi
 
 ## Context & Confluence Tools
 
-### Strategy Lense (Focused Presets)
-A **Strategy Lense** applies focused defaults to reduce clutter and align the toolset with a style.  
+### Context Lenses (Focused Presets)
+A **Context Lens** applies focused defaults to reduce clutter and align the toolset with a specific market read.  
 - **Custom**: manual control (no automatic switching)
-- **Session Map**: structure + sessions + key levels + ATR/ADR context
-- **ORB**: OR/IB + RVOL participation
-- **Mean Reversion**: VWAP + Bands/Z (optionally divergences)
-- **Breakout**: participation + structure framing
-- **Squeeze Breakout**: squeeze box + RVOL confirmation
-- **Trend Continuation**: CONF/REG + FVG + continuation framing
+- **Market Map**: sessions + key levels + volume profile + pivots
+- **Opening Auction**: OR/IB + RVOL + 1st session candle + MTF candles
+- **Value Reversion**: VWAP + bands/z + divergences + volume profile
+- **Compression -> Expansion**: squeeze box + RVOL + trendlines + last fractal
+- **Trend Continuation**: EMA cloud + FVG1 + weekly VWAP + MTF candles
+- **Range Rotation**: volume profile + VWAP line + last fractal + PDC
 
-> **Note:** Lenses are intentionally limited to a handful of defaults so they don’t constantly override your personal layout.
+> **Note:** Lenses are intentionally minimal so they don’t constantly override your personal layout. Custom remains fully manual.
 
 ### Key Levels (Origin-Anchored)
 - **PDH / PDL / PDC** (Previous Day High/Low/Close)
@@ -169,16 +169,12 @@ An optional alert that triggers **while the 5th candle is still forming** (real-
 
 ## Recommended Usage Workflow (Typical)
 
-1. **Start with structure**
-   - Enable **fractals**, **last fractal S/R**, optionally **SR lines**.
-2. **Add context levels**
-   - Enable **Key Levels** (PDH/PDL/WOpen) and/or **VWAP**.
-3. **Add breakout framing**
-   - Enable **fractal trend lines** and/or **FVG**.
-4. **Add participation**
-   - Enable **RVOL** (consider showing points only for high/extreme).
-5. **Add session structure**
-   - Enable **sessions** and optionally **OR/IB** for intraday.
+1. **Start with a regime scan**
+   - Use **Market Map** to see sessions, key levels, pivots, and volume profile in context.
+2. **Pick a focused lens**
+   - Switch to **Opening Auction**, **Value Reversion**, **Compression -> Expansion**, **Trend Continuation**, or **Range Rotation** based on the regime.
+3. **Refine execution**
+   - Toggle any extra tools manually in **Custom** if you want full control beyond the presets.
 
 ---
 

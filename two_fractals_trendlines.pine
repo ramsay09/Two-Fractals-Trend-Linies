@@ -34,7 +34,7 @@ panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update Mode
                           \nRealtime Preview: shows live/developing values (○). \nStrict Confirm: shows last confirmed close values only (●).")
 bool panel_show_live    = panel_update_mode == "Realtime Preview"
 
-trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Session Map", "ORB", "Mean Reversion", "Breakout", "Squeeze Breakout", "Trend Continuation"], tooltip="Applies focused defaults for a trading lens. Custom = fully manual. \n• Custom: Full manual control.\n• Session Map: Structure, Key Levels, ADR.\n• ORB: Opening Range, RVOL.\n• Mean Reversion: VWAP, Bands, Divergences.\n• Breakout/Squeeze: RVOL, Structure, Momentum.\n• Trend Continuation: CONF/REG, FVG.")
+trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Market Map", "Opening Auction", "Value Reversion", "Compression -> Expansion", "Trend Continuation", "Range Rotation"], tooltip="Applies focused defaults for a trading lens. Custom = fully manual. \n• Custom: Full manual control.\n• Market Map: Sessions, key levels, VP, pivots.\n• Opening Auction: OR/IB, RVOL, 1st session candle, MTF candles.\n• Value Reversion: VWAP + bands/z, VP, divergences.\n• Compression -> Expansion: Squeeze box, RVOL, trendlines, last fractal.\n• Trend Continuation: EMA cloud, FVG1, weekly VWAP, MTF candles.\n• Range Rotation: VP, VWAP line, last fractal, PDC.")
 
 
 // Confluence & Regime Visuals
@@ -541,14 +541,17 @@ transp_bg           = input.int(85, 'Background Color Transparency', minval=1, m
 // Stage 0: Centralized Gating Flags as aliases for inputs
 
 // Preset Helper
-int approach_id = trading_approach == "Session Map" ? 1 : trading_approach == "ORB" ? 2 : trading_approach == "Mean Reversion" ? 3 : trading_approach == "Breakout" ? 4 : trading_approach == "Squeeze Breakout" ? 5 : trading_approach == "Trend Continuation" ? 6 : 0
+int approach_id = trading_approach == "Market Map" ? 1 : trading_approach == "Opening Auction" ? 2 : trading_approach == "Value Reversion" ? 3 : trading_approach == "Compression -> Expansion" ? 4 : trading_approach == "Trend Continuation" ? 5 : trading_approach == "Range Rotation" ? 6 : 0
 
-f_approach_bool(_custom, _sessMap, _orb, _mr, _brk, _sqzBrk, _trend) =>
-    approach_id == 1 ? _sessMap : approach_id == 2 ? _orb : approach_id == 3 ? _mr : approach_id == 4 ? _brk : approach_id == 5 ? _sqzBrk : approach_id == 6 ? _trend : _custom
+f_approach_bool(_custom, _map, _auction, _reversion, _compExp, _trend, _range) =>
+    approach_id == 1 ? _map : approach_id == 2 ? _auction : approach_id == 3 ? _reversion : approach_id == 4 ? _compExp : approach_id == 5 ? _trend : approach_id == 6 ? _range : _custom
 
 // Preset Helper for Strings
-f_approach_str(_custom, _sessMap, _orb, _mr, _brk, _sqzBrk, _trend) =>
-    approach_id == 1 ? _sessMap : approach_id == 2 ? _orb : approach_id == 3 ? _mr : approach_id == 4 ? _brk : approach_id == 5 ? _sqzBrk : approach_id == 6 ? _trend : _custom
+f_approach_str(_custom, _map, _auction, _reversion, _compExp, _trend, _range) =>
+    approach_id == 1 ? _map : approach_id == 2 ? _auction : approach_id == 3 ? _reversion : approach_id == 4 ? _compExp : approach_id == 5 ? _trend : approach_id == 6 ? _range : _custom
+
+var int prev_approach_id = na
+bool lens_changed = not na(prev_approach_id) and approach_id != prev_approach_id
 
 // Debug Stress Preset (internal clamps, UI unchanged)
 int fvg1_limit_eff = dbg_stress ? math.min(fvg1_limit, 120) : fvg1_limit
@@ -556,85 +559,86 @@ int fvg2_limit_eff = dbg_stress ? math.min(fvg2_limit, 120) : fvg2_limit
 int sess_line_limit_eff = dbg_stress ? math.min(sess_line_limit, 120) : sess_line_limit
 
 // Effective Feature Flags
-//                                          Cust           SessMap   ORB    MR     Brk    SqzBrk  Trend
-eff_fractals_plot   = f_approach_bool(fractals_plot,      true,     true,  true,  true,  true,   true)
-eff_sub_fractals    = f_approach_bool(sub_fractals,       false,    false, false, false, false,  false)
-eff_plot_trendline  = f_approach_bool(plot_trendline,     false,    true,  false, true,  true,   true)
+//                                          Cust           Map      Auction  Reversion  CompExp  Trend   Range
+eff_fractals_plot   = f_approach_bool(fractals_plot,      true,     true,    true,      true,    true,   true)
+eff_sub_fractals    = f_approach_bool(sub_fractals,       false,    false,   false,     false,   false,  false)
+eff_plot_trendline  = f_approach_bool(plot_trendline,     true,     false,   false,     true,    true,   false)
 
-eff_vp_enable       = f_approach_bool(vp_enable,          false,    false, false, false, false,  false)
-eff_vp_smart        = f_approach_bool(vp_smart,           vp_smart, false, false, false, false,  false)
+eff_vp_enable       = f_approach_bool(vp_enable,          true,     false,   true,      false,   false,  true)
+eff_vp_smart        = f_approach_bool(vp_smart,           true,     vp_smart,true,      vp_smart,vp_smart,true)
+string eff_vp_mode  = f_approach_str(vp_mode,             "Visible Range", "Visible Range", "Visible Range", "Visible Range", vp_mode, "Visible Range")
 
-eff_show_mtf_candles= f_approach_bool(show_mtf_candles,   false,    false, false, false, false,  false)
+eff_show_mtf_candles= f_approach_bool(show_mtf_candles,   false,    true,    false,     true,    true,   false)
 
-eff_use_sess_1st    = f_approach_bool(use_sess_1st,       false,    false, false, false, false,  false)
-eff_show_last_frac  = f_approach_bool(show_last_frac,     false,    false, false, false, false,  false)
-eff_show_vol        = f_approach_bool(show_vol,           true,     false, false, false, false,  false) // Legacy spike, prefer RVOL in new modes
+eff_use_sess_1st    = f_approach_bool(use_sess_1st,       false,    true,    false,     false,   false,  false)
+eff_show_last_frac  = f_approach_bool(show_last_frac,     false,    true,    true,      true,    true,   true)
+eff_show_vol        = f_approach_bool(show_vol,           show_vol, false,   false,     false,   false,  false) // Legacy spike, prefer RVOL in new modes
 
-eff_plot_fvg1       = f_approach_bool(plot_fvg1,          false,    false, false, false, false,  true)
-eff_plot_fvg2       = f_approach_bool(plot_fvg2,          false,    false, false, false, false,  false)
+eff_plot_fvg1       = f_approach_bool(plot_fvg1,          false,    false,   false,     false,   true,   false)
+eff_plot_fvg2       = f_approach_bool(plot_fvg2,          false,    false,   false,     false,   false,  false)
 
-eff_ps_mode         = f_approach_str(ps_mode,             "None",   "None","None","None","None", "Auto")
+eff_ps_mode         = f_approach_str(ps_mode,             "None",   "None",  "None",    "None",  "None", "None")
 
-eff_BB_plot         = f_approach_bool(BB_plot,            false,    false, false, false, false,  false) // MR uses VWAP Bands
+eff_BB_plot         = f_approach_bool(BB_plot,            false,    false,   false,     false,   false,  false) // MR uses VWAP Bands
 
-eff_en_cloud        = f_approach_bool(en_cloud,           false,    false, false, false, false,  false)
-eff_sig_plot        = f_approach_bool(sig_plot,           sig_plot, false, false, false, false,  false)
-eff_ma1_type        = f_approach_str(ma1_type,            ma1_type, "None","None","None","None", "None")
-eff_ma2_type        = f_approach_str(ma2_type,            ma2_type, "None","None","None","None", "None")
+eff_en_cloud        = f_approach_bool(en_cloud,           false,    false,   false,     false,   true,   false)
+eff_sig_plot        = f_approach_bool(sig_plot,           sig_plot, false,   false,     false,   false,  false)
+eff_ma1_type        = f_approach_str(ma1_type,            ma1_type, "None",  "None",    "None",  "None", "None")
+eff_ma2_type        = f_approach_str(ma2_type,            ma2_type, "None",  "None",    "None",  "None", "None")
 
-eff_plot_div        = f_approach_bool(plot_div,           false,    false, true,  false, false,  false)
+eff_plot_div        = f_approach_bool(plot_div,           false,    false,   true,      false,   false,  false)
 
 // Bar Patterns
-eff_plot_l12_bar    = f_approach_bool(plot_l12_bar,       false,    false, false, false, false,  false)
-eff_plot_nr_bar     = f_approach_bool(plot_nr_bar,        false,    false, false, false, false,  false)
-eff_plot_i_bar      = f_approach_bool(plot_i_bar,         false,    false, false, false, false,  false)
-eff_plot_o_bar      = f_approach_bool(plot_o_bar,         false,    false, false, false, false,  false)
-eff_plot_s_bar      = f_approach_bool(plot_s_bar,         false,    false, false, false, false,  false)
-eff_plot_f_bar      = f_approach_bool(plot_f_bar,         false,    false, false, false, false,  false)
+eff_plot_l12_bar    = f_approach_bool(plot_l12_bar,       false,    false,   false,     false,   false,  false)
+eff_plot_nr_bar     = f_approach_bool(plot_nr_bar,        false,    false,   false,     true,    false,  false)
+eff_plot_i_bar      = f_approach_bool(plot_i_bar,         false,    false,   false,     false,   false,  true)
+eff_plot_o_bar      = f_approach_bool(plot_o_bar,         false,    false,   false,     false,   false,  false)
+eff_plot_s_bar      = f_approach_bool(plot_s_bar,         false,    false,   false,     false,   false,  false)
+eff_plot_f_bar      = f_approach_bool(plot_f_bar,         false,    false,   false,     false,   false,  false)
 
-eff_plot_segments   = f_approach_bool(plot_segments,      false,    false, false, false, false,  false)
+eff_plot_segments   = f_approach_bool(plot_segments,      false,    false,   false,     false,   false,  false)
 
 // Pivots (Classic)
-eff_plot_pivots_h1  = f_approach_bool(plot_pivots_h1,     false,    false, false, false, false,  false)
-eff_plot_pivots_h4  = f_approach_bool(plot_pivots_h4,     false,    false, false, false, false,  false)
-eff_plot_pivots_d   = f_approach_bool(plot_pivots_d,      false,    false, false, false, false,  false)
-eff_plot_pivots_w   = f_approach_bool(plot_pivots_w,      false,    false, false, false, false,  false)
-eff_plot_pivots_m   = f_approach_bool(plot_pivots_m,      false,    false, false, false, false,  false)
-eff_plot_pivots_3m  = f_approach_bool(plot_pivots_3m,     false,    false, false, false, false,  false)
-eff_plot_pivots_12m = f_approach_bool(plot_pivots_12m,    false,    false, false, false, false,  false)
+eff_plot_pivots_h1  = f_approach_bool(plot_pivots_h1,     false,    false,   false,     false,   false,  false)
+eff_plot_pivots_h4  = f_approach_bool(plot_pivots_h4,     false,    false,   false,     false,   false,  false)
+eff_plot_pivots_d   = f_approach_bool(plot_pivots_d,      true,     false,   false,     false,   false,  false)
+eff_plot_pivots_w   = f_approach_bool(plot_pivots_w,      true,     false,   false,     false,   false,  false)
+eff_plot_pivots_m   = f_approach_bool(plot_pivots_m,      false,    false,   false,     false,   false,  false)
+eff_plot_pivots_3m  = f_approach_bool(plot_pivots_3m,     false,    false,   false,     false,   false,  false)
+eff_plot_pivots_12m = f_approach_bool(plot_pivots_12m,    false,    false,   false,     false,   false,  false)
 
 // Sessions
-eff_london_show     = f_approach_bool(london_show,        true,     true,  false, false, false,  false)
-eff_ny_show         = f_approach_bool(ny_show,            true,     true,  false, false, false,  false)
-eff_tokyo_show      = f_approach_bool(tokyo_show,         true,     true,  false, false, false,  false)
-eff_sydney_show     = f_approach_bool(sydney_show,        true,     true,  false, false, false,  false)
+eff_london_show     = f_approach_bool(london_show,        true,     true,    false,     false,   false,  false)
+eff_ny_show         = f_approach_bool(ny_show,            true,     true,    false,     false,   false,  false)
+eff_tokyo_show      = f_approach_bool(tokyo_show,         true,     true,    false,     false,   false,  false)
+eff_sydney_show     = f_approach_bool(sydney_show,        true,     true,    false,     false,   false,  false)
 
 // Session BG Flag
-eff_sess_bg_enable  = f_approach_bool(true,               true,     false, false, false, false,  false)
+eff_sess_bg_enable  = f_approach_bool(true,               true,     false,   false,     false,   false,  false)
 
 // Key Levels Flags
 eff_key_levels_enabled = f_approach_bool(key_levels_enabled, true, true, true, true, true, true)
 eff_show_pdh    = f_approach_bool(show_pdh, true, true, true, true, true, true)
 eff_show_pdl    = f_approach_bool(show_pdl, true, true, true, true, true, true)
-eff_show_pdc    = f_approach_bool(show_pdc, false, false, false, false, false, false)
-eff_show_wopen  = f_approach_bool(show_wopen, true, false, true, false, false, true)
-eff_show_mopen  = f_approach_bool(show_mopen, false, false, false, false, false, false)
+eff_show_pdc    = f_approach_bool(show_pdc, true, true, true, true, false, true)
+eff_show_wopen  = f_approach_bool(show_wopen, true, true, false, true, true, true)
+eff_show_mopen  = f_approach_bool(show_mopen, true, false, false, false, true, false)
 
 // RVOL Flags
 eff_rvol_enabled = f_approach_bool(rvol_enabled, false, true, false, true, true, false)
 eff_rvol_points_enabled = f_approach_bool(rvol_points_enabled, false, true, false, true, true, false)
 
 // VWAP Flags
-eff_vwap_enabled = f_approach_bool(vwap_enabled, false, false, true, false, false, true)
-eff_vwap_anchor  = f_approach_str(vwap_anchor, "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Weekly")
+eff_vwap_enabled = f_approach_bool(vwap_enabled, false, false, true, false, true, true)
+eff_vwap_anchor  = f_approach_str(vwap_anchor, "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Weekly", "Session (Daily Reset)")
 eff_vwap_bands   = f_approach_bool(vwap_bands_enabled, false, false, true, false, false, false)
 eff_vwap_z       = f_approach_bool(vwap_z_enabled, false, false, true, false, false, false)
 
 // OR/IB Flags
-eff_or_enabled   = f_approach_bool(or_enabled, false, true, false, true, false, false)
+eff_or_enabled   = f_approach_bool(or_enabled, false, true, false, false, false, false)
 
 // Squeeze Box Flags
-eff_sq_box_enabled = f_approach_bool(sq_box_enabled, false, false, false, false, true, false)
+eff_sq_box_enabled = f_approach_bool(sq_box_enabled, false, false, false, true, false, false)
 
 int active_sec_calls = 0
 // Performance Counters (Per Bar)
@@ -2186,81 +2190,81 @@ f_draw_pivot(_line, _val, _col, _width, _offset_start, _show_cond, _input_active
 // Bedingungen für Sichtbarkeit
 
 // 1H: Offset 1, Width 1 (Analog zu Daily)
-l_h1_pp := f_draw_pivot(l_h1_pp, h1_PP, color.orange, 1, 1, cond_h1, plot_pivots_h1)
-l_h1_r1 := f_draw_pivot(l_h1_r1, h1_R1, color.red, 1, 1, cond_h1, plot_pivots_h1)
-l_h1_r2 := f_draw_pivot(l_h1_r2, h1_R2, color.red, 1, 1, cond_h1, plot_pivots_h1)
-l_h1_r3 := f_draw_pivot(l_h1_r3, h1_R3, color.red, 1, 1, cond_h1, plot_pivots_h1)
-l_h1_r4 := f_draw_pivot(l_h1_r4, h1_R4, color.red, 1, 1, cond_h1, plot_pivots_h1)
-l_h1_s1 := f_draw_pivot(l_h1_s1, h1_S1, color.green, 1, 1, cond_h1, plot_pivots_h1)
-l_h1_s2 := f_draw_pivot(l_h1_s2, h1_S2, color.green, 1, 1, cond_h1, plot_pivots_h1)
-l_h1_s3 := f_draw_pivot(l_h1_s3, h1_S3, color.green, 1, 1, cond_h1, plot_pivots_h1)
-l_h1_s4 := f_draw_pivot(l_h1_s4, h1_S4, color.green, 1, 1, cond_h1, plot_pivots_h1)
+l_h1_pp := f_draw_pivot(l_h1_pp, h1_PP, color.orange, 1, 1, cond_h1, eff_plot_pivots_h1)
+l_h1_r1 := f_draw_pivot(l_h1_r1, h1_R1, color.red, 1, 1, cond_h1, eff_plot_pivots_h1)
+l_h1_r2 := f_draw_pivot(l_h1_r2, h1_R2, color.red, 1, 1, cond_h1, eff_plot_pivots_h1)
+l_h1_r3 := f_draw_pivot(l_h1_r3, h1_R3, color.red, 1, 1, cond_h1, eff_plot_pivots_h1)
+l_h1_r4 := f_draw_pivot(l_h1_r4, h1_R4, color.red, 1, 1, cond_h1, eff_plot_pivots_h1)
+l_h1_s1 := f_draw_pivot(l_h1_s1, h1_S1, color.green, 1, 1, cond_h1, eff_plot_pivots_h1)
+l_h1_s2 := f_draw_pivot(l_h1_s2, h1_S2, color.green, 1, 1, cond_h1, eff_plot_pivots_h1)
+l_h1_s3 := f_draw_pivot(l_h1_s3, h1_S3, color.green, 1, 1, cond_h1, eff_plot_pivots_h1)
+l_h1_s4 := f_draw_pivot(l_h1_s4, h1_S4, color.green, 1, 1, cond_h1, eff_plot_pivots_h1)
 
 // 4H: Offset 1, Width 1 (Analog zu Daily)
-l_h4_pp := f_draw_pivot(l_h4_pp, h4_PP, color.orange, 1, 1, cond_h4, plot_pivots_h4)
-l_h4_r1 := f_draw_pivot(l_h4_r1, h4_R1, color.red, 1, 1, cond_h4, plot_pivots_h4)
-l_h4_r2 := f_draw_pivot(l_h4_r2, h4_R2, color.red, 1, 1, cond_h4, plot_pivots_h4)
-l_h4_r3 := f_draw_pivot(l_h4_r3, h4_R3, color.red, 1, 1, cond_h4, plot_pivots_h4)
-l_h4_r4 := f_draw_pivot(l_h4_r4, h4_R4, color.red, 1, 1, cond_h4, plot_pivots_h4)
-l_h4_s1 := f_draw_pivot(l_h4_s1, h4_S1, color.green, 1, 1, cond_h4, plot_pivots_h4)
-l_h4_s2 := f_draw_pivot(l_h4_s2, h4_S2, color.green, 1, 1, cond_h4, plot_pivots_h4)
-l_h4_s3 := f_draw_pivot(l_h4_s3, h4_S3, color.green, 1, 1, cond_h4, plot_pivots_h4)
-l_h4_s4 := f_draw_pivot(l_h4_s4, h4_S4, color.green, 1, 1, cond_h4, plot_pivots_h4)
+l_h4_pp := f_draw_pivot(l_h4_pp, h4_PP, color.orange, 1, 1, cond_h4, eff_plot_pivots_h4)
+l_h4_r1 := f_draw_pivot(l_h4_r1, h4_R1, color.red, 1, 1, cond_h4, eff_plot_pivots_h4)
+l_h4_r2 := f_draw_pivot(l_h4_r2, h4_R2, color.red, 1, 1, cond_h4, eff_plot_pivots_h4)
+l_h4_r3 := f_draw_pivot(l_h4_r3, h4_R3, color.red, 1, 1, cond_h4, eff_plot_pivots_h4)
+l_h4_r4 := f_draw_pivot(l_h4_r4, h4_R4, color.red, 1, 1, cond_h4, eff_plot_pivots_h4)
+l_h4_s1 := f_draw_pivot(l_h4_s1, h4_S1, color.green, 1, 1, cond_h4, eff_plot_pivots_h4)
+l_h4_s2 := f_draw_pivot(l_h4_s2, h4_S2, color.green, 1, 1, cond_h4, eff_plot_pivots_h4)
+l_h4_s3 := f_draw_pivot(l_h4_s3, h4_S3, color.green, 1, 1, cond_h4, eff_plot_pivots_h4)
+l_h4_s4 := f_draw_pivot(l_h4_s4, h4_S4, color.green, 1, 1, cond_h4, eff_plot_pivots_h4)
 
 // Daily: Offset 1, Width 1
-l_d_pp := f_draw_pivot(l_d_pp, d_PP, color.orange, 2, 1, Intra, plot_pivots_d)
-l_d_r1 := f_draw_pivot(l_d_r1, d_R1, color.red, 2, 1, Intra, plot_pivots_d)
-l_d_r2 := f_draw_pivot(l_d_r2, d_R2, color.red, 2, 1, Intra, plot_pivots_d)
-l_d_r3 := f_draw_pivot(l_d_r3, d_R3, color.red, 2, 1, Intra, plot_pivots_d)
-l_d_r4 := f_draw_pivot(l_d_r4, d_R4, color.red, 2, 1, Intra, plot_pivots_d)
-l_d_s1 := f_draw_pivot(l_d_s1, d_S1, color.green, 2, 1, Intra, plot_pivots_d)
-l_d_s2 := f_draw_pivot(l_d_s2, d_S2, color.green, 2, 1, Intra, plot_pivots_d)
-l_d_s3 := f_draw_pivot(l_d_s3, d_S3, color.green, 2, 1, Intra, plot_pivots_d)
-l_d_s4 := f_draw_pivot(l_d_s4, d_S4, color.green, 2, 1, Intra, plot_pivots_d)
+l_d_pp := f_draw_pivot(l_d_pp, d_PP, color.orange, 2, 1, Intra, eff_plot_pivots_d)
+l_d_r1 := f_draw_pivot(l_d_r1, d_R1, color.red, 2, 1, Intra, eff_plot_pivots_d)
+l_d_r2 := f_draw_pivot(l_d_r2, d_R2, color.red, 2, 1, Intra, eff_plot_pivots_d)
+l_d_r3 := f_draw_pivot(l_d_r3, d_R3, color.red, 2, 1, Intra, eff_plot_pivots_d)
+l_d_r4 := f_draw_pivot(l_d_r4, d_R4, color.red, 2, 1, Intra, eff_plot_pivots_d)
+l_d_s1 := f_draw_pivot(l_d_s1, d_S1, color.green, 2, 1, Intra, eff_plot_pivots_d)
+l_d_s2 := f_draw_pivot(l_d_s2, d_S2, color.green, 2, 1, Intra, eff_plot_pivots_d)
+l_d_s3 := f_draw_pivot(l_d_s3, d_S3, color.green, 2, 1, Intra, eff_plot_pivots_d)
+l_d_s4 := f_draw_pivot(l_d_s4, d_S4, color.green, 2, 1, Intra, eff_plot_pivots_d)
 
 // Weekly: Offset 3, Width 3
-l_w_pp := f_draw_pivot(l_w_pp, w_PP, color.yellow, 3, 3, Intra_D, plot_pivots_w)
-l_w_r1 := f_draw_pivot(l_w_r1, w_R1, color.red, 3, 3, Intra_D, plot_pivots_w)
-l_w_r2 := f_draw_pivot(l_w_r2, w_R2, color.red, 3, 3, Intra_D, plot_pivots_w)
-l_w_r3 := f_draw_pivot(l_w_r3, w_R3, color.red, 3, 3, Intra_D, plot_pivots_w)
-l_w_r4 := f_draw_pivot(l_w_r4, w_R4, color.red, 3, 3, Intra_D, plot_pivots_w)
-l_w_s1 := f_draw_pivot(l_w_s1, w_S1, color.green, 3, 3, Intra_D, plot_pivots_w)
-l_w_s2 := f_draw_pivot(l_w_s2, w_S2, color.green, 3, 3, Intra_D, plot_pivots_w)
-l_w_s3 := f_draw_pivot(l_w_s3, w_S3, color.green, 3, 3, Intra_D, plot_pivots_w)
-l_w_s4 := f_draw_pivot(l_w_s4, w_S4, color.green, 3, 3, Intra_D, plot_pivots_w)
+l_w_pp := f_draw_pivot(l_w_pp, w_PP, color.yellow, 3, 3, Intra_D, eff_plot_pivots_w)
+l_w_r1 := f_draw_pivot(l_w_r1, w_R1, color.red, 3, 3, Intra_D, eff_plot_pivots_w)
+l_w_r2 := f_draw_pivot(l_w_r2, w_R2, color.red, 3, 3, Intra_D, eff_plot_pivots_w)
+l_w_r3 := f_draw_pivot(l_w_r3, w_R3, color.red, 3, 3, Intra_D, eff_plot_pivots_w)
+l_w_r4 := f_draw_pivot(l_w_r4, w_R4, color.red, 3, 3, Intra_D, eff_plot_pivots_w)
+l_w_s1 := f_draw_pivot(l_w_s1, w_S1, color.green, 3, 3, Intra_D, eff_plot_pivots_w)
+l_w_s2 := f_draw_pivot(l_w_s2, w_S2, color.green, 3, 3, Intra_D, eff_plot_pivots_w)
+l_w_s3 := f_draw_pivot(l_w_s3, w_S3, color.green, 3, 3, Intra_D, eff_plot_pivots_w)
+l_w_s4 := f_draw_pivot(l_w_s4, w_S4, color.green, 3, 3, Intra_D, eff_plot_pivots_w)
 
 // Monthly: Offset 5, Width 4
-l_m_pp := f_draw_pivot(l_m_pp, m_PP, color.yellow, 4, 5, Intra_D_W, plot_pivots_m)
-l_m_r1 := f_draw_pivot(l_m_r1, m_R1, color.red, 4, 5, Intra_D_W, plot_pivots_m)
-l_m_r2 := f_draw_pivot(l_m_r2, m_R2, color.red, 4, 5, Intra_D_W, plot_pivots_m)
-l_m_r3 := f_draw_pivot(l_m_r3, m_R3, color.red, 4, 5, Intra_D_W, plot_pivots_m)
-l_m_r4 := f_draw_pivot(l_m_r4, m_R4, color.red, 4, 5, Intra_D_W, plot_pivots_m)
-l_m_s1 := f_draw_pivot(l_m_s1, m_S1, color.green, 4, 5, Intra_D_W, plot_pivots_m)
-l_m_s2 := f_draw_pivot(l_m_s2, m_S2, color.green, 4, 5, Intra_D_W, plot_pivots_m)
-l_m_s3 := f_draw_pivot(l_m_s3, m_S3, color.green, 4, 5, Intra_D_W, plot_pivots_m)
-l_m_s4 := f_draw_pivot(l_m_s4, m_S4, color.green, 4, 5, Intra_D_W, plot_pivots_m)
+l_m_pp := f_draw_pivot(l_m_pp, m_PP, color.yellow, 4, 5, Intra_D_W, eff_plot_pivots_m)
+l_m_r1 := f_draw_pivot(l_m_r1, m_R1, color.red, 4, 5, Intra_D_W, eff_plot_pivots_m)
+l_m_r2 := f_draw_pivot(l_m_r2, m_R2, color.red, 4, 5, Intra_D_W, eff_plot_pivots_m)
+l_m_r3 := f_draw_pivot(l_m_r3, m_R3, color.red, 4, 5, Intra_D_W, eff_plot_pivots_m)
+l_m_r4 := f_draw_pivot(l_m_r4, m_R4, color.red, 4, 5, Intra_D_W, eff_plot_pivots_m)
+l_m_s1 := f_draw_pivot(l_m_s1, m_S1, color.green, 4, 5, Intra_D_W, eff_plot_pivots_m)
+l_m_s2 := f_draw_pivot(l_m_s2, m_S2, color.green, 4, 5, Intra_D_W, eff_plot_pivots_m)
+l_m_s3 := f_draw_pivot(l_m_s3, m_S3, color.green, 4, 5, Intra_D_W, eff_plot_pivots_m)
+l_m_s4 := f_draw_pivot(l_m_s4, m_S4, color.green, 4, 5, Intra_D_W, eff_plot_pivots_m)
 
 // 3 Month: Offset 7, Width 5
-l_3m_pp := f_draw_pivot(l_3m_pp, m3_PP, color.yellow, 5, 7, Intra_D_W_M, plot_pivots_3m)
-l_3m_r1 := f_draw_pivot(l_3m_r1, m3_R1, color.red, 5, 7, Intra_D_W_M, plot_pivots_3m)
-l_3m_r2 := f_draw_pivot(l_3m_r2, m3_R2, color.red, 5, 7, Intra_D_W_M, plot_pivots_3m)
-l_3m_r3 := f_draw_pivot(l_3m_r3, m3_R3, color.red, 5, 7, Intra_D_W_M, plot_pivots_3m)
-l_3m_r4 := f_draw_pivot(l_3m_r4, m3_R4, color.red, 5, 7, Intra_D_W_M, plot_pivots_3m)
-l_3m_s1 := f_draw_pivot(l_3m_s1, m3_S1, color.green, 5, 7, Intra_D_W_M, plot_pivots_3m)
-l_3m_s2 := f_draw_pivot(l_3m_s2, m3_S2, color.green, 5, 7, Intra_D_W_M, plot_pivots_3m)
-l_3m_s3 := f_draw_pivot(l_3m_s3, m3_S3, color.green, 5, 7, Intra_D_W_M, plot_pivots_3m)
-l_3m_s4 := f_draw_pivot(l_3m_s4, m3_S4, color.green, 5, 7, Intra_D_W_M, plot_pivots_3m)
+l_3m_pp := f_draw_pivot(l_3m_pp, m3_PP, color.yellow, 5, 7, Intra_D_W_M, eff_plot_pivots_3m)
+l_3m_r1 := f_draw_pivot(l_3m_r1, m3_R1, color.red, 5, 7, Intra_D_W_M, eff_plot_pivots_3m)
+l_3m_r2 := f_draw_pivot(l_3m_r2, m3_R2, color.red, 5, 7, Intra_D_W_M, eff_plot_pivots_3m)
+l_3m_r3 := f_draw_pivot(l_3m_r3, m3_R3, color.red, 5, 7, Intra_D_W_M, eff_plot_pivots_3m)
+l_3m_r4 := f_draw_pivot(l_3m_r4, m3_R4, color.red, 5, 7, Intra_D_W_M, eff_plot_pivots_3m)
+l_3m_s1 := f_draw_pivot(l_3m_s1, m3_S1, color.green, 5, 7, Intra_D_W_M, eff_plot_pivots_3m)
+l_3m_s2 := f_draw_pivot(l_3m_s2, m3_S2, color.green, 5, 7, Intra_D_W_M, eff_plot_pivots_3m)
+l_3m_s3 := f_draw_pivot(l_3m_s3, m3_S3, color.green, 5, 7, Intra_D_W_M, eff_plot_pivots_3m)
+l_3m_s4 := f_draw_pivot(l_3m_s4, m3_S4, color.green, 5, 7, Intra_D_W_M, eff_plot_pivots_3m)
 
 // 12 Month: Offset 9, Width 6
-l_12m_pp := f_draw_pivot(l_12m_pp, m12_PP, color.yellow, 6, 9, Intra_D_W_M, plot_pivots_12m)
-l_12m_r1 := f_draw_pivot(l_12m_r1, m12_R1, color.red, 6, 9, Intra_D_W_M, plot_pivots_12m)
-l_12m_r2 := f_draw_pivot(l_12m_r2, m12_R2, color.red, 6, 9, Intra_D_W_M, plot_pivots_12m)
-l_12m_r3 := f_draw_pivot(l_12m_r3, m12_R3, color.red, 6, 9, Intra_D_W_M, plot_pivots_12m)
-l_12m_r4 := f_draw_pivot(l_12m_r4, m12_R4, color.red, 6, 9, Intra_D_W_M, plot_pivots_12m)
-l_12m_s1 := f_draw_pivot(l_12m_s1, m12_S1, color.green, 6, 9, Intra_D_W_M, plot_pivots_12m)
-l_12m_s2 := f_draw_pivot(l_12m_s2, m12_S2, color.green, 6, 9, Intra_D_W_M, plot_pivots_12m)
-l_12m_s3 := f_draw_pivot(l_12m_s3, m12_S3, color.green, 6, 9, Intra_D_W_M, plot_pivots_12m)
-l_12m_s4 := f_draw_pivot(l_12m_s4, m12_S4, color.green, 6, 9, Intra_D_W_M, plot_pivots_12m)
+l_12m_pp := f_draw_pivot(l_12m_pp, m12_PP, color.yellow, 6, 9, Intra_D_W_M, eff_plot_pivots_12m)
+l_12m_r1 := f_draw_pivot(l_12m_r1, m12_R1, color.red, 6, 9, Intra_D_W_M, eff_plot_pivots_12m)
+l_12m_r2 := f_draw_pivot(l_12m_r2, m12_R2, color.red, 6, 9, Intra_D_W_M, eff_plot_pivots_12m)
+l_12m_r3 := f_draw_pivot(l_12m_r3, m12_R3, color.red, 6, 9, Intra_D_W_M, eff_plot_pivots_12m)
+l_12m_r4 := f_draw_pivot(l_12m_r4, m12_R4, color.red, 6, 9, Intra_D_W_M, eff_plot_pivots_12m)
+l_12m_s1 := f_draw_pivot(l_12m_s1, m12_S1, color.green, 6, 9, Intra_D_W_M, eff_plot_pivots_12m)
+l_12m_s2 := f_draw_pivot(l_12m_s2, m12_S2, color.green, 6, 9, Intra_D_W_M, eff_plot_pivots_12m)
+l_12m_s3 := f_draw_pivot(l_12m_s3, m12_S3, color.green, 6, 9, Intra_D_W_M, eff_plot_pivots_12m)
+l_12m_s4 := f_draw_pivot(l_12m_s4, m12_S4, color.green, 6, 9, Intra_D_W_M, eff_plot_pivots_12m)
 
 
 //----------------------------------- Bollinger Bands ------------------------------------
@@ -2419,6 +2423,36 @@ st_syd := t_st_syd
 bool any_sess_configured = eff_london_show or eff_ny_show or eff_tokyo_show or eff_sydney_show
 bool any_sess_active     = lon_active or ny_active or tok_active or syd_active
 
+if lens_changed
+    if not eff_london_show and not na(b_lon)
+        box.delete(b_lon)
+        b_lon := na
+        h_lon := na
+        l_lon := na
+        st_lon := na
+    if not eff_ny_show and not na(b_ny)
+        box.delete(b_ny)
+        b_ny := na
+        h_ny := na
+        l_ny := na
+        st_ny := na
+    if not eff_tokyo_show and not na(b_tok)
+        box.delete(b_tok)
+        b_tok := na
+        h_tok := na
+        l_tok := na
+        st_tok := na
+    if not eff_sydney_show and not na(b_syd)
+        box.delete(b_syd)
+        b_syd := na
+        h_syd := na
+        l_syd := na
+        st_syd := na
+    if not any_sess_configured and array.size(sess_lines) > 0
+        for i = 0 to array.size(sess_lines) - 1
+            line.delete(array.get(sess_lines, i))
+        array.clear(sess_lines)
+
 color bg_sess_color = na
 
 if show_sess_on_tf
@@ -2536,6 +2570,22 @@ else
 // Stage 5: OR/IB Module
 
 var OrState ors = OrState.new(na, na, na, false, false, na, na, na)
+
+if lens_changed and not eff_or_enabled
+    if not na(ors.id_box)
+        box.delete(ors.id_box)
+    if not na(ors.l_hi)
+        line.delete(ors.l_hi)
+    if not na(ors.l_lo)
+        line.delete(ors.l_lo)
+    ors.start_bar := na
+    ors.hi := na
+    ors.lo := na
+    ors.building := false
+    ors.locked := false
+    ors.id_box := na
+    ors.l_hi := na
+    ors.l_lo := na
 
 // Session Determination
 string or_s_str = na
@@ -3035,7 +3085,7 @@ sig_vol_spike := eff_show_vol and is_vol_spike
 // ------------------------------------------- Gradient Volume Profile ----------------------------------------------
 
 // Mode flag
-bool vp_is_full = (vp_mode == "Full TF")
+bool vp_is_full = (eff_vp_mode == "Full TF")
 bool vp_is_bars = (vp_style == "Bars")
 
 // Full TF Data Structures (range-independent bins)
@@ -3134,7 +3184,7 @@ if eff_vp_enable and vp_is_full and barstate.isconfirmed
 
 if barstate.islast
     // --- DIRTY LOGIC ---
-    bool mode_changed = (vp_mode != last_vp_mode)
+    bool mode_changed = (eff_vp_mode != last_vp_mode)
     bool style_changed = (vp_style != last_vp_style)
     int vp_rows_eff = vp_rows
     int vp_render_rows = vp_is_bars ? math.max(vp_rows, math.min(VP_BOX_BUDGET, vp_rows * 2)) : vp_rows_eff
@@ -3451,7 +3501,7 @@ if barstate.islast
                         f_vp_hide_line(array.get(vp_lines, j))
 
     // --- Update trackers ---
-    last_vp_mode := vp_mode
+    last_vp_mode := eff_vp_mode
     last_vp_style := vp_style
     last_left    := chart.left_visible_bar_time
     last_right   := chart.right_visible_bar_time
@@ -3542,7 +3592,7 @@ if dbg_ops and barstate.islast
     table.cell(tbl_dbg, 1, 4, str.tostring(ops_vp_scan + ops_vp_draw) + " (" + str.tostring(peak_ops_vp) + ")", text_color=(ops_vp_scan + ops_vp_draw) > 1000 ? color.red : color.green, text_size=size.small)
 
     if dbg_perf
-        string vp_dbg = "d=" + str.tostring(vp_dirty) + " rows=" + str.tostring(vp_render_rows_dbg) + " " + vp_mode + " " + vp_style
+        string vp_dbg = "d=" + str.tostring(vp_dirty) + " rows=" + str.tostring(vp_render_rows_dbg) + " " + eff_vp_mode + " " + vp_style
         table.cell(tbl_dbg, 0, 3, "VP", text_color=color.white, text_size=size.small)
         table.cell(tbl_dbg, 1, 3, vp_dbg, text_color=color.silver, text_size=size.small)
 
@@ -3716,6 +3766,15 @@ if eff_regime_panel and not na(info_panel) and barstate.islast
 // Stage 6: Squeeze Box logic
 
 var SqState sqs = SqState.new(na, na, false, false, na)
+
+if lens_changed and not eff_sq_box_enabled
+    if not na(sqs.id_box)
+        box.delete(sqs.id_box)
+    sqs.hi := na
+    sqs.lo := na
+    sqs.active := false
+    sqs.locked := false
+    sqs.id_box := na
 
 // Condition
 bool in_sq_condition = (regime_state == "SQUEEZE")
@@ -4220,6 +4279,9 @@ alertcondition(sq_start, "Squeeze Start", "Market entered Squeeze Regime")
 alertcondition(sq_end, "Squeeze Release", "Market left Squeeze Regime")
 alertcondition(sq_break_up, "Squeeze Box Break Up", "Price broke Squeeze Box Up")
 alertcondition(sq_break_dn, "Squeeze Box Break Down", "Price broke Squeeze Box Down")
+
+if barstate.islast
+    prev_approach_id := approach_id
 
 // --- Profiling Notes ---
 // Use Pine Profiler to compare before/after performance.
