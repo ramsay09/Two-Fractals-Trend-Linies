@@ -3107,15 +3107,6 @@ var line[]  vp_lines    = array.new_line()
 var box[]   vp_boxes    = array.new_box()
 var int vp_render_rows_dbg = na
 
-// Dirty tracking
-var int last_left  = na
-var int last_right = na
-var int last_full_bar = na
-var string last_vp_mode = na
-var string last_vp_style = na
-var int last_vp_line_count = na
-var int last_vp_box_count = na
-
 // Helper: safe map add
 f_vp_map_add(int k, float addv) =>
     float prev = nz(map.get(vp_map, k), 0.0)
@@ -3170,6 +3161,13 @@ f_run_vp() =>
     var int full_max_k = na
     var bool vp_prev_enabled = na
     var bool vp_dirty = true
+    var int last_left  = na
+    var int last_right = na
+    var int last_full_bar = na
+    var string last_vp_mode = na
+    var string last_vp_style = na
+    var int last_vp_line_count = na
+    var int last_vp_box_count = na
     int vp_render_rows_dbg_local = na
     // --- Full TF incremental build (ONLY on confirmed bars to avoid double counting) ---
     if eff_vp_enable and vp_is_full and barstate.isconfirmed
