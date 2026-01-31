@@ -3518,7 +3518,8 @@ f_run_vp() =>
         vp_prev_enabled := eff_vp_enable
     [vp_render_rows_dbg_local, ops_vp_scan_local, ops_vp_draw_local]
 
-[vp_render_rows_dbg, ops_vp_scan_inc, ops_vp_draw_inc] = f_run_vp()
+[vp_render_rows_dbg_local, ops_vp_scan_inc, ops_vp_draw_inc] = f_run_vp()
+vp_render_rows_dbg := vp_render_rows_dbg_local
 ops_vp_scan += ops_vp_scan_inc
 ops_vp_draw += ops_vp_draw_inc
 
