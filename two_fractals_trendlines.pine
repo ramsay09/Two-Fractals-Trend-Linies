@@ -27,17 +27,18 @@ int W_O     = 1
 
 
 // --- TOP LEVEL UI ---
-auto_tuning     = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Auto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
-
-trading_approach = input.string("Custom", "Context Lenses", options=["Custom", "Session Map", "ORB", "Mean Reversion", "Breakout", "Squeeze Breakout", "Trend Continuation"], tooltip="Applies focused defaults for a trading lens. Custom = fully manual. \n• Custom: Full manual control.\n• Session Map: Structure, Key Levels, ADR.\n• ORB: Opening Range, RVOL.\n• Mean Reversion: VWAP, Bands, Divergences.\n• Breakout/Squeeze: RVOL, Structure, Momentum.\n• Trend Continuation: CONF/REG, FVG.")
-
 // adx, hma and ema1 x ema2 mtf trend info panel
-panel_pos      = input.string(title='MTF Info Panel', defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
-                 tooltip='Provides an overview of multi time frame trends: FVG Close state, and Fractal Break state. Displays for 5m, 15m, 1H, 4H, 1D, 1W, 1M. Select position to enable.\n○ = developing (current candle not closed), ● = confirmed (closed).')
-panel_update_mode = input.string("Realtime Preview", "Panel Update Mode", options=["Realtime Preview", "Strict Confirm"], tooltip="Realtime Preview: shows live/developing values (○). Strict Confirm: shows last confirmed close values only (●).")
-bool panel_show_live = panel_update_mode == "Realtime Preview"
+panel_pos               = input.string(title='MTF Panel', inline="panel", defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
+                          tooltip='')
+panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update Mode", inline="panel", options=["Realtime Preview", "Strict Confirm"], tooltip="Provides an overview of multi time frame trends: FVG Close state, and Fractal Break state. Select position to enable.\n○ = developing (current candle not closed), \n● = confirmed (closed).
+                          \nRealtime Preview: shows live/developing values (○). \nStrict Confirm: shows last confirmed close values only (●).")
+bool panel_show_live    = panel_update_mode == "Realtime Preview"
+
+trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Session Map", "ORB", "Mean Reversion", "Breakout", "Squeeze Breakout", "Trend Continuation"], tooltip="Applies focused defaults for a trading lens. Custom = fully manual. \n• Custom: Full manual control.\n• Session Map: Structure, Key Levels, ADR.\n• ORB: Opening Range, RVOL.\n• Mean Reversion: VWAP, Bands, Divergences.\n• Breakout/Squeeze: RVOL, Structure, Momentum.\n• Trend Continuation: CONF/REG, FVG.")
+
 
 // Confluence & Regime Visuals
+auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Auto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
 show_conf_meter     = input.bool(true, "Confluence Meter⠀⠀⠀", inline="conf_ui", tooltip="")
 show_conf_bg        = input.bool(false, "Confluence Meter BG", inline="conf_ui", tooltip="CONF (Trend Bias) shows the current dominant trend direction as a compact 0–100 score.
                      \n• BULL / BEAR / NEUT = direction
@@ -55,7 +56,7 @@ show_conf_bg        = input.bool(false, "Confluence Meter BG", inline="conf_ui",
 
 conf_use_vwap_quality = input.bool(true, "CONF: VWAP Quality Gate", tooltip="Adjusts CONF quality using VWAP alignment + stretch (anti-chase). State remains unchanged.")
 conf_vwap_mode        = input.string("Auto", "VWAP Anchor", inline="conf", options=["Auto","Session VWAP","Weekly VWAP"], tooltip="")
-conf_z_penalty_mode   = input.string("Default", "⠀Stretch Penalty", inline="conf", options=["Default","Conservative","Aggressive"], tooltip="Which VWAP anchor CONF uses for quality. Auto: Session ≤ 60m, Weekly > 60m. n\How strongly VWAP stretch reduces CONF quality.")
+conf_z_penalty_mode   = input.string("Default", "⠀Stretch Penalty", inline="conf", options=["Default","Conservative","Aggressive"], tooltip="Which VWAP anchor CONF uses for quality. Auto: Session ≤ 60m, Weekly > 60m. \nHow strongly VWAP stretch reduces CONF quality.")
 
 show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
 regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
@@ -408,12 +409,11 @@ BB_sdev_2           = 3
 BB_sdev_3           = 4
 BB_sdev_4           = 5
 
-
 // ema cloud and ma inputs
 grp_ma              = 'EMA cloud and MA'
 en_cloud            = input.bool(false, title='EMA Cloud⠀', inline="ema_c", group=grp_ma, tooltip='')
 sig_plot            = input.bool(true, title='Cloud Color Signal', inline="ema_c", group=grp_ma, tooltip='EMA1 cross EMA2 color signal.
-                      n\This EMA cloud works as dynamic support and resistance and as trend indication. A wide cloud indicates high volatility, a narrow cloud indicates low volatility and breakout potential. Interesting pairs: 8/21, 40/97')
+                      \nThis EMA cloud works as dynamic support and resistance and as trend indication. A wide cloud indicates high volatility, a narrow cloud indicates low volatility and breakout potential. Interesting pairs: 8/21, 40/97')
 
 ema_inp1            = input.int(8, title='EMA1 Length', inline="ema_l", minval=1, group=grp_ma, tooltip="")
 ema_inp2            = input.int(21, title='⠀EMA2 Length', inline="ema_l", minval=1, group=grp_ma, tooltip="")
@@ -444,7 +444,7 @@ grp_div             = 'Divergences'
 plot_div            = input.bool(true, title='Divergences', group=grp_div, tooltip='These divergences are very early signals and must be used in confluence with other signals. Hidden and classic divergence are used')
 div_indi            = input.string('rsi', title='Divergence Indicator', options=['rsi', 'macd(fast_line)', 'macd(slow_line)'], tooltip='Select an Indicator for divergence calculation.', group=grp_div)
 rsi_length          = input.int(14, title='RSI Length', inline="rsi_p", minval=1, step=2, group=grp_div)
-bar_div_p           = input.int(25, title='⠀⠀⠀⠀Bar Period', inline="rsi_p", minval=1, step=1, tooltip='RSI Length. n\The number of bars in which divergences are detected.', group=grp_div)
+bar_div_p           = input.int(25, title='⠀⠀⠀⠀Bar Period', inline="rsi_p", minval=1, step=1, tooltip='RSI Length. \nThe number of bars in which divergences are detected.', group=grp_div)
 src_div             = input.string('high/low', title='Bar Divergence Source', options=['high/low', 'close'], tooltip='The bar source for divergence calculation.', group=grp_div)
 
 // bar signals inputs
@@ -508,7 +508,6 @@ grp_alerts      = "🔔 Alerts"
 alert_profile   = input.string("Normal", "Alert Profile", options=["Off", "Minimal","Normal","Moderate"], group=grp_alerts, tooltip="Controls the complexity of alert triggers to avoid spam. \n• Off: No alerts. \n• Minimal: Trendline Breakouts only. \n• Normal: Adds Divergences. \n• Moderate: Adds Regime Changes & High Confluence Events.")
 alert_cooldown  = input.int(5, "Cooldown (Bars)", minval=1, group=grp_alerts, tooltip="Wait period (in bars) after an alert is triggered before the same alert type can trigger again. Prevents repetitive alerts during the same market event.")
 use_rt_alert   = input.bool(false, title="Alert on 5th Fractal Candle (Real-time)", group=grp_alerts, tooltip="Triggers an alert signal while the 5th candle of a fractal pattern is forming (Real-time). Select 'Any function call' when creating the alert.")
-
 
 // Debug (Performance)
 debug_on       = input.bool(false, "Debug (Perf)", group="Debug")
@@ -1258,8 +1257,6 @@ plotshape(plot_bear_combined, style=shape.arrowdown, location=location.abovebar,
 plotshape(plot_bull_combined, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,  textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Bull divergence')
 
 
-
-
 //----------------------------------------------------------------- ema cloud / hma slope / dmi adx (Visuals for Chart) -------------------------------------------------------------------
 
 ema1                = ta.ema(close, ema_inp1)
@@ -1696,7 +1693,6 @@ if eff_plot_segments and barstate.isconfirmed
     line.delete(segment_low_2_l[1])
     line.delete(segment_low_3_l[1])
 
-
     // short segments
     for i = 0 to sb by 1
         count1_s := count1_s + 1
@@ -1738,8 +1734,6 @@ if eff_plot_segments and barstate.isconfirmed
 
     if low < low[1] and segment_3_stat_s
         sig_seg_bear := true
-
-
 
 
 //-------------------------------------------------------------------- info panel -------------------------------------------------------------------------
@@ -2991,8 +2985,6 @@ else
     lb_s1_h := na
     label.delete(lb_s1_l)
     lb_s1_l := na
-
-
 
 
 // --- 2. Last Fractal S/R (Lines & Labels) ---
