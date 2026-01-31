@@ -3169,6 +3169,8 @@ f_run_vp() =>
     var int last_vp_line_count = na
     var int last_vp_box_count = na
     int vp_render_rows_dbg_local = na
+    int ops_vp_scan_local = 0
+    int ops_vp_draw_local = 0
     // --- Full TF incremental build (ONLY on confirmed bars to avoid double counting) ---
     if eff_vp_enable and vp_is_full and barstate.isconfirmed
         float band_f = syminfo.mintick * vp_full_band_ticks
@@ -3256,7 +3258,7 @@ f_run_vp() =>
 
                 // SCAN 1: price range over visible window (legacy logic)
                 for ii = 0 to loopLimit
-                    ops_vp_scan += dbg_ops ? 1 : 0
+                    ops_vp_scan_local += dbg_ops ? 1 : 0
                     int t = time[ii]
                     if t < vStart
                         break
@@ -3342,7 +3344,7 @@ f_run_vp() =>
                     int[] keys = map.keys(vp_map)
                     if array.size(keys) > 0
                         for ii = 0 to array.size(keys) - 1
-                            ops_vp_scan += dbg_ops ? 1 : 0
+                            ops_vp_scan_local += dbg_ops ? 1 : 0
                             int k = array.get(keys, ii)
                             float vol = nz(map.get(vp_map, k), 0.0)
 
@@ -3452,7 +3454,7 @@ f_run_vp() =>
                                         intens := 1.0
                                     float intens_c = math.pow(intens, 0.65)
                                     if intens_c > min_intens
-                                        ops_vp_draw += dbg_ops ? 1 : 0
+                                        ops_vp_draw_local += dbg_ops ? 1 : 0
                                         int len_bi = int(math.round(intens_c * vp_bars_w))
                                         if len_bi < 2
                                             len_bi := 2
@@ -3487,7 +3489,7 @@ f_run_vp() =>
 
                                 float min_intens = vp_is_full ? 0.01 : 0.003
                                 if intens > min_intens
-                                    ops_vp_draw += dbg_ops ? 1 : 0
+                                    ops_vp_draw_local += dbg_ops ? 1 : 0
                                     color col = color.from_gradient(intens, 0, 1, color.new(vp_color, 100), color.new(vp_color, 0))
                                     line.set_xy1(ln, xLoc, y1)
                                     line.set_xy2(ln, xLoc, y2)
@@ -3514,9 +3516,11 @@ f_run_vp() =>
             last_full_bar := bar_index
         vp_dirty := false
         vp_prev_enabled := eff_vp_enable
-    vp_render_rows_dbg_local
+    [vp_render_rows_dbg_local, ops_vp_scan_local, ops_vp_draw_local]
 
-vp_render_rows_dbg := f_run_vp()
+[vp_render_rows_dbg, ops_vp_scan_inc, ops_vp_draw_inc] = f_run_vp()
+ops_vp_scan += ops_vp_scan_inc
+ops_vp_draw += ops_vp_draw_inc
 
 
 // --- Stage 2: ADR/Today Range Calculation ---
