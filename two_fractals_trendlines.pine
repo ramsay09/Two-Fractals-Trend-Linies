@@ -3096,8 +3096,6 @@ bool vp_is_bars = (vp_style == "Bars")
 // Full TF Data Structures (range-independent bins)
 int vp_full_band_ticks = 10
 var map<int, float> vp_map = map.new<int, float>()
-var int full_min_k = na
-var int full_max_k = na
 
 // Arrays / draw objects
 var float[] vp_volArray = array.new_float(vp_rows, 0.0)
@@ -3170,6 +3168,8 @@ f_vp_ensure_boxes(int count) =>
         box.delete(array.pop(vp_boxes))
 
 f_run_vp() =>
+    var int full_min_k = na
+    var int full_max_k = na
     // --- Full TF incremental build (ONLY on confirmed bars to avoid double counting) ---
     if eff_vp_enable and vp_is_full and barstate.isconfirmed
         float band_f = syminfo.mintick * vp_full_band_ticks
