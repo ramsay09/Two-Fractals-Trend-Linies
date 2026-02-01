@@ -1,6 +1,6 @@
 //@version=5
 
-indicator('Market Context & Confluence Suite', overlay=true, shorttitle='MCCS', max_bars_back=4000, max_lines_count=500, max_boxes_count=500, dynamic_requests=true)
+indicator('Market Context & Confluence Suite', overlay=true, shorttitle='MCCS', max_bars_back=3000, max_lines_count=500, max_boxes_count=500, dynamic_requests=true)
 
 general_info   = input.bool(title='General Description', defval=false, tooltip='Use the signals in confluence and as an indication of market tension, which will discharged in higher volatility or trend continuation. ... context matters.
                  Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
@@ -79,18 +79,11 @@ f_with_marker(string txt, string marker) =>
 int tf_sec = timeframe.in_seconds(timeframe.period)
 
 // 2. Define Effective Variables (Init)
-// CONF
-int eff_core_ema_len = 13
-int eff_vol_len      = 80
-float eff_enter_k    = 1.0
-float eff_exit_k     = 0.5
-int eff_persist_bars = 3
-float eff_ov_decay   = 0.70
-float eff_ov_clamp   = 0.15
+// CONF - Variables defined via f_resolve_auto_params
 
 // REG
 int eff_adx_len      = 14
-int eff_adx_th       = 20
+// eff_adx_th defined via f_resolve_auto_params
 int eff_bb_len       = 20
 float eff_bb_mult    = 2.0
 int eff_kc_len       = 20
@@ -99,10 +92,10 @@ bool eff_squeeze_strict = true
 bool eff_use_kc_squeeze = true
 
 // ADR/ATR
-bool eff_use_adr_gate = true
+// eff_use_adr_gate defined via f_resolve_auto_params
 int eff_adr_len      = 20
-float eff_adr_warn   = 85.0
-float eff_adr_hard   = 110.0
+// eff_adr_warn defined via f_resolve_auto_params
+// eff_adr_hard defined via f_resolve_auto_params
 int eff_atr_len      = 14
 int eff_atr_norm     = 50
 float eff_atr_low    = 0.90
@@ -581,59 +574,16 @@ f_resolve_effective_flags() =>
     bool eff_vwap_z = f_approach_bool(vwap_z_enabled, false, false, true, false, false, false)
     bool eff_or_enabled = f_approach_bool(or_enabled, false, true, false, true, false, false)
     bool eff_sq_box_enabled = f_approach_bool(sq_box_enabled, false, false, false, false, true, false)
-    [
-        eff_fractals_plot,
-        eff_sub_fractals,
-        eff_plot_trendline,
-        eff_vp_enable,
-        eff_vp_smart,
-        eff_show_mtf_candles,
-        eff_use_sess_1st,
-        eff_show_last_frac,
-        eff_show_vol,
-        eff_plot_fvg1,
-        eff_plot_fvg2,
-        eff_ps_mode,
-        eff_BB_plot,
-        eff_en_cloud,
-        eff_sig_plot,
-        eff_ma1_type,
-        eff_ma2_type,
-        eff_plot_div,
-        eff_plot_l12_bar,
-        eff_plot_nr_bar,
-        eff_plot_i_bar,
-        eff_plot_o_bar,
-        eff_plot_s_bar,
-        eff_plot_f_bar,
-        eff_plot_segments,
-        eff_plot_pivots_h1,
-        eff_plot_pivots_h4,
-        eff_plot_pivots_d,
-        eff_plot_pivots_w,
-        eff_plot_pivots_m,
-        eff_plot_pivots_3m,
-        eff_plot_pivots_12m,
-        eff_london_show,
-        eff_ny_show,
-        eff_tokyo_show,
-        eff_sydney_show,
-        eff_sess_bg_enable,
-        eff_key_levels_enabled,
-        eff_show_pdh,
-        eff_show_pdl,
-        eff_show_pdc,
-        eff_show_wopen,
-        eff_show_mopen,
-        eff_rvol_enabled,
-        eff_rvol_points_enabled,
-        eff_vwap_enabled,
-        eff_vwap_anchor,
-        eff_vwap_bands,
-        eff_vwap_z,
-        eff_or_enabled,
-        eff_sq_box_enabled
-    ]
+    [eff_fractals_plot, eff_sub_fractals, eff_plot_trendline, eff_vp_enable, eff_vp_smart,
+     eff_show_mtf_candles, eff_use_sess_1st, eff_show_last_frac, eff_show_vol, eff_plot_fvg1,
+     eff_plot_fvg2, eff_ps_mode, eff_BB_plot, eff_en_cloud, eff_sig_plot,
+     eff_ma1_type, eff_ma2_type, eff_plot_div, eff_plot_l12_bar, eff_plot_nr_bar,
+     eff_plot_i_bar, eff_plot_o_bar, eff_plot_s_bar, eff_plot_f_bar, eff_plot_segments,
+     eff_plot_pivots_h1, eff_plot_pivots_h4, eff_plot_pivots_d, eff_plot_pivots_w, eff_plot_pivots_m,
+     eff_plot_pivots_3m, eff_plot_pivots_12m, eff_london_show, eff_ny_show, eff_tokyo_show, eff_sydney_show,
+     eff_sess_bg_enable, eff_key_levels_enabled, eff_show_pdh, eff_show_pdl, eff_show_pdc, eff_show_wopen,
+     eff_show_mopen, eff_rvol_enabled, eff_rvol_points_enabled, eff_vwap_enabled, eff_vwap_anchor, eff_vwap_bands,
+     eff_vwap_z, eff_or_enabled, eff_sq_box_enabled]
 
 [eff_fractals_plot, eff_sub_fractals, eff_plot_trendline, eff_vp_enable, eff_vp_smart, eff_show_mtf_candles, eff_use_sess_1st, eff_show_last_frac, eff_show_vol, eff_plot_fvg1, eff_plot_fvg2, eff_ps_mode, eff_BB_plot, eff_en_cloud, eff_sig_plot, eff_ma1_type, eff_ma2_type, eff_plot_div, eff_plot_l12_bar, eff_plot_nr_bar, eff_plot_i_bar, eff_plot_o_bar, eff_plot_s_bar, eff_plot_f_bar, eff_plot_segments, eff_plot_pivots_h1, eff_plot_pivots_h4, eff_plot_pivots_d, eff_plot_pivots_w, eff_plot_pivots_m, eff_plot_pivots_3m, eff_plot_pivots_12m, eff_london_show, eff_ny_show, eff_tokyo_show, eff_sydney_show, eff_sess_bg_enable, eff_key_levels_enabled, eff_show_pdh, eff_show_pdl, eff_show_pdc, eff_show_wopen, eff_show_mopen, eff_rvol_enabled, eff_rvol_points_enabled, eff_vwap_enabled, eff_vwap_anchor, eff_vwap_bands, eff_vwap_z, eff_or_enabled, eff_sq_box_enabled] = f_resolve_effective_flags()
 
@@ -808,7 +758,7 @@ f_draw_kl_time(_l, _lb, _t1, _val, _txt, _col, _en, _style, _ext) =>
     [ret_l, ret_lb]
 
 // Scan Limits
-int MAX_SCAN = 4000 // Max bars back
+int MAX_SCAN = 3000 // Max bars back
 
 if eff_key_levels_enabled and barstate.islast and bar_index > 100
     // Dynamic Scan Limit (Safe)
