@@ -750,6 +750,29 @@ f_rvol_update(_cfg) =>
 f_trendlines_update(_cfg) =>
     false
 
+// Stage 6: Info Panel Refactoring (Global Current TF)
+// FVG
+var int fvg_state_inf = 1
+bool bull_fvg_inf = low > high[2]
+bool bear_fvg_inf = high < low[2]
+if bull_fvg_inf
+    fvg_state_inf := 1
+else if bear_fvg_inf
+    fvg_state_inf := -1
+
+// Fractals
+up_fr_inf = ta.pivothigh(2, 2)
+dn_fr_inf = ta.pivotlow(2, 2)
+last_up_lvl_inf = ta.valuewhen(not na(up_fr_inf), high[2], 0)
+last_dn_lvl_inf = ta.valuewhen(not na(dn_fr_inf), low[2], 0)
+var int fr_state_inf = 1
+bool fr_evt_up_inf = ta.crossover(high, last_up_lvl_inf)
+bool fr_evt_dn_inf = ta.crossunder(low, last_dn_lvl_inf)
+if fr_evt_up_inf
+    fr_state_inf := 1
+else if fr_evt_dn_inf
+    fr_state_inf := -1
+
 // Helper function for Panel State
 f_panel_state() =>
     // FVG Close State
@@ -1019,7 +1042,8 @@ f_main(_cfg) =>
     f_conf_engine_update(_cfg)
 
 f_main(cfg)
-[info_panel, sec_calls_panel] = f_info_panel_update(cfg)
+[_panel, sec_calls_panel] = f_info_panel_update(cfg)
+info_panel := _panel
 active_sec_calls += sec_calls_panel
 
 
@@ -2047,28 +2071,6 @@ Intra_D         = timeframe.isintraday or timeframe.isdaily
 Intra_D_W       = timeframe.isintraday or timeframe.isdaily or timeframe.isweekly
 Intra_D_W_M     = timeframe.isintraday or timeframe.isdaily or timeframe.isweekly or timeframe.ismonthly
 
-// Stage 6: Info Panel Refactoring (Global Current TF)
-// FVG
-var int fvg_state_inf = 1
-bool bull_fvg_inf = low > high[2]
-bool bear_fvg_inf = high < low[2]
-if bull_fvg_inf
-    fvg_state_inf := 1
-else if bear_fvg_inf
-    fvg_state_inf := -1
-
-// Fractals
-up_fr_inf = ta.pivothigh(2, 2)
-dn_fr_inf = ta.pivotlow(2, 2)
-last_up_lvl_inf = ta.valuewhen(not na(up_fr_inf), high[2], 0)
-last_dn_lvl_inf = ta.valuewhen(not na(dn_fr_inf), low[2], 0)
-var int fr_state_inf = 1
-bool fr_evt_up_inf = ta.crossover(high, last_up_lvl_inf)
-bool fr_evt_dn_inf = ta.crossunder(low, last_dn_lvl_inf)
-if fr_evt_up_inf
-    fr_state_inf := 1
-else if fr_evt_dn_inf
-    fr_state_inf := -1
 // ----------------------------------------------------------- pivot points -----------------------------------------------------------------
 
 // Optimierte Datenabfrage (Tuples), um das "Security Limit" von 40 nicht zu sprengen
