@@ -173,15 +173,7 @@ f_resolve_auto_params(_tf_sec, _auto_tuning) =>
         adr_hard := 110.0
     [int(a_core_len), int(a_vol_len), a_enter_k, a_exit_k, int(a_persist), a_decay, a_clamp, a_adx_th, use_adr_gate, adr_warn, adr_hard]
 
-[eff_core_ema_len, eff_vol_len, eff_enter_k, eff_exit_k, eff_persist_bars, eff_ov_decay, eff_ov_clamp, eff_adx_th, eff_use_adr_gate, eff_adr_warn, eff_adr_hard] = f_resolve_auto_params(tf_sec, auto_tuning)
-
-// Fixed REG Settings
-eff_bb_len         := 20
-eff_bb_mult        := 2.0
-eff_kc_len         := 20
-eff_kc_mult        := 1.5
-eff_squeeze_strict := true
-eff_use_kc_squeeze := true
+// CFG will be built after the effective flags resolver.
 
 // fractals input
 fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, tooltip='')
@@ -585,7 +577,183 @@ f_resolve_effective_flags() =>
      eff_show_mopen, eff_rvol_enabled, eff_rvol_points_enabled, eff_vwap_enabled, eff_vwap_anchor, eff_vwap_bands,
      eff_vwap_z, eff_or_enabled, eff_sq_box_enabled]
 
-[eff_fractals_plot, eff_sub_fractals, eff_plot_trendline, eff_vp_enable, eff_vp_smart, eff_show_mtf_candles, eff_use_sess_1st, eff_show_last_frac, eff_show_vol, eff_plot_fvg1, eff_plot_fvg2, eff_ps_mode, eff_BB_plot, eff_en_cloud, eff_sig_plot, eff_ma1_type, eff_ma2_type, eff_plot_div, eff_plot_l12_bar, eff_plot_nr_bar, eff_plot_i_bar, eff_plot_o_bar, eff_plot_s_bar, eff_plot_f_bar, eff_plot_segments, eff_plot_pivots_h1, eff_plot_pivots_h4, eff_plot_pivots_d, eff_plot_pivots_w, eff_plot_pivots_m, eff_plot_pivots_3m, eff_plot_pivots_12m, eff_london_show, eff_ny_show, eff_tokyo_show, eff_sydney_show, eff_sess_bg_enable, eff_key_levels_enabled, eff_show_pdh, eff_show_pdl, eff_show_pdc, eff_show_wopen, eff_show_mopen, eff_rvol_enabled, eff_rvol_points_enabled, eff_vwap_enabled, eff_vwap_anchor, eff_vwap_bands, eff_vwap_z, eff_or_enabled, eff_sq_box_enabled] = f_resolve_effective_flags()
+type Cfg
+    int eff_core_ema_len
+    int eff_vol_len
+    float eff_enter_k
+    float eff_exit_k
+    int eff_persist_bars
+    float eff_ov_decay
+    float eff_ov_clamp
+    int eff_adx_th
+    bool eff_use_adr_gate
+    float eff_adr_warn
+    float eff_adr_hard
+    int eff_bb_len
+    float eff_bb_mult
+    int eff_kc_len
+    float eff_kc_mult
+    bool eff_squeeze_strict
+    bool eff_use_kc_squeeze
+    bool eff_fractals_plot
+    bool eff_sub_fractals
+    bool eff_plot_trendline
+    bool eff_vp_enable
+    bool eff_vp_smart
+    bool eff_show_mtf_candles
+    bool eff_use_sess_1st
+    bool eff_show_last_frac
+    bool eff_show_vol
+    bool eff_plot_fvg1
+    bool eff_plot_fvg2
+    string eff_ps_mode
+    bool eff_BB_plot
+    bool eff_en_cloud
+    bool eff_sig_plot
+    string eff_ma1_type
+    string eff_ma2_type
+    bool eff_plot_div
+    bool eff_plot_l12_bar
+    bool eff_plot_nr_bar
+    bool eff_plot_i_bar
+    bool eff_plot_o_bar
+    bool eff_plot_s_bar
+    bool eff_plot_f_bar
+    bool eff_plot_segments
+    bool eff_plot_pivots_h1
+    bool eff_plot_pivots_h4
+    bool eff_plot_pivots_d
+    bool eff_plot_pivots_w
+    bool eff_plot_pivots_m
+    bool eff_plot_pivots_3m
+    bool eff_plot_pivots_12m
+    bool eff_london_show
+    bool eff_ny_show
+    bool eff_tokyo_show
+    bool eff_sydney_show
+    bool eff_sess_bg_enable
+    bool eff_key_levels_enabled
+    bool eff_show_pdh
+    bool eff_show_pdl
+    bool eff_show_pdc
+    bool eff_show_wopen
+    bool eff_show_mopen
+    bool eff_rvol_enabled
+    bool eff_rvol_points_enabled
+    bool eff_vwap_enabled
+    string eff_vwap_anchor
+    bool eff_vwap_bands
+    bool eff_vwap_z
+    bool eff_or_enabled
+    bool eff_sq_box_enabled
+
+type Out
+    float dummy
+
+type Sig
+    bool tl_bull
+    bool tl_bear
+    bool div_bull
+    bool div_bear
+    bool ema_bull
+    bool ema_bear
+    bool ma_bull
+    bool ma_bear
+    bool seg_bull
+    bool seg_bear
+    bool l12_bull
+    bool l12_bear
+    bool pat_bull
+    bool pat_bear
+    bool o_bull
+    bool o_bear
+    bool kama_bull
+    bool kama_bear
+    bool fvg_bull
+    bool fvg_bear
+    bool vol_spike
+
+f_build_cfg() =>
+    [eff_core_ema_len, eff_vol_len, eff_enter_k, eff_exit_k, eff_persist_bars, eff_ov_decay, eff_ov_clamp, eff_adx_th, eff_use_adr_gate, eff_adr_warn, eff_adr_hard] = f_resolve_auto_params(tf_sec, auto_tuning)
+    int eff_bb_len = 20
+    float eff_bb_mult = 2.0
+    int eff_kc_len = 20
+    float eff_kc_mult = 1.5
+    bool eff_squeeze_strict = true
+    bool eff_use_kc_squeeze = true
+    [eff_fractals_plot, eff_sub_fractals, eff_plot_trendline, eff_vp_enable, eff_vp_smart, eff_show_mtf_candles, eff_use_sess_1st, eff_show_last_frac, eff_show_vol, eff_plot_fvg1, eff_plot_fvg2, eff_ps_mode, eff_BB_plot, eff_en_cloud, eff_sig_plot, eff_ma1_type, eff_ma2_type, eff_plot_div, eff_plot_l12_bar, eff_plot_nr_bar, eff_plot_i_bar, eff_plot_o_bar, eff_plot_s_bar, eff_plot_f_bar, eff_plot_segments, eff_plot_pivots_h1, eff_plot_pivots_h4, eff_plot_pivots_d, eff_plot_pivots_w, eff_plot_pivots_m, eff_plot_pivots_3m, eff_plot_pivots_12m, eff_london_show, eff_ny_show, eff_tokyo_show, eff_sydney_show, eff_sess_bg_enable, eff_key_levels_enabled, eff_show_pdh, eff_show_pdl, eff_show_pdc, eff_show_wopen, eff_show_mopen, eff_rvol_enabled, eff_rvol_points_enabled, eff_vwap_enabled, eff_vwap_anchor, eff_vwap_bands, eff_vwap_z, eff_or_enabled, eff_sq_box_enabled] = f_resolve_effective_flags()
+    Cfg.new(eff_core_ema_len, eff_vol_len, eff_enter_k, eff_exit_k, eff_persist_bars, eff_ov_decay, eff_ov_clamp, eff_adx_th, eff_use_adr_gate, eff_adr_warn, eff_adr_hard, eff_bb_len, eff_bb_mult, eff_kc_len, eff_kc_mult, eff_squeeze_strict, eff_use_kc_squeeze, eff_fractals_plot, eff_sub_fractals, eff_plot_trendline, eff_vp_enable, eff_vp_smart, eff_show_mtf_candles, eff_use_sess_1st, eff_show_last_frac, eff_show_vol, eff_plot_fvg1, eff_plot_fvg2, eff_ps_mode, eff_BB_plot, eff_en_cloud, eff_sig_plot, eff_ma1_type, eff_ma2_type, eff_plot_div, eff_plot_l12_bar, eff_plot_nr_bar, eff_plot_i_bar, eff_plot_o_bar, eff_plot_s_bar, eff_plot_f_bar, eff_plot_segments, eff_plot_pivots_h1, eff_plot_pivots_h4, eff_plot_pivots_d, eff_plot_pivots_w, eff_plot_pivots_m, eff_plot_pivots_3m, eff_plot_pivots_12m, eff_london_show, eff_ny_show, eff_tokyo_show, eff_sydney_show, eff_sess_bg_enable, eff_key_levels_enabled, eff_show_pdh, eff_show_pdl, eff_show_pdc, eff_show_wopen, eff_show_mopen, eff_rvol_enabled, eff_rvol_points_enabled, eff_vwap_enabled, eff_vwap_anchor, eff_vwap_bands, eff_vwap_z, eff_or_enabled, eff_sq_box_enabled)
+
+Cfg cfg = f_build_cfg()
+
+eff_core_ema_len = cfg.eff_core_ema_len
+eff_vol_len = cfg.eff_vol_len
+eff_enter_k = cfg.eff_enter_k
+eff_exit_k = cfg.eff_exit_k
+eff_persist_bars = cfg.eff_persist_bars
+eff_ov_decay = cfg.eff_ov_decay
+eff_ov_clamp = cfg.eff_ov_clamp
+eff_adx_th = cfg.eff_adx_th
+eff_use_adr_gate = cfg.eff_use_adr_gate
+eff_adr_warn = cfg.eff_adr_warn
+eff_adr_hard = cfg.eff_adr_hard
+eff_bb_len = cfg.eff_bb_len
+eff_bb_mult = cfg.eff_bb_mult
+eff_kc_len = cfg.eff_kc_len
+eff_kc_mult = cfg.eff_kc_mult
+eff_squeeze_strict = cfg.eff_squeeze_strict
+eff_use_kc_squeeze = cfg.eff_use_kc_squeeze
+eff_fractals_plot = cfg.eff_fractals_plot
+eff_sub_fractals = cfg.eff_sub_fractals
+eff_plot_trendline = cfg.eff_plot_trendline
+eff_vp_enable = cfg.eff_vp_enable
+eff_vp_smart = cfg.eff_vp_smart
+eff_show_mtf_candles = cfg.eff_show_mtf_candles
+eff_use_sess_1st = cfg.eff_use_sess_1st
+eff_show_last_frac = cfg.eff_show_last_frac
+eff_show_vol = cfg.eff_show_vol
+eff_plot_fvg1 = cfg.eff_plot_fvg1
+eff_plot_fvg2 = cfg.eff_plot_fvg2
+eff_ps_mode = cfg.eff_ps_mode
+eff_BB_plot = cfg.eff_BB_plot
+eff_en_cloud = cfg.eff_en_cloud
+eff_sig_plot = cfg.eff_sig_plot
+eff_ma1_type = cfg.eff_ma1_type
+eff_ma2_type = cfg.eff_ma2_type
+eff_plot_div = cfg.eff_plot_div
+eff_plot_l12_bar = cfg.eff_plot_l12_bar
+eff_plot_nr_bar = cfg.eff_plot_nr_bar
+eff_plot_i_bar = cfg.eff_plot_i_bar
+eff_plot_o_bar = cfg.eff_plot_o_bar
+eff_plot_s_bar = cfg.eff_plot_s_bar
+eff_plot_f_bar = cfg.eff_plot_f_bar
+eff_plot_segments = cfg.eff_plot_segments
+eff_plot_pivots_h1 = cfg.eff_plot_pivots_h1
+eff_plot_pivots_h4 = cfg.eff_plot_pivots_h4
+eff_plot_pivots_d = cfg.eff_plot_pivots_d
+eff_plot_pivots_w = cfg.eff_plot_pivots_w
+eff_plot_pivots_m = cfg.eff_plot_pivots_m
+eff_plot_pivots_3m = cfg.eff_plot_pivots_3m
+eff_plot_pivots_12m = cfg.eff_plot_pivots_12m
+eff_london_show = cfg.eff_london_show
+eff_ny_show = cfg.eff_ny_show
+eff_tokyo_show = cfg.eff_tokyo_show
+eff_sydney_show = cfg.eff_sydney_show
+eff_sess_bg_enable = cfg.eff_sess_bg_enable
+eff_key_levels_enabled = cfg.eff_key_levels_enabled
+eff_show_pdh = cfg.eff_show_pdh
+eff_show_pdl = cfg.eff_show_pdl
+eff_show_pdc = cfg.eff_show_pdc
+eff_show_wopen = cfg.eff_show_wopen
+eff_show_mopen = cfg.eff_show_mopen
+eff_rvol_enabled = cfg.eff_rvol_enabled
+eff_rvol_points_enabled = cfg.eff_rvol_points_enabled
+eff_vwap_enabled = cfg.eff_vwap_enabled
+eff_vwap_anchor = cfg.eff_vwap_anchor
+eff_vwap_bands = cfg.eff_vwap_bands
+eff_vwap_z = cfg.eff_vwap_z
+eff_or_enabled = cfg.eff_or_enabled
+eff_sq_box_enabled = cfg.eff_sq_box_enabled
 
 int active_sec_calls = 0
 // Performance Counters (Per Bar)
@@ -621,27 +789,36 @@ squeeze_strict      = eff_squeeze_strict
 //----------------- Global Signal Registry (For Alerts & Confluence) -----------------
 // These variables are reset to false/na on every bar execution
 // We populate them inside the respective feature blocks
-bool sig_tl_bull        = false
-bool sig_tl_bear        = false
-bool sig_div_bull       = false
-bool sig_div_bear       = false
-bool sig_ema_bull       = false
-bool sig_ema_bear       = false
-bool sig_ma_bull        = false
-bool sig_ma_bear        = false
-bool sig_seg_bull       = false
-bool sig_seg_bear       = false
-bool sig_l12_bull       = false
-bool sig_l12_bear       = false
-bool sig_pat_bull       = false
-bool sig_pat_bear       = false // General pattern
-bool sig_o_bull         = false
-bool sig_o_bear         = false
-bool sig_kama_bull      = false
-bool sig_kama_bear      = false
-bool sig_fvg_bull       = false
-bool sig_fvg_bear       = false
-bool sig_vol_spike      = false
+var Out out = Out.new(na)
+var Sig sig = Sig.new(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false)
+
+f_reset_sig() =>
+    sig.tl_bull := false
+    sig.tl_bear := false
+    sig.div_bull := false
+    sig.div_bear := false
+    sig.ema_bull := false
+    sig.ema_bear := false
+    sig.ma_bull := false
+    sig.ma_bear := false
+    sig.seg_bull := false
+    sig.seg_bear := false
+    sig.l12_bull := false
+    sig.l12_bear := false
+    sig.pat_bull := false
+    sig.pat_bear := false
+    sig.o_bull := false
+    sig.o_bear := false
+    sig.kama_bull := false
+    sig.kama_bear := false
+    sig.fvg_bull := false
+    sig.fvg_bear := false
+    sig.vol_spike := false
+
+f_main(_cfg) =>
+    f_reset_sig()
+
+f_main(cfg)
 
 
 // Helper Functions for Object Reuse (Unified)
@@ -1171,8 +1348,8 @@ if ON_DIV
 plot_bear_combined = ON_DIV and (c_div_bear or h_div_bear)
 plot_bull_combined = ON_DIV and (c_div_bull or h_div_bull)
 if ON_DIV
-    sig_div_bull := c_div_bull or h_div_bull
-    sig_div_bear := c_div_bear or h_div_bear
+    sig.div_bull := c_div_bull or h_div_bull
+    sig.div_bear := c_div_bear or h_div_bear
 
 plotshape(plot_bear_combined, style=shape.arrowdown, location=location.abovebar, offset=0, size= size.small,  textcolor=color.new(color.red, 0),  color=color.new(color.red, 0), title='Bear divergence')
 plotshape(plot_bull_combined, style=shape.arrowup, location=location.belowbar, offset=0, size= size.small,  textcolor=color.new(color.green, 0), color=color.new(color.green, 0), title='Bull divergence')
@@ -1207,8 +1384,8 @@ ema_buy             = eff_en_cloud ? ema1 > ema2 : na
 ema_sell            = eff_en_cloud ? ema1 < ema2 : na
 
 if eff_en_cloud
-    sig_ema_bull := ema_buy
-    sig_ema_bear := ema_sell
+    sig.ema_bull := ema_buy
+    sig.ema_bear := ema_sell
 
 ema1_pl             = plot(eff_en_cloud ? ema1 : na, color=color.new(color.blue, 100), title='EMA 1')
 ema2_pl             = plot(eff_en_cloud ? ema2 : na, color=color.new(color.blue, 100), title='EMA 2')
@@ -1235,8 +1412,8 @@ kama_val = f_kama(close, kama_len, kama_fast, kama_slow)
 bool kama_bull = kama_val > kama_val[1]
 bool kama_bear = kama_val < kama_val[1]
 
-sig_kama_bull := kama_bull
-sig_kama_bear := kama_bear
+sig.kama_bull := kama_bull
+sig.kama_bear := kama_bear
 
 
 //------------------------------------------------------------ trend lines (Visuals for Chart) ----------------------------------------------------------------
@@ -1436,9 +1613,9 @@ if eff_plot_trendline
 
     // Update Registry
     if not na(cur_y_up) and close > cur_y_up
-        sig_tl_bull := true
+        sig.tl_bull := true
     if not na(cur_y_dn) and close < cur_y_dn
-        sig_tl_bear := true
+        sig.tl_bear := true
 
 else
     // Cleanup & State Reset (Crucial for Resuming)
@@ -1549,20 +1726,20 @@ plotchar(eff_plot_f_bar ? f_dn and (not f_dn[1] or not f_dn[2] or not f_dn[3]) o
 
 // Registry Updates
 if eff_plot_l12_bar
-    sig_l12_bull := plot_l12_long
-    sig_l12_bear := plot_l12_short
+    sig.l12_bull := plot_l12_long
+    sig.l12_bear := plot_l12_short
 
 if eff_plot_f_bar
-    sig_pat_bull := f_up
-    sig_pat_bear := f_dn
+    sig.pat_bull := f_up
+    sig.pat_bear := f_dn
 
 if eff_plot_o_bar
     // Green O (Long) -> Bullish
     if o_bar and close < low[1]
-        sig_o_bull := true
+        sig.o_bull := true
     // Red O (Short) -> Bearish
     if o_bar and close > high[1]
-        sig_o_bear := true
+        sig.o_bear := true
 
 
 //----------------------------------------------------------------- segments (Visuals for Chart) --------------------------------------------------------------
@@ -1652,10 +1829,10 @@ if eff_plot_segments and barstate.isconfirmed
     // Buy Signal: high > high[1] and segment_1_stat_l and segment_2_stat_l and segment_3_stat_l
 
     if high > high[1] and segment_3_stat_l
-        sig_seg_bull := true
+        sig.seg_bull := true
 
     if low < low[1] and segment_3_stat_s
-        sig_seg_bear := true
+        sig.seg_bear := true
 
 
 //-------------------------------------------------------------------- info panel -------------------------------------------------------------------------
@@ -2713,8 +2890,8 @@ if ON_FVG1
             b_new := box.new(left=bar_index[2], top=low[2], right=bar_index + (fvg1_len - 1), bottom=high, border_color=_border_bear, bgcolor=col_fvg1_bear)
 
         // Registry
-        sig_fvg_bull := low > high[2]
-        sig_fvg_bear := high < low[2]
+        sig.fvg_bull := low > high[2]
+        sig.fvg_bear := high < low[2]
 
     // CASE B: Higher Timeframe (Security Source)
     else
@@ -2980,7 +3157,7 @@ is_vol_spike = volume > (avg_vol * vol_mult)
 
 // Uses plotchar (Symbol 'V' in bold RED)
 plotchar(eff_show_vol ? is_vol_spike : na, char='v', location=location.bottom, color=color.new(color.red, 30), size=size.tiny, title="High Volume Spike")
-sig_vol_spike := eff_show_vol and is_vol_spike
+sig.vol_spike := eff_show_vol and is_vol_spike
 
 
 // ------------------------------------------- Gradient Volume Profile ----------------------------------------------
@@ -3820,9 +3997,9 @@ if eff_calc_conf
 
     // KAMA (Core)
     float kama_val_score = 0.0
-    if sig_kama_bull
+    if sig.kama_bull
         kama_val_score := 1.0
-    else if sig_kama_bear
+    else if sig.kama_bear
         kama_val_score := -1.0
 
     core_w_sum += W_KAMA_CORE
@@ -3869,16 +4046,16 @@ if eff_calc_conf
     var float ov_seg = 0.0
 
     // Update Overlay States
-    if sig_tl_bull
+    if sig.tl_bull
         ov_tl := 1.0
-    else if sig_tl_bear
+    else if sig.tl_bear
         ov_tl := -1.0
     else
         ov_tl := ov_tl * eff_ov_decay
 
-    if sig_seg_bull
+    if sig.seg_bull
         ov_seg := 1.0
-    else if sig_seg_bear
+    else if sig.seg_bear
         ov_seg := -1.0
     else
         ov_seg := ov_seg * eff_ov_decay
@@ -3960,7 +4137,7 @@ if eff_calc_conf
 
     // KAMA
     active_core += 1.0
-    float kama_sign = sig_kama_bull ? 1.0 : sig_kama_bear ? -1.0 : 0.0
+    float kama_sign = sig.kama_bull ? 1.0 : sig.kama_bear ? -1.0 : 0.0
     if state_sign != 0 and kama_sign == state_sign
         aligned_core += 1.0
 
@@ -4104,8 +4281,8 @@ bgcolor(bg_final, title="MCCS Master Background")
 // Events based on registry
 
 // 1. Prepare Conditions
-bool al_tl_break = (sig_tl_bull and not sig_tl_bull[1]) or (sig_tl_bear and not sig_tl_bear[1])
-bool al_div      = (sig_div_bull and not sig_div_bull[1]) or (sig_div_bear and not sig_div_bear[1])
+bool al_tl_break = (sig.tl_bull and not sig.tl_bull[1]) or (sig.tl_bear and not sig.tl_bear[1])
+bool al_div      = (sig.div_bull and not sig.div_bull[1]) or (sig.div_bear and not sig.div_bear[1])
 bool al_conf_cross = ta.crossover(conf_score, 75) or ta.crossunder(conf_score, 25) // Tighter Thresholds for Alerts
 bool al_regime_chg = regime_state != regime_state[1]
 
