@@ -741,40 +741,40 @@ f_reset_sig() =>
     sig.vol_spike := false
 
 f_key_levels_update(_cfg) =>
-    na
+    false
 
 f_rvol_update(_cfg) =>
-    na
+    false
 
 f_trendlines_update(_cfg) =>
-    na
+    false
 
 f_info_panel_update(_cfg) =>
-    na
+    false
 
 f_pivots_update(_cfg) =>
-    na
+    false
 
 f_sessions_update(_cfg) =>
-    na
+    false
 
 f_vwap_update(_cfg) =>
-    na
+    false
 
 f_or_ib_update(_cfg) =>
-    na
+    false
 
 f_mtf_candles_update(_cfg) =>
-    na
+    false
 
 f_fvg_update(_cfg) =>
-    na
+    false
 
 f_volume_profile_update(_cfg) =>
-    na
+    false
 
 f_conf_engine_update(_cfg) =>
-    na
+    false
 
 f_main(_cfg) =>
     f_reset_sig()
