@@ -100,6 +100,72 @@ int eff_atr_len      = 14
 int eff_atr_norm     = 50
 float eff_atr_low    = 0.90
 float eff_atr_high   = 1.10
+int eff_core_ema_len = 0
+int eff_vol_len = 0
+float eff_enter_k = na
+float eff_exit_k = na
+int eff_persist_bars = 0
+float eff_ov_decay = na
+float eff_ov_clamp = na
+int eff_adx_th = 0
+bool eff_use_adr_gate = false
+float eff_adr_warn = na
+float eff_adr_hard = na
+
+bool eff_fractals_plot = false
+bool eff_sub_fractals = false
+bool eff_plot_trendline = false
+bool eff_vp_enable = false
+bool eff_vp_smart = false
+bool eff_show_mtf_candles = false
+bool eff_use_sess_1st = false
+bool eff_show_last_frac = false
+bool eff_show_vol = false
+bool eff_plot_fvg1 = false
+bool eff_plot_fvg2 = false
+string eff_ps_mode = "None"
+bool eff_BB_plot = false
+bool eff_en_cloud = false
+bool eff_sig_plot = false
+string eff_ma1_type = "None"
+string eff_ma2_type = "None"
+bool eff_plot_div = false
+bool eff_plot_l12_bar = false
+bool eff_plot_nr_bar = false
+bool eff_plot_i_bar = false
+bool eff_plot_o_bar = false
+bool eff_plot_s_bar = false
+bool eff_plot_f_bar = false
+bool eff_plot_segments = false
+bool eff_plot_pivots_h1 = false
+bool eff_plot_pivots_h4 = false
+bool eff_plot_pivots_d = false
+bool eff_plot_pivots_w = false
+bool eff_plot_pivots_m = false
+bool eff_plot_pivots_3m = false
+bool eff_plot_pivots_12m = false
+bool eff_london_show = false
+bool eff_ny_show = false
+bool eff_tokyo_show = false
+bool eff_sydney_show = false
+bool eff_sess_bg_enable = false
+bool eff_key_levels_enabled = false
+bool eff_show_pdh = false
+bool eff_show_pdl = false
+bool eff_show_pdc = false
+bool eff_show_wopen = false
+bool eff_show_mopen = false
+bool eff_rvol_enabled = false
+bool eff_rvol_points_enabled = false
+bool eff_vwap_enabled = false
+string eff_vwap_anchor = "Session (Daily Reset)"
+bool eff_vwap_bands = false
+bool eff_vwap_z = false
+bool eff_or_enabled = false
+bool eff_sq_box_enabled = false
+bool eff_show_conf_meter = false
+bool eff_regime_panel = false
+string eff_regime_bg_mode = "None"
 
 f_resolve_auto_params(_tf_sec, _auto_tuning) =>
     bool is_fast = _tf_sec <= 900
@@ -779,8 +845,8 @@ ON_PS           = eff_ps_mode != "None"
 // New Features Flags (Independently Controlled)
 // Confluence & Regime are now strictly controlled by their inputs, ignoring Profile Mode
 eff_show_conf_meter := show_conf_meter
-eff_regime_panel    = show_regime_panel
-eff_regime_bg_mode  = regime_bg_mode
+eff_regime_panel    := show_regime_panel
+eff_regime_bg_mode  := regime_bg_mode
 
 // ADR/KC Logic (Mapped to Config Stage)
 // We map the legacy names to our new effective variables to minimize downstream changes
