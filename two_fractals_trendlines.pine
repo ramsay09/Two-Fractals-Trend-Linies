@@ -36,30 +36,38 @@ bool panel_show_live    = panel_update_mode == "Realtime Preview"
 
 trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Session Map", "ORB", "Mean Reversion", "Breakout", "Squeeze Breakout", "Trend Continuation"], tooltip="Applies focused defaults for a trading lens. Custom = fully manual. \n• Custom: Full manual control.\n• Session Map: Structure, Key Levels, ADR.\n• ORB: Opening Range, RVOL.\n• Mean Reversion: VWAP, Bands, Divergences.\n• Breakout/Squeeze: RVOL, Structure, Momentum.\n• Trend Continuation: CONF/REG, FVG.")
 
+// fractals input
+fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, tooltip='')
+sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, tooltip='Bill Williams Fractals (five Candles): white triangle. Works as support and resistance level.
+                 \nSub Bill Williams Fractals (four Candles): Lightgray triangle. Works as support and resistance level. These are B. W. Fractals on a Lower Timeframe.')
+
 
 // Confluence & Regime Visuals
-auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Auto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
-show_conf_meter     = input.bool(true, "Confluence Meter⠀⠀⠀", inline="conf_ui", tooltip="")
-show_conf_bg        = input.bool(false, "Confluence Meter BG", inline="conf_ui", tooltip="CONF (Trend Bias) shows the current dominant trend direction as a compact 0–100 score.
+grp_conf_reg    = "Confluence & Regime Visuals"
+auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], group=grp_conf_reg, tooltip="CONF (Trend Bias) shows the current dominant trend direction as a compact 0–100 score.
                      \n• BULL / BEAR / NEUT = direction
                      \n• Number = bias strength (50 = neutral)
                      \n• H / M / L = quality / reliability (high / medium / low)
-                     How CONF is built:
+                     \nHow CONF is built:
                      \n• Core bias comes from structural trend components (mainly FVG state + fractal/structure + a trend filter).
                      \n  The first FVG sets the bias and it stays valid until an opposite FVG appears.
                      \n• Trendlines & Segments act only as short-lived confirmation (with decay) and cannot flip the bias on their own.
                      \n• REG (SQUEEZE/TREND/RANGE) gates reliability: in SQUEEZE, CONF is intentionally dampened (FVG is not counted at full weight).
-                     Visuals:
+                     \nVisuals:
                      \n• Green/Red = Bull/Bear bias
                      \n• NEUT is fully transparent (panel + chart background).
-                     \n\nPlots the Confluence Signal background color.")
+                     \n\nPlots the Confluence Signal background color.
+                     \nAuto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
 
-conf_use_vwap_quality = input.bool(true, "CONF: VWAP Quality Gate", tooltip="Adjusts CONF quality using VWAP alignment + stretch (anti-chase). State remains unchanged.")
-conf_vwap_mode        = input.string("Auto", "VWAP Anchor", inline="conf", options=["Auto","Session VWAP","Weekly VWAP"], tooltip="")
-conf_z_penalty_mode   = input.string("Default", "⠀Stretch Penalty", inline="conf", options=["Default","Conservative","Aggressive"], tooltip="Which VWAP anchor CONF uses for quality. Auto: Session ≤ 60m, Weekly > 60m. \nHow strongly VWAP stretch reduces CONF quality.")
+conf_use_vwap_quality = input.bool(true, "CONF: VWAP Quality Gate", group=grp_conf_reg, tooltip="Adjusts CONF quality using VWAP alignment + stretch (anti-chase). State remains unchanged.")
+conf_vwap_mode        = input.string("Auto", "VWAP Anchor", inline="conf", options=["Auto","Session VWAP","Weekly VWAP"], group=grp_conf_reg, tooltip="")
+conf_z_penalty_mode   = input.string("Default", "⠀⠀Stretch Penalty", inline="conf", options=["Default","Conservative","Aggressive"], group=grp_conf_reg, tooltip="Which VWAP anchor CONF uses for quality. Auto: Session ≤ 60m, Weekly > 60m. \nHow strongly VWAP stretch reduces CONF quality.")
 
-show_regime_panel   = input.bool(true, "Squeeze/Trend", inline="REGIME_UI", tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
-regime_bg_mode      = input.string("None", "⠀⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI")
+show_conf_meter     = input.bool(true, "CONF⠀⠀⠀", inline="conf_ui", group=grp_conf_reg, tooltip="")
+show_conf_bg        = input.bool(false, "Confluence Meter BG", inline="conf_ui", group=grp_conf_reg, tooltip="Confluence Meter")
+
+show_regime_panel   = input.bool(true, "REG", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
+regime_bg_mode      = input.string("None", "⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI", group=grp_conf_reg, tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
 
 string M_FORM = "○"
 string M_CONF = "●"
@@ -175,17 +183,11 @@ f_resolve_auto_params(_tf_sec, _auto_tuning) =>
 
 [eff_core_ema_len, eff_vol_len, eff_enter_k, eff_exit_k, eff_persist_bars, eff_ov_decay, eff_ov_clamp, eff_adx_th, eff_use_adr_gate, eff_adr_warn, eff_adr_hard] = f_resolve_auto_params(tf_sec, auto_tuning)
 
-// fractals input
-fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, tooltip='')
-sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, tooltip='Bill Williams Fractals (five Candles): white triangle. Works as support and resistance level.
-                 \nSub Bill Williams Fractals (four Candles): Lightgray triangle. Works as support and resistance level. These are B. W. Fractals on a Lower Timeframe.')
-
-
 // MTF CANDLE OVERLAY INPUTS
 grp_mtf_candle    = "MTF Candle Overlay"
-show_mtf_candles  = input.bool(false, "MTF Candle Overlay ⠀⠀⠀⠀⠀", group=grp_mtf_candle, inline="mtf_ov", tooltip="Two timelines at one glance. It's like looking inside a candle with X-rays.")
+show_mtf_candles  = input.bool(false, "MTF Candle Overlay", group=grp_mtf_candle, inline="mtf_ov", tooltip="")
 mtf_tf_sel        = input.string("1h", "", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], inline="mtf_ov", group=grp_mtf_candle)
-mtf_opacity       = input.int(15, "Opacity %", minval=0, maxval=100, group=grp_mtf_candle, tooltip="0% = Invisible, 100% = Solid")
+mtf_opacity       = input.int(15, "⠀Opacity %", inline="mtf_ov", minval=0, maxval=100, group=grp_mtf_candle, tooltip="Two timelines at one glance. It's like looking inside a candle with X-rays. \n0% = Invisible, 100% = Solid")
 
 // Additional Context Inputs
 grp_add         = "Additional Context"
