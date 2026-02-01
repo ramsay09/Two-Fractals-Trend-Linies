@@ -782,6 +782,7 @@ f_panel_state() =>
 
 f_info_panel_update(_cfg) =>
     var table panel = na
+    int sec_calls = 0
     bool enabled = panel_pos != "None"
     var bool prev_enabled = false
     if not enabled
@@ -842,7 +843,7 @@ f_info_panel_update(_cfg) =>
             [fvg_m, fvg_m_conf, fr_m, fr_m_conf, tfconf_m_i, fvgcand_m_i, frpend_m_i]     = request.security(syminfo.tickerid, 'M',   f_panel_state())
 
             // Stage 6: Debug Instrument
-            active_sec_calls += 7
+            sec_calls := 7
 
             int ctf_conf_i = (barstate.isconfirmed or not barstate.isrealtime) ? 1 : 0
             bool ctf_conf = ctf_conf_i == 1
@@ -977,7 +978,7 @@ f_info_panel_update(_cfg) =>
             table.cell(table_id=panel, column=2, row=10, text=m_fr_c, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(intra_d_w_m) ? fr_color_c : na)
 
         prev_enabled := true
-    panel
+    [panel, sec_calls]
 
 f_pivots_update(_cfg) =>
     false
@@ -1018,7 +1019,8 @@ f_main(_cfg) =>
     f_conf_engine_update(_cfg)
 
 f_main(cfg)
-info_panel := f_info_panel_update(cfg)
+[info_panel, sec_calls_panel] = f_info_panel_update(cfg)
+active_sec_calls += sec_calls_panel
 
 
 // Helper Functions for Object Reuse (Unified)
