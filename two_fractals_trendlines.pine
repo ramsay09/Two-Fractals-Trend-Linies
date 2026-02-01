@@ -3106,6 +3106,7 @@ var float[] vp_bars_render = array.new_float(0)
 var line[]  vp_lines    = array.new_line()
 var box[]   vp_boxes    = array.new_box()
 var int vp_render_rows_dbg = na
+var bool vp_dirty_dbg = false
 
 // Helper: safe map add
 f_vp_map_add(int k, float addv) =>
@@ -3161,6 +3162,7 @@ f_run_vp() =>
     var int full_max_k = na
     var bool vp_prev_enabled = na
     var bool vp_dirty = true
+    bool vp_dirty_dbg_local = vp_dirty
     var int last_left  = na
     var int last_right = na
     var int last_full_bar = na
@@ -3204,14 +3206,17 @@ f_run_vp() =>
 
         if mode_changed or style_changed
             vp_dirty := true
+            vp_dirty_dbg_local := true
         else if vp_is_full
             // Full mode: redraw only when a new bar arrives (bar_index changes)
             if na(last_full_bar) or bar_index != last_full_bar
                 vp_dirty := true
+                vp_dirty_dbg_local := true
         else
             // Visible mode: redraw only when viewport changed
             if (chart.left_visible_bar_time != last_left) or (chart.right_visible_bar_time != last_right)
                 vp_dirty := true
+                vp_dirty_dbg_local := true
 
         int target_line_count = vp_is_bars ? 0 : vp_rows_eff
         int target_box_count = vp_is_bars ? vp_render_rows : 0
@@ -3231,6 +3236,7 @@ f_run_vp() =>
 
         if vp_turning_on
             vp_dirty := true
+            vp_dirty_dbg_local := true
 
         // 2) CALCULATION
         if eff_vp_enable and vp_dirty
@@ -3516,9 +3522,10 @@ f_run_vp() =>
             last_full_bar := bar_index
         vp_dirty := false
         vp_prev_enabled := eff_vp_enable
-    [vp_render_rows_dbg_local, ops_vp_scan_local, ops_vp_draw_local]
+    [vp_dirty_dbg_local, vp_render_rows_dbg_local, ops_vp_scan_local, ops_vp_draw_local]
 
-[vp_render_rows_dbg_local, ops_vp_scan_inc, ops_vp_draw_inc] = f_run_vp()
+[vp_dirty_dbg_local, vp_render_rows_dbg_local, ops_vp_scan_inc, ops_vp_draw_inc] = f_run_vp()
+vp_dirty_dbg := vp_dirty_dbg_local
 vp_render_rows_dbg := vp_render_rows_dbg_local
 ops_vp_scan += ops_vp_scan_inc
 ops_vp_draw += ops_vp_draw_inc
@@ -3605,7 +3612,7 @@ if dbg_ops and barstate.islast
     table.cell(tbl_dbg, 1, 4, str.tostring(ops_vp_scan + ops_vp_draw) + " (" + str.tostring(peak_ops_vp) + ")", text_color=(ops_vp_scan + ops_vp_draw) > 1000 ? color.red : color.green, text_size=size.small)
 
     if dbg_perf
-        string vp_dbg = "d=" + str.tostring(vp_dirty) + " rows=" + str.tostring(vp_render_rows_dbg) + " " + eff_vp_mode + " " + vp_style
+        string vp_dbg = "d=" + str.tostring(vp_dirty_dbg) + " rows=" + str.tostring(vp_render_rows_dbg) + " " + eff_vp_mode + " " + vp_style
         table.cell(tbl_dbg, 0, 3, "VP", text_color=color.white, text_size=size.small)
         table.cell(tbl_dbg, 1, 3, vp_dbg, text_color=color.silver, text_size=size.small)
 
