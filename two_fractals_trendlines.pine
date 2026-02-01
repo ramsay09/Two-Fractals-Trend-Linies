@@ -716,6 +716,7 @@ squeeze_strict      = eff_squeeze_strict
 // We populate them inside the respective feature blocks
 var Out out = Out.new(na)
 var Sig sig = Sig.new(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false)
+var table info_panel = na
 
 f_reset_sig() =>
     sig.tl_bull := false
@@ -750,7 +751,201 @@ f_trendlines_update(_cfg) =>
     false
 
 f_info_panel_update(_cfg) =>
-    false
+    bool enabled = panel_pos != "None"
+    var bool prev_enabled = false
+    if not enabled
+        if prev_enabled and not na(info_panel)
+            table.delete(info_panel)
+            info_panel := na
+        prev_enabled := false
+    else
+        if barstate.islast
+            atr14_val = ta.atr(14)
+
+            //colors
+            color color_blue_1    = color.new(color.blue, 30)
+            color color_red_1     = color.new(color.red, 30)
+            color color_gray_1    = color.new(color.gray, 100)
+
+            // Current TF markers (panel only)
+            bool bull_fvg_inf = low > high[2]
+            bool bear_fvg_inf = high < low[2]
+            int fvg_candidate_inf = (not barstate.isconfirmed and (bull_fvg_inf or bear_fvg_inf)) ? 1 : 0
+
+            bool fr_evt_up_inf = ta.crossover(high, ta.valuewhen(not na(ta.pivothigh(2, 2)), high[2], 0))
+            bool fr_evt_dn_inf = ta.crossunder(low, ta.valuewhen(not na(ta.pivotlow(2, 2)), low[2], 0))
+            int fr_pending_inf = ((fr_evt_up_inf or fr_evt_dn_inf) and not barstate.isconfirmed) ? 1 : 0
+
+            // Define Variables for HTF colors (Init to default)
+            color fvg_color_5m  = na
+            color fvg_color_15m = na
+            color fvg_color_1h  = na
+            color fvg_color_4h  = na
+            color fvg_color_d   = na
+            color fvg_color_w   = na
+            color fvg_color_m   = na
+
+            color fr_color_5m  = na
+            color fr_color_15m = na
+            color fr_color_1h  = na
+            color fr_color_4h  = na
+            color fr_color_d   = na
+            color fr_color_w   = na
+            color fr_color_m   = na
+            color fvg_color_c  = na
+            color fr_color_c   = na
+
+            bool intra = timeframe.isintraday
+            bool intra_d = timeframe.isintraday or timeframe.isdaily
+            bool intra_d_w = timeframe.isintraday or timeframe.isdaily or timeframe.isweekly
+            bool intra_d_w_m = timeframe.isintraday or timeframe.isdaily or timeframe.isweekly or timeframe.ismonthly
+
+            // Optimization: Combine security calls for Info Panel (7 calls)
+            // Using global input parameters for all timeframes as requested
+            [fvg_5m, fvg_5m_conf, fr_5m, fr_5m_conf, tfconf_5m_i, fvgcand_5m_i, frpend_5m_i] = request.security(syminfo.tickerid, '5',   f_panel_state())
+            [fvg_15m, fvg_15m_conf, fr_15m, fr_15m_conf, tfconf_15m_i, fvgcand_15m_i, frpend_15m_i] = request.security(syminfo.tickerid, '15',  f_panel_state())
+            [fvg_1h, fvg_1h_conf, fr_1h, fr_1h_conf, tfconf_1h_i, fvgcand_1h_i, frpend_1h_i] = request.security(syminfo.tickerid, '60',  f_panel_state())
+            [fvg_4h, fvg_4h_conf, fr_4h, fr_4h_conf, tfconf_4h_i, fvgcand_4h_i, frpend_4h_i] = request.security(syminfo.tickerid, '240', f_panel_state())
+            [fvg_d, fvg_d_conf, fr_d, fr_d_conf, tfconf_d_i, fvgcand_d_i, frpend_d_i]     = request.security(syminfo.tickerid, 'D',   f_panel_state())
+            [fvg_w, fvg_w_conf, fr_w, fr_w_conf, tfconf_w_i, fvgcand_w_i, frpend_w_i]     = request.security(syminfo.tickerid, 'W',   f_panel_state())
+            [fvg_m, fvg_m_conf, fr_m, fr_m_conf, tfconf_m_i, fvgcand_m_i, frpend_m_i]     = request.security(syminfo.tickerid, 'M',   f_panel_state())
+
+            // Stage 6: Debug Instrument
+            active_sec_calls += 7
+
+            int ctf_conf_i = (barstate.isconfirmed or not barstate.isrealtime) ? 1 : 0
+            bool ctf_conf = ctf_conf_i == 1
+            int fvg_c_conf = ctf_conf ? fvg_state_inf : fvg_state_inf[1]
+            int fr_c_conf = ctf_conf ? fr_state_inf : fr_state_inf[1]
+
+            string m_fvg_5m = panel_show_live ? (fvgcand_5m_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fvg_15m = panel_show_live ? (fvgcand_15m_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fvg_1h = panel_show_live ? (fvgcand_1h_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fvg_4h = panel_show_live ? (fvgcand_4h_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fvg_d = panel_show_live ? (fvgcand_d_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fvg_w = panel_show_live ? (fvgcand_w_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fvg_m = panel_show_live ? (fvgcand_m_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fvg_c = panel_show_live ? (fvg_candidate_inf == 1 ? M_FORM : M_CONF) : M_CONF
+
+            string m_fr_5m = panel_show_live ? (frpend_5m_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fr_15m = panel_show_live ? (frpend_15m_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fr_1h = panel_show_live ? (frpend_1h_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fr_4h = panel_show_live ? (frpend_4h_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fr_d = panel_show_live ? (frpend_d_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fr_w = panel_show_live ? (frpend_w_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fr_m = panel_show_live ? (frpend_m_i == 1 ? M_FORM : M_CONF) : M_CONF
+            string m_fr_c = panel_show_live ? (fr_pending_inf == 1 ? M_FORM : M_CONF) : M_CONF
+
+            int fvg_disp_5m = panel_show_live ? fvg_5m : fvg_5m_conf
+            int fr_disp_5m = panel_show_live ? fr_5m : fr_5m_conf
+            int fvg_disp_15m = panel_show_live ? fvg_15m : fvg_15m_conf
+            int fr_disp_15m = panel_show_live ? fr_15m : fr_15m_conf
+            int fvg_disp_1h = panel_show_live ? fvg_1h : fvg_1h_conf
+            int fr_disp_1h = panel_show_live ? fr_1h : fr_1h_conf
+            int fvg_disp_4h = panel_show_live ? fvg_4h : fvg_4h_conf
+            int fr_disp_4h = panel_show_live ? fr_4h : fr_4h_conf
+            int fvg_disp_d = panel_show_live ? fvg_d : fvg_d_conf
+            int fr_disp_d = panel_show_live ? fr_d : fr_d_conf
+            int fvg_disp_w = panel_show_live ? fvg_w : fvg_w_conf
+            int fr_disp_w = panel_show_live ? fr_w : fr_w_conf
+            int fvg_disp_m = panel_show_live ? fvg_m : fvg_m_conf
+            int fr_disp_m = panel_show_live ? fr_m : fr_m_conf
+            int fvg_disp_c = panel_show_live ? fvg_state_inf : fvg_c_conf
+            int fr_disp_c = panel_show_live ? fr_state_inf : fr_c_conf
+
+            // --- Color Logic ---
+            fvg_color_5m  := fvg_disp_5m == 1 ? color_blue_1 : fvg_disp_5m == -1 ? color_red_1 : color_gray_1
+            fvg_color_15m := fvg_disp_15m == 1 ? color_blue_1 : fvg_disp_15m == -1 ? color_red_1 : color_gray_1
+            fvg_color_1h  := fvg_disp_1h == 1 ? color_blue_1 : fvg_disp_1h == -1 ? color_red_1 : color_gray_1
+            fvg_color_4h  := fvg_disp_4h == 1 ? color_blue_1 : fvg_disp_4h == -1 ? color_red_1 : color_gray_1
+            fvg_color_d   := fvg_disp_d == 1 ? color_blue_1 : fvg_disp_d == -1 ? color_red_1 : color_gray_1
+            fvg_color_w   := fvg_disp_w == 1 ? color_blue_1 : fvg_disp_w == -1 ? color_red_1 : color_gray_1
+            fvg_color_m   := fvg_disp_m == 1 ? color_blue_1 : fvg_disp_m == -1 ? color_red_1 : color_gray_1
+
+            // FR (Fractals)
+            fr_color_5m   := fr_disp_5m == 1 ? color_blue_1 : fr_disp_5m == -1 ? color_red_1 : color_gray_1
+            fr_color_15m  := fr_disp_15m == 1 ? color_blue_1 : fr_disp_15m == -1 ? color_red_1 : color_gray_1
+            fr_color_1h   := fr_disp_1h == 1 ? color_blue_1 : fr_disp_1h == -1 ? color_red_1 : color_gray_1
+            fr_color_4h   := fr_disp_4h == 1 ? color_blue_1 : fr_disp_4h == -1 ? color_red_1 : color_gray_1
+            fr_color_d    := fr_disp_d == 1 ? color_blue_1 : fr_disp_d == -1 ? color_red_1 : color_gray_1
+            fr_color_w    := fr_disp_w == 1 ? color_blue_1 : fr_disp_w == -1 ? color_red_1 : color_gray_1
+            fr_color_m    := fr_disp_m == 1 ? color_blue_1 : fr_disp_m == -1 ? color_red_1 : color_gray_1
+            fvg_color_c   := fvg_disp_c == 1 ? color_blue_1 : fvg_disp_c == -1 ? color_red_1 : color_gray_1
+            fr_color_c    := fr_disp_c == 1 ? color_blue_1 : fr_disp_c == -1 ? color_red_1 : color_gray_1
+
+            // Stage 7: TF Highlight Logic (Optimized with var)
+            var color col_tf_highlight = color.new(color.yellow, 75)
+            var int cur_sec = timeframe.in_seconds(timeframe.period)
+
+            // Exact matches (Cached)
+            var bool is_5m  = cur_sec == timeframe.in_seconds("5")
+            var bool is_15m = cur_sec == timeframe.in_seconds("15")
+            var bool is_1h  = cur_sec == timeframe.in_seconds("60")
+            var bool is_4h  = cur_sec == timeframe.in_seconds("240")
+            var bool is_1d  = cur_sec == timeframe.in_seconds("D")
+            var bool is_1w  = cur_sec == timeframe.in_seconds("W")
+            var bool is_1m  = cur_sec == timeframe.in_seconds("M")
+
+            // If none match, highlight "Current"
+            var bool is_custom_tf = not (is_5m or is_15m or is_1h or is_4h or is_1d or is_1w or is_1m)
+
+            string pos_input = panel_pos == "Top Right" ? position.top_right : panel_pos == "Bottom Right" ? position.bottom_right : position.bottom_left
+            info_panel := na(info_panel) ? table.new(position = pos_input, columns = PANEL_COLS, rows = PANEL_ROWS, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50)) : info_panel
+
+            // HEADER NAMES (Row 0)
+            table.cell(table_id=info_panel, column=0, row=0, text="TF", text_size= size.small, text_color=color.silver)
+            table.cell(table_id=info_panel, column=1, row=0, text= "FVG⠀", text_size= size.small, text_color=color.silver)
+            table.cell(table_id=info_panel, column=2, row=0, text= "FR", text_size= size.small, text_color=color.silver)
+
+            // 1M (Row 1)
+            table.cell(table_id=info_panel, column=0, row=1, text="1M", text_size= size.small, text_color=color.silver, bgcolor=is_1m ? col_tf_highlight : na)
+            table.cell(table_id=info_panel, column=1, row=1, text=m_fvg_m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(intra_d_w_m) ? fvg_color_m : na)
+            table.cell(table_id=info_panel, column=2, row=1, text=m_fr_m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(intra_d_w_m) ? fr_color_m : na)
+
+            // 1W (Row 2)
+            table.cell(table_id=info_panel, column=0, row=2, text="1W", text_size= size.small, text_color=color.silver, bgcolor=is_1w ? col_tf_highlight : na)
+            table.cell(table_id=info_panel, column=1, row=2, text=m_fvg_w, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(intra_d_w) ? fvg_color_w : na)
+            table.cell(table_id=info_panel, column=2, row=2, text=m_fr_w, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(intra_d_w) ? fr_color_w : na)
+
+            // 1D (Row 3)
+            table.cell(table_id=info_panel, column=0, row=3, text="1D", text_size= size.small, text_color=color.silver, bgcolor=is_1d ? col_tf_highlight : na)
+            table.cell(table_id=info_panel, column=1, row=3, text=m_fvg_d, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(intra_d) ? fvg_color_d : na)
+            table.cell(table_id=info_panel, column=2, row=3, text=m_fr_d, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(intra_d) ? fr_color_d : na)
+
+            // 4H (Row 4)
+            table.cell(table_id=info_panel, column=0, row=4, text="4H", text_size= size.small, text_color=color.silver, bgcolor=is_4h ? col_tf_highlight : na)
+            table.cell(table_id=info_panel, column=1, row=4, text=m_fvg_4h, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=intra ? fvg_color_4h : na)
+            table.cell(table_id=info_panel, column=2, row=4, text=m_fr_4h, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=intra ? fr_color_4h : na)
+
+            // 1H (Row 5)
+            table.cell(table_id=info_panel, column=0, row=5, text="1H", text_size= size.small, text_color=color.silver, bgcolor=is_1h ? col_tf_highlight : na)
+            table.cell(table_id=info_panel, column=1, row=5, text=m_fvg_1h, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=intra ? fvg_color_1h : na)
+            table.cell(table_id=info_panel, column=2, row=5, text=m_fr_1h, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=intra ? fr_color_1h : na)
+
+            // 15m (Row 6)
+            table.cell(table_id=info_panel, column=0, row=6, text="15m", text_size= size.small, text_color=color.silver, bgcolor=is_15m ? col_tf_highlight : na)
+            table.cell(table_id=info_panel, column=1, row=6, text=m_fvg_15m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=intra ? fvg_color_15m : na)
+            table.cell(table_id=info_panel, column=2, row=6, text=m_fr_15m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=intra ? fr_color_15m : na)
+
+            // 5m (Row 7)
+            table.cell(table_id=info_panel, column=0, row=7, text="5m", text_size= size.small, text_color=color.silver, bgcolor=is_5m ? col_tf_highlight : na)
+            table.cell(table_id=info_panel, column=1, row=7, text=m_fvg_5m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=intra ? fvg_color_5m : na)
+            table.cell(table_id=info_panel, column=2, row=7, text=m_fr_5m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=intra ? fr_color_5m : na)
+
+            // ATR14 (Row 8)
+            table.merge_cells(info_panel, 0, 8, 2, 8)
+            table.cell(table_id=info_panel, column=0, row=8, text="ATR14 " + str.tostring(atr14_val, "#.#####"), text_size=size.small, text_color=color.silver)
+
+            // ADR% (Row 9) - Initial Placeholder (Filled later)
+            table.merge_cells(info_panel, 0, 9, 2, 9)
+            table.cell(table_id=info_panel, column=0, row=9, text="ADR%", text_size=size.small, text_color=color.silver)
+
+            // HEADER (Row 10: Current)
+            table.cell(table_id=info_panel, column=0, row=10, text="C", text_size= size.small, text_color=color.silver, bgcolor=is_custom_tf ? col_tf_highlight : na)
+            table.cell(table_id=info_panel, column=1, row=10, text=m_fvg_c, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(intra_d_w_m) ? fvg_color_c : na)
+            table.cell(table_id=info_panel, column=2, row=10, text=m_fr_c, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(intra_d_w_m) ? fr_color_c : na)
+
+        prev_enabled := true
 
 f_pivots_update(_cfg) =>
     false
@@ -1842,26 +2037,13 @@ f_panel_state() =>
 
     [fvg_state, fvg_last_conf, fr_state, fr_last_conf, tf_conf_i, fvg_candidate_i, fr_pending_i]
 
-//colors
-color_blue_1    = color.new(color.blue, 30)
-color_red_1     = color.new(color.red, 30)
-color_gray_1    = color.new(color.gray, 100)
-
-//current tf condition for adx, hama and ema
-// RECALC for info panel table to ensure it matches current chart regardless of bg signal
-
 //mtf time frames
 Intra           = timeframe.isintraday
 Intra_D         = timeframe.isintraday or timeframe.isdaily
 Intra_D_W       = timeframe.isintraday or timeframe.isdaily or timeframe.isweekly
 Intra_D_W_M     = timeframe.isintraday or timeframe.isdaily or timeframe.isweekly or timeframe.ismonthly
 
-// Stage 6: Info Panel Refactoring (Global Current TF + Gated HTF)
-
-// 1. Always Run Current TF (To prevent warm-up issues)
-atr14_val             = ta.atr(14)
-
-// Global Current TF Logic (Additions)
+// Stage 6: Info Panel Refactoring (Global Current TF)
 // FVG
 var int fvg_state_inf = 1
 bool bull_fvg_inf = low > high[2]
@@ -1870,7 +2052,6 @@ if bull_fvg_inf
     fvg_state_inf := 1
 else if bear_fvg_inf
     fvg_state_inf := -1
-int fvg_candidate_inf = (not barstate.isconfirmed and (bull_fvg_inf or bear_fvg_inf)) ? 1 : 0
 
 // Fractals
 up_fr_inf = ta.pivothigh(2, 2)
@@ -1884,186 +2065,6 @@ if fr_evt_up_inf
     fr_state_inf := 1
 else if fr_evt_dn_inf
     fr_state_inf := -1
-int fr_pending_inf = ((fr_evt_up_inf or fr_evt_dn_inf) and not barstate.isconfirmed) ? 1 : 0
-
-fvg_color_c     = fvg_state_inf == 1 ? color_blue_1 : fvg_state_inf == -1 ? color_red_1 : color_gray_1
-fr_color_c      = fr_state_inf == 1 ? color_blue_1 : fr_state_inf == -1 ? color_red_1 : color_gray_1
-
-// Info Panel Table (Declared global to allow deletion)
-var table info_panel = na
-
-// Define Variables for HTF colors (Init to default)
-// FVG Colors
-color fvg_color_5m  = na
-color fvg_color_15m = na
-color fvg_color_1h  = na
-color fvg_color_4h  = na
-color fvg_color_d   = na
-color fvg_color_w   = na
-color fvg_color_m   = na
-
-// FR Colors
-color fr_color_5m  = na
-color fr_color_15m = na
-color fr_color_1h  = na
-color fr_color_4h  = na
-color fr_color_d   = na
-color fr_color_w   = na
-color fr_color_m   = na
-
-// 2. Gated HTF & Table Update
-if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Security & Logic
-    // Optimization: Combine security calls for Info Panel (7 calls)
-    // Using global input parameters for all timeframes as requested
-    [fvg_5m, fvg_5m_conf, fr_5m, fr_5m_conf, tfconf_5m_i, fvgcand_5m_i, frpend_5m_i] = request.security(syminfo.tickerid, '5',   f_panel_state())
-    [fvg_15m, fvg_15m_conf, fr_15m, fr_15m_conf, tfconf_15m_i, fvgcand_15m_i, frpend_15m_i] = request.security(syminfo.tickerid, '15',  f_panel_state())
-    [fvg_1h, fvg_1h_conf, fr_1h, fr_1h_conf, tfconf_1h_i, fvgcand_1h_i, frpend_1h_i] = request.security(syminfo.tickerid, '60',  f_panel_state())
-    [fvg_4h, fvg_4h_conf, fr_4h, fr_4h_conf, tfconf_4h_i, fvgcand_4h_i, frpend_4h_i] = request.security(syminfo.tickerid, '240', f_panel_state())
-    [fvg_d, fvg_d_conf, fr_d, fr_d_conf, tfconf_d_i, fvgcand_d_i, frpend_d_i]     = request.security(syminfo.tickerid, 'D',   f_panel_state())
-    [fvg_w, fvg_w_conf, fr_w, fr_w_conf, tfconf_w_i, fvgcand_w_i, frpend_w_i]     = request.security(syminfo.tickerid, 'W',   f_panel_state())
-    [fvg_m, fvg_m_conf, fr_m, fr_m_conf, tfconf_m_i, fvgcand_m_i, frpend_m_i]     = request.security(syminfo.tickerid, 'M',   f_panel_state())
-
-    // Stage 6: Debug Instrument
-    active_sec_calls += 7
-
-    int ctf_conf_i = (barstate.isconfirmed or not barstate.isrealtime) ? 1 : 0
-    bool ctf_conf = ctf_conf_i == 1
-    int fvg_c_conf = ctf_conf ? fvg_state_inf : fvg_state_inf[1]
-    int fr_c_conf = ctf_conf ? fr_state_inf : fr_state_inf[1]
-
-    string m_fvg_5m = panel_show_live ? (fvgcand_5m_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fvg_15m = panel_show_live ? (fvgcand_15m_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fvg_1h = panel_show_live ? (fvgcand_1h_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fvg_4h = panel_show_live ? (fvgcand_4h_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fvg_d = panel_show_live ? (fvgcand_d_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fvg_w = panel_show_live ? (fvgcand_w_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fvg_m = panel_show_live ? (fvgcand_m_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fvg_c = panel_show_live ? (fvg_candidate_inf == 1 ? M_FORM : M_CONF) : M_CONF
-
-    string m_fr_5m = panel_show_live ? (frpend_5m_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_15m = panel_show_live ? (frpend_15m_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_1h = panel_show_live ? (frpend_1h_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_4h = panel_show_live ? (frpend_4h_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_d = panel_show_live ? (frpend_d_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_w = panel_show_live ? (frpend_w_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_m = panel_show_live ? (frpend_m_i == 1 ? M_FORM : M_CONF) : M_CONF
-    string m_fr_c = panel_show_live ? (fr_pending_inf == 1 ? M_FORM : M_CONF) : M_CONF
-
-    int fvg_disp_5m = panel_show_live ? fvg_5m : fvg_5m_conf
-    int fr_disp_5m = panel_show_live ? fr_5m : fr_5m_conf
-    int fvg_disp_15m = panel_show_live ? fvg_15m : fvg_15m_conf
-    int fr_disp_15m = panel_show_live ? fr_15m : fr_15m_conf
-    int fvg_disp_1h = panel_show_live ? fvg_1h : fvg_1h_conf
-    int fr_disp_1h = panel_show_live ? fr_1h : fr_1h_conf
-    int fvg_disp_4h = panel_show_live ? fvg_4h : fvg_4h_conf
-    int fr_disp_4h = panel_show_live ? fr_4h : fr_4h_conf
-    int fvg_disp_d = panel_show_live ? fvg_d : fvg_d_conf
-    int fr_disp_d = panel_show_live ? fr_d : fr_d_conf
-    int fvg_disp_w = panel_show_live ? fvg_w : fvg_w_conf
-    int fr_disp_w = panel_show_live ? fr_w : fr_w_conf
-    int fvg_disp_m = panel_show_live ? fvg_m : fvg_m_conf
-    int fr_disp_m = panel_show_live ? fr_m : fr_m_conf
-    int fvg_disp_c = panel_show_live ? fvg_state_inf : fvg_c_conf
-    int fr_disp_c = panel_show_live ? fr_state_inf : fr_c_conf
-
-    // --- Color Logic ---
-    // FVG
-    fvg_color_5m  := fvg_disp_5m == 1 ? color_blue_1 : fvg_disp_5m == -1 ? color_red_1 : color_gray_1
-    fvg_color_15m := fvg_disp_15m == 1 ? color_blue_1 : fvg_disp_15m == -1 ? color_red_1 : color_gray_1
-    fvg_color_1h  := fvg_disp_1h == 1 ? color_blue_1 : fvg_disp_1h == -1 ? color_red_1 : color_gray_1
-    fvg_color_4h  := fvg_disp_4h == 1 ? color_blue_1 : fvg_disp_4h == -1 ? color_red_1 : color_gray_1
-    fvg_color_d   := fvg_disp_d == 1 ? color_blue_1 : fvg_disp_d == -1 ? color_red_1 : color_gray_1
-    fvg_color_w   := fvg_disp_w == 1 ? color_blue_1 : fvg_disp_w == -1 ? color_red_1 : color_gray_1
-    fvg_color_m   := fvg_disp_m == 1 ? color_blue_1 : fvg_disp_m == -1 ? color_red_1 : color_gray_1
-
-    // FR (Fractals)
-    fr_color_5m   := fr_disp_5m == 1 ? color_blue_1 : fr_disp_5m == -1 ? color_red_1 : color_gray_1
-    fr_color_15m  := fr_disp_15m == 1 ? color_blue_1 : fr_disp_15m == -1 ? color_red_1 : color_gray_1
-    fr_color_1h   := fr_disp_1h == 1 ? color_blue_1 : fr_disp_1h == -1 ? color_red_1 : color_gray_1
-    fr_color_4h   := fr_disp_4h == 1 ? color_blue_1 : fr_disp_4h == -1 ? color_red_1 : color_gray_1
-    fr_color_d    := fr_disp_d == 1 ? color_blue_1 : fr_disp_d == -1 ? color_red_1 : color_gray_1
-    fr_color_w    := fr_disp_w == 1 ? color_blue_1 : fr_disp_w == -1 ? color_red_1 : color_gray_1
-    fr_color_m    := fr_disp_m == 1 ? color_blue_1 : fr_disp_m == -1 ? color_red_1 : color_gray_1
-    fvg_color_c   := fvg_disp_c == 1 ? color_blue_1 : fvg_disp_c == -1 ? color_red_1 : color_gray_1
-    fr_color_c    := fr_disp_c == 1 ? color_blue_1 : fr_disp_c == -1 ? color_red_1 : color_gray_1
-
-    // Stage 7: TF Highlight Logic (Optimized with var)
-    var color col_tf_highlight = color.new(color.yellow, 75)
-    var int cur_sec = timeframe.in_seconds(timeframe.period)
-
-    // Exact matches (Cached)
-    var bool is_5m  = cur_sec == timeframe.in_seconds("5")
-    var bool is_15m = cur_sec == timeframe.in_seconds("15")
-    var bool is_1h  = cur_sec == timeframe.in_seconds("60")
-    var bool is_4h  = cur_sec == timeframe.in_seconds("240")
-    var bool is_1d  = cur_sec == timeframe.in_seconds("D")
-    var bool is_1w  = cur_sec == timeframe.in_seconds("W")
-    var bool is_1m  = cur_sec == timeframe.in_seconds("M")
-
-    // If none match, highlight "Current"
-    var bool is_custom_tf = not (is_5m or is_15m or is_1h or is_4h or is_1d or is_1w or is_1m)
-
-    string pos_input = panel_pos == "Top Right" ? position.top_right : panel_pos == "Bottom Right" ? position.bottom_right : position.bottom_left
-    info_panel := na(info_panel) ? table.new(position = pos_input, columns = PANEL_COLS, rows = PANEL_ROWS, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50)) : info_panel
-
-    // HEADER NAMES (Row 0)
-    table.cell(table_id=info_panel, column=0, row=0, text="TF", text_size= size.small, text_color=color.silver)
-    table.cell(table_id=info_panel, column=1, row=0, text= "FVG⠀", text_size= size.small, text_color=color.silver)
-    table.cell(table_id=info_panel, column=2, row=0, text= "FR", text_size= size.small, text_color=color.silver)
-
-    // 1M (Row 1)
-    table.cell(table_id=info_panel, column=0, row=1, text="1M", text_size= size.small, text_color=color.silver, bgcolor=is_1m ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=1, text=m_fvg_m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(Intra_D_W_M) ? fvg_color_m : na)
-    table.cell(table_id=info_panel, column=2, row=1, text=m_fr_m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(Intra_D_W_M) ? fr_color_m : na)
-
-    // 1W (Row 2)
-    table.cell(table_id=info_panel, column=0, row=2, text="1W", text_size= size.small, text_color=color.silver, bgcolor=is_1w ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=2, text=m_fvg_w, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(Intra_D_W) ? fvg_color_w : na)
-    table.cell(table_id=info_panel, column=2, row=2, text=m_fr_w, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(Intra_D_W) ? fr_color_w : na)
-
-    // 1D (Row 3)
-    table.cell(table_id=info_panel, column=0, row=3, text="1D", text_size= size.small, text_color=color.silver, bgcolor=is_1d ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=3, text=m_fvg_d, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(Intra_D) ? fvg_color_d : na)
-    table.cell(table_id=info_panel, column=2, row=3, text=m_fr_d, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(Intra_D) ? fr_color_d : na)
-
-    // 4H (Row 4)
-    table.cell(table_id=info_panel, column=0, row=4, text="4H", text_size= size.small, text_color=color.silver, bgcolor=is_4h ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=4, text=m_fvg_4h, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=Intra ? fvg_color_4h : na)
-    table.cell(table_id=info_panel, column=2, row=4, text=m_fr_4h, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=Intra ? fr_color_4h : na)
-
-    // 1H (Row 5)
-    table.cell(table_id=info_panel, column=0, row=5, text="1H", text_size= size.small, text_color=color.silver, bgcolor=is_1h ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=5, text=m_fvg_1h, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=Intra ? fvg_color_1h : na)
-    table.cell(table_id=info_panel, column=2, row=5, text=m_fr_1h, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=Intra ? fr_color_1h : na)
-
-    // 15m (Row 6)
-    table.cell(table_id=info_panel, column=0, row=6, text="15m", text_size= size.small, text_color=color.silver, bgcolor=is_15m ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=6, text=m_fvg_15m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=Intra ? fvg_color_15m : na)
-    table.cell(table_id=info_panel, column=2, row=6, text=m_fr_15m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=Intra ? fr_color_15m : na)
-
-    // 5m (Row 7)
-    table.cell(table_id=info_panel, column=0, row=7, text="5m", text_size= size.small, text_color=color.silver, bgcolor=is_5m ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=7, text=m_fvg_5m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=Intra ? fvg_color_5m : na)
-    table.cell(table_id=info_panel, column=2, row=7, text=m_fr_5m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=Intra ? fr_color_5m : na)
-
-    // ATR14 (Row 8)
-    table.merge_cells(info_panel, 0, 8, 2, 8)
-    table.cell(table_id=info_panel, column=0, row=8, text="ATR14 " + str.tostring(atr14_val, "#.#####"), text_size=size.small, text_color=color.silver)
-
-    // ADR% (Row 9) - Initial Placeholder (Filled later)
-    table.merge_cells(info_panel, 0, 9, 2, 9)
-    table.cell(table_id=info_panel, column=0, row=9, text="ADR%", text_size=size.small, text_color=color.silver)
-
-    // HEADER (Row 10: Current)
-    table.cell(table_id=info_panel, column=0, row=10, text="C", text_size= size.small, text_color=color.silver, bgcolor=is_custom_tf ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=10, text=m_fvg_c, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(Intra_D_W_M) ? fvg_color_c : na)
-    table.cell(table_id=info_panel, column=2, row=10, text=m_fr_c, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(Intra_D_W_M) ? fr_color_c : na)
-else
-    if not na(info_panel)
-        table.delete(info_panel)
-        info_panel := na
-
-
 // ----------------------------------------------------------- pivot points -----------------------------------------------------------------
 
 // Optimierte Datenabfrage (Tuples), um das "Security Limit" von 40 nicht zu sprengen
