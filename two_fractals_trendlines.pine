@@ -740,8 +740,56 @@ f_reset_sig() =>
     sig.fvg_bear := false
     sig.vol_spike := false
 
+f_key_levels_update(_cfg) =>
+    na
+
+f_rvol_update(_cfg) =>
+    na
+
+f_trendlines_update(_cfg) =>
+    na
+
+f_info_panel_update(_cfg) =>
+    na
+
+f_pivots_update(_cfg) =>
+    na
+
+f_sessions_update(_cfg) =>
+    na
+
+f_vwap_update(_cfg) =>
+    na
+
+f_or_ib_update(_cfg) =>
+    na
+
+f_mtf_candles_update(_cfg) =>
+    na
+
+f_fvg_update(_cfg) =>
+    na
+
+f_volume_profile_update(_cfg) =>
+    na
+
+f_conf_engine_update(_cfg) =>
+    na
+
 f_main(_cfg) =>
     f_reset_sig()
+    f_key_levels_update(_cfg)
+    f_rvol_update(_cfg)
+    f_trendlines_update(_cfg)
+    f_sessions_update(_cfg)
+    f_vwap_update(_cfg)
+    f_or_ib_update(_cfg)
+    f_mtf_candles_update(_cfg)
+    f_fvg_update(_cfg)
+    f_pivots_update(_cfg)
+    f_info_panel_update(_cfg)
+    f_volume_profile_update(_cfg)
+    f_conf_engine_update(_cfg)
 
 f_main(cfg)
 
