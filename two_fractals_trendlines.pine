@@ -750,6 +750,36 @@ f_rvol_update(_cfg) =>
 f_trendlines_update(_cfg) =>
     false
 
+// Helper function for Panel State
+f_panel_state() =>
+    // FVG Close State
+    var int fvg_state = 1
+    bool bull_fvg_cond = low > high[2]
+    bool bear_fvg_cond = high < low[2]
+    fvg_state := bull_fvg_cond ? 1 : bear_fvg_cond ? -1 : fvg_state
+    int fvg_candidate_i = (not barstate.isconfirmed and (bull_fvg_cond or bear_fvg_cond)) ? 1 : 0
+
+    // Bill Williams Fractals State
+    // Standard 2,2 fractals
+    up_fr = ta.pivothigh(2, 2)
+    dn_fr = ta.pivotlow(2, 2)
+
+    last_up_lvl = ta.valuewhen(not na(up_fr), high[2], 0)
+    last_dn_lvl = ta.valuewhen(not na(dn_fr), low[2], 0)
+
+    var int fr_state = 1
+    // Check breaks
+    bool fr_evt_up = ta.crossover(high, last_up_lvl)
+    bool fr_evt_dn = ta.crossunder(low, last_dn_lvl)
+    fr_state := fr_evt_up ? 1 : fr_evt_dn ? -1 : fr_state
+
+    int tf_conf_i = barstate.isconfirmed ? 1 : 0
+    int fr_pending_i = ((fr_evt_up or fr_evt_dn) and not barstate.isconfirmed) ? 1 : 0
+    int fvg_last_conf = barstate.isconfirmed ? fvg_state : fvg_state[1]
+    int fr_last_conf = barstate.isconfirmed ? fr_state : fr_state[1]
+
+    [fvg_state, fvg_last_conf, fr_state, fr_last_conf, tf_conf_i, fvg_candidate_i, fr_pending_i]
+
 f_info_panel_update(_cfg) =>
     var table panel = na
     bool enabled = panel_pos != "None"
@@ -2008,36 +2038,6 @@ if eff_plot_segments and barstate.isconfirmed
 //-------------------------------------------------------------------- info panel -------------------------------------------------------------------------
 
 //indicator funktions for 4h, d, w, m
-
-// Helper function for Panel State
-f_panel_state() =>
-    // FVG Close State
-    var int fvg_state = 1
-    bool bull_fvg_cond = low > high[2]
-    bool bear_fvg_cond = high < low[2]
-    fvg_state := bull_fvg_cond ? 1 : bear_fvg_cond ? -1 : fvg_state
-    int fvg_candidate_i = (not barstate.isconfirmed and (bull_fvg_cond or bear_fvg_cond)) ? 1 : 0
-
-    // Bill Williams Fractals State
-    // Standard 2,2 fractals
-    up_fr = ta.pivothigh(2, 2)
-    dn_fr = ta.pivotlow(2, 2)
-
-    last_up_lvl = ta.valuewhen(not na(up_fr), high[2], 0)
-    last_dn_lvl = ta.valuewhen(not na(dn_fr), low[2], 0)
-
-    var int fr_state = 1
-    // Check breaks
-    bool fr_evt_up = ta.crossover(high, last_up_lvl)
-    bool fr_evt_dn = ta.crossunder(low, last_dn_lvl)
-    fr_state := fr_evt_up ? 1 : fr_evt_dn ? -1 : fr_state
-
-    int tf_conf_i = barstate.isconfirmed ? 1 : 0
-    int fr_pending_i = ((fr_evt_up or fr_evt_dn) and not barstate.isconfirmed) ? 1 : 0
-    int fvg_last_conf = barstate.isconfirmed ? fvg_state : fvg_state[1]
-    int fr_last_conf = barstate.isconfirmed ? fr_state : fr_state[1]
-
-    [fvg_state, fvg_last_conf, fr_state, fr_last_conf, tf_conf_i, fvg_candidate_i, fr_pending_i]
 
 //mtf time frames
 Intra           = timeframe.isintraday
