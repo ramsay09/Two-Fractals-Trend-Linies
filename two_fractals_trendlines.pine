@@ -166,6 +166,7 @@ bool eff_sq_box_enabled = false
 bool eff_show_conf_meter = false
 bool eff_regime_panel = false
 string eff_regime_bg_mode = "None"
+bool eff_calc_conf = false
 
 f_resolve_auto_params(_tf_sec, _auto_tuning) =>
     bool is_fast = _tf_sec <= 900
