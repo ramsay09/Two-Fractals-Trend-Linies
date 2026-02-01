@@ -78,12 +78,6 @@ f_with_marker(string txt, string marker) =>
 // 1. Timeframe Classification
 int tf_sec = timeframe.in_seconds(timeframe.period)
 
-bool is_fast       = tf_sec <= 900 // <= 15m
-bool is_med        = tf_sec > 900 and tf_sec <= 14400 // > 15m and <= 4h
-bool is_slow       = tf_sec > 14400 and tf_sec < 86400 // > 4h and < 1D
-bool is_daily      = tf_sec >= 86400 and tf_sec < 604800 // >= 1D and < 1W
-bool is_weekly_plus= tf_sec >= 604800 // >= 1W
-
 // 2. Define Effective Variables (Init)
 // CONF
 int eff_core_ema_len = 13
@@ -114,100 +108,91 @@ int eff_atr_norm     = 50
 float eff_atr_low    = 0.90
 float eff_atr_high   = 1.10
 
-// 3. PARAMETER RESOLVER
+f_resolve_auto_params(_tf_sec, _auto_tuning) =>
+    bool is_fast = _tf_sec <= 900
+    bool is_med = _tf_sec > 900 and _tf_sec <= 14400
+    bool is_slow = _tf_sec > 14400 and _tf_sec < 86400
+    bool is_daily = _tf_sec >= 86400 and _tf_sec < 604800
+    bool is_weekly_plus = _tf_sec >= 604800
+    int a_core_len = 13
+    int a_persist = 3
+    int a_vol_len = 80
+    float a_enter_k = 1.0
+    float a_exit_k = 0.5
+    float a_decay = 0.70
+    float a_clamp = 0.15
+    int a_adx_th = 20
+    bool use_adr_gate = true
+    float adr_warn = 85.0
+    float adr_hard = 110.0
+    if is_fast
+        a_core_len := 8
+        a_persist  := 3
+        a_vol_len  := 50
+    else if is_med
+        a_core_len := 13
+        a_persist  := 3
+        a_vol_len  := 80
+    else if is_slow
+        a_core_len := 21
+        a_persist  := 2
+        a_vol_len  := 120
+    else if is_daily
+        a_core_len := 21
+        a_persist  := 2
+        a_vol_len  := 150
+    else
+        a_core_len := 34
+        a_persist  := 2
+        a_vol_len  := 200
+    if _auto_tuning == "Conservative"
+        a_enter_k := 1.25
+        a_exit_k  := 0.65
+        a_decay   := 0.60
+        a_clamp   := 0.12
+        a_adx_th  := 22
+        a_core_len := math.round(a_core_len * 1.4)
+        a_vol_len  := math.round(a_vol_len * 1.4)
+        a_persist  := math.min(a_persist + 2, 6)
+        use_adr_gate := true
+        adr_warn := 85.0
+        adr_hard := 110.0
+    else if _auto_tuning == "Aggressive"
+        a_enter_k := 0.80
+        a_exit_k  := 0.45
+        a_decay   := 0.75
+        a_clamp   := 0.18
+        a_adx_th  := 18
+        a_core_len := math.max(math.round(a_core_len * 0.75), 5)
+        a_vol_len  := math.max(math.round(a_vol_len * 0.75), 30)
+        a_persist  := math.max(a_persist - 1, 2)
+        use_adr_gate := (is_daily or is_weekly_plus) ? false : true
+        adr_warn := 85.0
+        adr_hard := 110.0
+    else
+        a_enter_k := 1.00
+        a_exit_k  := 0.50
+        a_decay   := 0.70
+        a_clamp   := 0.15
+        a_adx_th  := 20
+        use_adr_gate := true
+        adr_warn := 85.0
+        adr_hard := 110.0
+    [int(a_core_len), int(a_vol_len), a_enter_k, a_exit_k, int(a_persist), a_decay, a_clamp, a_adx_th, use_adr_gate, adr_warn, adr_hard]
 
-// --- AUTO MODE LOGIC (Full Auto Trader Edition) ---
-
-// Base Values (Balanced)
-int a_core_len  = 13
-int a_persist   = 3
-int a_vol_len   = 80
-float a_enter_k = 1.0
-float a_exit_k  = 0.5
-float a_decay   = 0.70
-float a_clamp   = 0.15
-int a_adx_th    = 20
-
-// Timeframe Scaling Defaults
-if is_fast
-    a_core_len := 8
-    a_persist  := 3
-    a_vol_len  := 50
-else if is_med
-    a_core_len := 13
-    a_persist  := 3
-    a_vol_len  := 80
-else if is_slow
-    a_core_len := 21
-    a_persist  := 2
-    a_vol_len  := 120
-else if is_daily
-    a_core_len := 21
-    a_persist  := 2
-    a_vol_len  := 150
-else // Weekly+
-    a_core_len := 34
-    a_persist  := 2
-    a_vol_len  := 200
-
-// Auto Tuning Logic
-if auto_tuning == "Conservative"
-    a_enter_k := 1.25
-    a_exit_k  := 0.65
-    a_decay   := 0.60
-    a_clamp   := 0.12
-    a_adx_th  := 22
-
-    // Scale up for robustness
-    a_core_len := math.round(a_core_len * 1.4)
-    a_vol_len  := math.round(a_vol_len * 1.4)
-    a_persist  := math.min(a_persist + 2, 6)
-
-    // ADR Gate: Soft (Enabled)
-    eff_use_adr_gate := true
-    eff_adr_warn := 85.0
-    eff_adr_hard := 110.0
-
-else if auto_tuning == "Aggressive"
-    a_enter_k := 0.80
-    a_exit_k  := 0.45
-    a_decay   := 0.75
-    a_clamp   := 0.18
-    a_adx_th  := 18
-
-    // Scale down for speed
-    a_core_len := math.max(math.round(a_core_len * 0.75), 5)
-    a_vol_len  := math.max(math.round(a_vol_len * 0.75), 30)
-    a_persist  := math.max(a_persist - 1, 2) // Prompt says max(base-1, 2). Assuming I take current persisted value which is base.
-
-    // ADR Gate: Off on Daily+, Soft otherwise
-    eff_use_adr_gate := (is_daily or is_weekly_plus) ? false : true
-    eff_adr_warn := 85.0
-    eff_adr_hard := 110.0
-
-else
-    // Balanced
-    // No multipliers on TF base values
-    a_enter_k := 1.00
-    a_exit_k  := 0.50
-    a_decay   := 0.70
-    a_clamp   := 0.15
-    a_adx_th  := 20
-
-    // ADR Gate: Soft (Enabled)
-    eff_use_adr_gate := true
-    eff_adr_warn := 85.0
-    eff_adr_hard := 110.0
-
-// Assignment
-eff_core_ema_len := int(a_core_len)
-eff_vol_len      := int(a_vol_len)
-eff_enter_k      := a_enter_k
-eff_exit_k       := a_exit_k
-eff_persist_bars := int(a_persist)
-eff_ov_decay     := a_decay
-eff_ov_clamp     := a_clamp
-eff_adx_th       := a_adx_th
+[
+    eff_core_ema_len,
+    eff_vol_len,
+    eff_enter_k,
+    eff_exit_k,
+    eff_persist_bars,
+    eff_ov_decay,
+    eff_ov_clamp,
+    eff_adx_th,
+    eff_use_adr_gate,
+    eff_adr_warn,
+    eff_adr_hard
+] = f_resolve_auto_params(tf_sec, auto_tuning)
 
 // Fixed REG Settings
 eff_bb_len         := 20
@@ -555,86 +540,166 @@ int fvg1_limit_eff = dbg_stress ? math.min(fvg1_limit, 120) : fvg1_limit
 int fvg2_limit_eff = dbg_stress ? math.min(fvg2_limit, 120) : fvg2_limit
 int sess_line_limit_eff = dbg_stress ? math.min(sess_line_limit, 120) : sess_line_limit
 
-// Effective Feature Flags
-//                                          Cust           SessMap   ORB    MR     Brk    SqzBrk  Trend
-eff_fractals_plot   = f_approach_bool(fractals_plot,      true,     true,  true,  true,  true,   true)
-eff_sub_fractals    = f_approach_bool(sub_fractals,       false,    false, false, false, false,  false)
-eff_plot_trendline  = f_approach_bool(plot_trendline,     false,    true,  false, true,  true,   true)
+f_resolve_effective_flags() =>
+    //                                          Cust           SessMap   ORB    MR     Brk    SqzBrk  Trend
+    bool eff_fractals_plot = f_approach_bool(fractals_plot,      true,     true,  true,  true,  true,   true)
+    bool eff_sub_fractals = f_approach_bool(sub_fractals,       false,    false, false, false, false,  false)
+    bool eff_plot_trendline = f_approach_bool(plot_trendline,     false,    true,  false, true,  true,   true)
+    bool eff_vp_enable = f_approach_bool(vp_enable,          false,    false, false, false, false,  false)
+    bool eff_vp_smart = f_approach_bool(vp_smart,           vp_smart, false, false, false, false,  false)
+    bool eff_show_mtf_candles = f_approach_bool(show_mtf_candles,   false,    false, false, false, false,  false)
+    bool eff_use_sess_1st = f_approach_bool(use_sess_1st,       false,    false, false, false, false,  false)
+    bool eff_show_last_frac = f_approach_bool(show_last_frac,     false,    false, false, false, false,  false)
+    bool eff_show_vol = f_approach_bool(show_vol,           true,     false, false, false, false,  false)
+    bool eff_plot_fvg1 = f_approach_bool(plot_fvg1,          false,    false, false, false, false,  true)
+    bool eff_plot_fvg2 = f_approach_bool(plot_fvg2,          false,    false, false, false, false,  false)
+    string eff_ps_mode = f_approach_str(ps_mode,             "None",   "None","None","None","None", "Auto")
+    bool eff_BB_plot = f_approach_bool(BB_plot,            false,    false, false, false, false,  false)
+    bool eff_en_cloud = f_approach_bool(en_cloud,           false,    false, false, false, false,  false)
+    bool eff_sig_plot = f_approach_bool(sig_plot,           sig_plot, false, false, false, false,  false)
+    string eff_ma1_type = f_approach_str(ma1_type,            ma1_type, "None","None","None","None", "None")
+    string eff_ma2_type = f_approach_str(ma2_type,            ma2_type, "None","None","None","None", "None")
+    bool eff_plot_div = f_approach_bool(plot_div,           false,    false, true,  false, false,  false)
+    bool eff_plot_l12_bar = f_approach_bool(plot_l12_bar,       false,    false, false, false, false,  false)
+    bool eff_plot_nr_bar = f_approach_bool(plot_nr_bar,        false,    false, false, false, false,  false)
+    bool eff_plot_i_bar = f_approach_bool(plot_i_bar,         false,    false, false, false, false,  false)
+    bool eff_plot_o_bar = f_approach_bool(plot_o_bar,         false,    false, false, false, false,  false)
+    bool eff_plot_s_bar = f_approach_bool(plot_s_bar,         false,    false, false, false, false,  false)
+    bool eff_plot_f_bar = f_approach_bool(plot_f_bar,         false,    false, false, false, false,  false)
+    bool eff_plot_segments = f_approach_bool(plot_segments,      false,    false, false, false, false,  false)
+    bool eff_plot_pivots_h1 = f_approach_bool(plot_pivots_h1,     false,    false, false, false, false,  false)
+    bool eff_plot_pivots_h4 = f_approach_bool(plot_pivots_h4,     false,    false, false, false, false,  false)
+    bool eff_plot_pivots_d = f_approach_bool(plot_pivots_d,      false,    false, false, false, false,  false)
+    bool eff_plot_pivots_w = f_approach_bool(plot_pivots_w,      false,    false, false, false, false,  false)
+    bool eff_plot_pivots_m = f_approach_bool(plot_pivots_m,      false,    false, false, false, false,  false)
+    bool eff_plot_pivots_3m = f_approach_bool(plot_pivots_3m,     false,    false, false, false, false,  false)
+    bool eff_plot_pivots_12m = f_approach_bool(plot_pivots_12m,    false,    false, false, false, false,  false)
+    bool eff_london_show = f_approach_bool(london_show,        true,     true,  false, false, false,  false)
+    bool eff_ny_show = f_approach_bool(ny_show,            true,     true,  false, false, false,  false)
+    bool eff_tokyo_show = f_approach_bool(tokyo_show,         true,     true,  false, false, false,  false)
+    bool eff_sydney_show = f_approach_bool(sydney_show,        true,     true,  false, false, false,  false)
+    bool eff_sess_bg_enable = f_approach_bool(true,               true,     false, false, false, false,  false)
+    bool eff_key_levels_enabled = f_approach_bool(key_levels_enabled, true, true, true, true, true, true)
+    bool eff_show_pdh = f_approach_bool(show_pdh, true, true, true, true, true, true)
+    bool eff_show_pdl = f_approach_bool(show_pdl, true, true, true, true, true, true)
+    bool eff_show_pdc = f_approach_bool(show_pdc, false, false, false, false, false, false)
+    bool eff_show_wopen = f_approach_bool(show_wopen, true, false, true, false, false, true)
+    bool eff_show_mopen = f_approach_bool(show_mopen, false, false, false, false, false, false)
+    bool eff_rvol_enabled = f_approach_bool(rvol_enabled, false, true, false, true, true, false)
+    bool eff_rvol_points_enabled = f_approach_bool(rvol_points_enabled, false, true, false, true, true, false)
+    bool eff_vwap_enabled = f_approach_bool(vwap_enabled, false, false, true, false, false, true)
+    string eff_vwap_anchor = f_approach_str(vwap_anchor, "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Weekly")
+    bool eff_vwap_bands = f_approach_bool(vwap_bands_enabled, false, false, true, false, false, false)
+    bool eff_vwap_z = f_approach_bool(vwap_z_enabled, false, false, true, false, false, false)
+    bool eff_or_enabled = f_approach_bool(or_enabled, false, true, false, true, false, false)
+    bool eff_sq_box_enabled = f_approach_bool(sq_box_enabled, false, false, false, false, true, false)
+    [
+        eff_fractals_plot,
+        eff_sub_fractals,
+        eff_plot_trendline,
+        eff_vp_enable,
+        eff_vp_smart,
+        eff_show_mtf_candles,
+        eff_use_sess_1st,
+        eff_show_last_frac,
+        eff_show_vol,
+        eff_plot_fvg1,
+        eff_plot_fvg2,
+        eff_ps_mode,
+        eff_BB_plot,
+        eff_en_cloud,
+        eff_sig_plot,
+        eff_ma1_type,
+        eff_ma2_type,
+        eff_plot_div,
+        eff_plot_l12_bar,
+        eff_plot_nr_bar,
+        eff_plot_i_bar,
+        eff_plot_o_bar,
+        eff_plot_s_bar,
+        eff_plot_f_bar,
+        eff_plot_segments,
+        eff_plot_pivots_h1,
+        eff_plot_pivots_h4,
+        eff_plot_pivots_d,
+        eff_plot_pivots_w,
+        eff_plot_pivots_m,
+        eff_plot_pivots_3m,
+        eff_plot_pivots_12m,
+        eff_london_show,
+        eff_ny_show,
+        eff_tokyo_show,
+        eff_sydney_show,
+        eff_sess_bg_enable,
+        eff_key_levels_enabled,
+        eff_show_pdh,
+        eff_show_pdl,
+        eff_show_pdc,
+        eff_show_wopen,
+        eff_show_mopen,
+        eff_rvol_enabled,
+        eff_rvol_points_enabled,
+        eff_vwap_enabled,
+        eff_vwap_anchor,
+        eff_vwap_bands,
+        eff_vwap_z,
+        eff_or_enabled,
+        eff_sq_box_enabled
+    ]
 
-eff_vp_enable       = f_approach_bool(vp_enable,          false,    false, false, false, false,  false)
-eff_vp_smart        = f_approach_bool(vp_smart,           vp_smart, false, false, false, false,  false)
-
-eff_show_mtf_candles= f_approach_bool(show_mtf_candles,   false,    false, false, false, false,  false)
-
-eff_use_sess_1st    = f_approach_bool(use_sess_1st,       false,    false, false, false, false,  false)
-eff_show_last_frac  = f_approach_bool(show_last_frac,     false,    false, false, false, false,  false)
-eff_show_vol        = f_approach_bool(show_vol,           true,     false, false, false, false,  false) // Legacy spike, prefer RVOL in new modes
-
-eff_plot_fvg1       = f_approach_bool(plot_fvg1,          false,    false, false, false, false,  true)
-eff_plot_fvg2       = f_approach_bool(plot_fvg2,          false,    false, false, false, false,  false)
-
-eff_ps_mode         = f_approach_str(ps_mode,             "None",   "None","None","None","None", "Auto")
-
-eff_BB_plot         = f_approach_bool(BB_plot,            false,    false, false, false, false,  false) // MR uses VWAP Bands
-
-eff_en_cloud        = f_approach_bool(en_cloud,           false,    false, false, false, false,  false)
-eff_sig_plot        = f_approach_bool(sig_plot,           sig_plot, false, false, false, false,  false)
-eff_ma1_type        = f_approach_str(ma1_type,            ma1_type, "None","None","None","None", "None")
-eff_ma2_type        = f_approach_str(ma2_type,            ma2_type, "None","None","None","None", "None")
-
-eff_plot_div        = f_approach_bool(plot_div,           false,    false, true,  false, false,  false)
-
-// Bar Patterns
-eff_plot_l12_bar    = f_approach_bool(plot_l12_bar,       false,    false, false, false, false,  false)
-eff_plot_nr_bar     = f_approach_bool(plot_nr_bar,        false,    false, false, false, false,  false)
-eff_plot_i_bar      = f_approach_bool(plot_i_bar,         false,    false, false, false, false,  false)
-eff_plot_o_bar      = f_approach_bool(plot_o_bar,         false,    false, false, false, false,  false)
-eff_plot_s_bar      = f_approach_bool(plot_s_bar,         false,    false, false, false, false,  false)
-eff_plot_f_bar      = f_approach_bool(plot_f_bar,         false,    false, false, false, false,  false)
-
-eff_plot_segments   = f_approach_bool(plot_segments,      false,    false, false, false, false,  false)
-
-// Pivots (Classic)
-eff_plot_pivots_h1  = f_approach_bool(plot_pivots_h1,     false,    false, false, false, false,  false)
-eff_plot_pivots_h4  = f_approach_bool(plot_pivots_h4,     false,    false, false, false, false,  false)
-eff_plot_pivots_d   = f_approach_bool(plot_pivots_d,      false,    false, false, false, false,  false)
-eff_plot_pivots_w   = f_approach_bool(plot_pivots_w,      false,    false, false, false, false,  false)
-eff_plot_pivots_m   = f_approach_bool(plot_pivots_m,      false,    false, false, false, false,  false)
-eff_plot_pivots_3m  = f_approach_bool(plot_pivots_3m,     false,    false, false, false, false,  false)
-eff_plot_pivots_12m = f_approach_bool(plot_pivots_12m,    false,    false, false, false, false,  false)
-
-// Sessions
-eff_london_show     = f_approach_bool(london_show,        true,     true,  false, false, false,  false)
-eff_ny_show         = f_approach_bool(ny_show,            true,     true,  false, false, false,  false)
-eff_tokyo_show      = f_approach_bool(tokyo_show,         true,     true,  false, false, false,  false)
-eff_sydney_show     = f_approach_bool(sydney_show,        true,     true,  false, false, false,  false)
-
-// Session BG Flag
-eff_sess_bg_enable  = f_approach_bool(true,               true,     false, false, false, false,  false)
-
-// Key Levels Flags
-eff_key_levels_enabled = f_approach_bool(key_levels_enabled, true, true, true, true, true, true)
-eff_show_pdh    = f_approach_bool(show_pdh, true, true, true, true, true, true)
-eff_show_pdl    = f_approach_bool(show_pdl, true, true, true, true, true, true)
-eff_show_pdc    = f_approach_bool(show_pdc, false, false, false, false, false, false)
-eff_show_wopen  = f_approach_bool(show_wopen, true, false, true, false, false, true)
-eff_show_mopen  = f_approach_bool(show_mopen, false, false, false, false, false, false)
-
-// RVOL Flags
-eff_rvol_enabled = f_approach_bool(rvol_enabled, false, true, false, true, true, false)
-eff_rvol_points_enabled = f_approach_bool(rvol_points_enabled, false, true, false, true, true, false)
-
-// VWAP Flags
-eff_vwap_enabled = f_approach_bool(vwap_enabled, false, false, true, false, false, true)
-eff_vwap_anchor  = f_approach_str(vwap_anchor, "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Weekly")
-eff_vwap_bands   = f_approach_bool(vwap_bands_enabled, false, false, true, false, false, false)
-eff_vwap_z       = f_approach_bool(vwap_z_enabled, false, false, true, false, false, false)
-
-// OR/IB Flags
-eff_or_enabled   = f_approach_bool(or_enabled, false, true, false, true, false, false)
-
-// Squeeze Box Flags
-eff_sq_box_enabled = f_approach_bool(sq_box_enabled, false, false, false, false, true, false)
+[
+    eff_fractals_plot,
+    eff_sub_fractals,
+    eff_plot_trendline,
+    eff_vp_enable,
+    eff_vp_smart,
+    eff_show_mtf_candles,
+    eff_use_sess_1st,
+    eff_show_last_frac,
+    eff_show_vol,
+    eff_plot_fvg1,
+    eff_plot_fvg2,
+    eff_ps_mode,
+    eff_BB_plot,
+    eff_en_cloud,
+    eff_sig_plot,
+    eff_ma1_type,
+    eff_ma2_type,
+    eff_plot_div,
+    eff_plot_l12_bar,
+    eff_plot_nr_bar,
+    eff_plot_i_bar,
+    eff_plot_o_bar,
+    eff_plot_s_bar,
+    eff_plot_f_bar,
+    eff_plot_segments,
+    eff_plot_pivots_h1,
+    eff_plot_pivots_h4,
+    eff_plot_pivots_d,
+    eff_plot_pivots_w,
+    eff_plot_pivots_m,
+    eff_plot_pivots_3m,
+    eff_plot_pivots_12m,
+    eff_london_show,
+    eff_ny_show,
+    eff_tokyo_show,
+    eff_sydney_show,
+    eff_sess_bg_enable,
+    eff_key_levels_enabled,
+    eff_show_pdh,
+    eff_show_pdl,
+    eff_show_pdc,
+    eff_show_wopen,
+    eff_show_mopen,
+    eff_rvol_enabled,
+    eff_rvol_points_enabled,
+    eff_vwap_enabled,
+    eff_vwap_anchor,
+    eff_vwap_bands,
+    eff_vwap_z,
+    eff_or_enabled,
+    eff_sq_box_enabled
+] = f_resolve_effective_flags()
 
 int active_sec_calls = 0
 // Performance Counters (Per Bar)
