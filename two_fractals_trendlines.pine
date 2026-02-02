@@ -28,23 +28,16 @@ int W_O     = 1
 
 // --- TOP LEVEL UI ---
 // adx, hma and ema1 x ema2 mtf trend info panel
+trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Market Map", "Opening Auction", "Value Reversion", "Compression -> Expansion", "Trend Continuation", "Range Rotation"], tooltip="Applies focused defaults for a trading lens. Custom = manual.\n• Market Map: Sessions + key levels.\n• Opening Auction: OR/IB + RVOL.\n• Value Reversion: VWAP bands + BB touch.\n• Compression -> Expansion: Squeeze + RVOL.\n• Trend Continuation: Trend tools + weekly VWAP.\n• Range Rotation: VWAP zone + BB touch.")
+
+
 panel_pos               = input.string(title='MTF Panel', inline="panel", defval='Bottom Right', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
                           tooltip='')
 panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update Mode", inline="panel", options=["Realtime Preview", "Strict Confirm"], tooltip="Provides an overview of multi time frame trends: FVG Close state, and Fractal Break state. Select position to enable.\n○ = developing (current candle not closed), \n● = confirmed (closed).
                           \nRealtime Preview: shows live/developing values (○). \nStrict Confirm: shows last confirmed close values only (●).")
 bool panel_show_live    = panel_update_mode == "Realtime Preview"
 
-trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Market Map", "Opening Auction", "Value Reversion", "Compression -> Expansion", "Trend Continuation", "Range Rotation"], tooltip="Applies focused defaults for a trading lens. Custom = manual.\n• Market Map: Sessions + key levels.\n• Opening Auction: OR/IB + RVOL.\n• Value Reversion: VWAP bands + BB touch.\n• Compression -> Expansion: Squeeze + RVOL.\n• Trend Continuation: Trend tools + weekly VWAP.\n• Range Rotation: VWAP zone + BB touch.")
-
-// fractals input
-fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, tooltip='')
-sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, tooltip='Bill Williams Fractals (five Candles): white triangle. Works as support and resistance level.
-                 \nSub Bill Williams Fractals (four Candles): Lightgray triangle. Works as support and resistance level. These are B. W. Fractals on a Lower Timeframe.')
-
-
-// Confluence & Regime Visuals
-grp_conf_reg    = "Confluence & Regime Visuals"
-auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], group=grp_conf_reg, tooltip="CONF (Trend Bias) shows the current dominant trend direction as a compact 0–100 score.
+auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="CONF (Trend Bias) shows the current dominant trend direction as a compact 0–100 score.
                      \n• BULL / BEAR / NEUT = direction
                      \n• Number = bias strength (50 = neutral)
                      \n• H / M / L = quality / reliability (high / medium / low)
@@ -58,6 +51,17 @@ auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=[
                      \n• NEUT is fully transparent (panel + chart background).
                      \n\nPlots the Confluence Signal background color.
                      \nAuto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
+
+
+// fractals input
+grp_adv_set     = "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀Advanced Settings"
+fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, group=grp_adv_set, tooltip='')
+sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, group=grp_adv_set, tooltip='Bill Williams Fractals (five Candles): white triangle. Works as support and resistance level.
+                 \nSub Bill Williams Fractals (four Candles): Lightgray triangle. Works as support and resistance level. These are B. W. Fractals on a Lower Timeframe.')
+
+
+// Confluence & Regime Visuals
+grp_conf_reg    = "Confluence & Regime Visuals"
 
 conf_use_vwap_quality = input.bool(true, "CONF: VWAP Quality Gate", group=grp_conf_reg, tooltip="Adjusts CONF quality using VWAP alignment + stretch (anti-chase). State remains unchanged.")
 conf_vwap_mode        = input.string("Auto", "VWAP Anchor", inline="conf", options=["Auto","Session VWAP","Weekly VWAP"], group=grp_conf_reg, tooltip="")
