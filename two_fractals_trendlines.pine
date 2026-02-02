@@ -252,7 +252,7 @@ vwap_only_sess      = input.bool(false, "Calc Only in Sessions", group=grp_vwap,
 
 vwap_display_mode   = input.string("Value Zone (±1σ)", "Display", options=["Line only", "Value Zone (±1σ)", "Full Bands (B1–B3)"], group=grp_vwap, inline="vw_3", tooltip="Line only: clean bias filter. \nValue Zone: VWAP ±1σ. \nFull: bands B1–B3.")
 vwap_bands_enabled  = input.bool(true, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="Standard Deviation Bands (K1/K2/K3). \nUsage: 'Don't chase' zones and Take Profit targets.")
-vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "⠀Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_4", tooltip="Rolling: Last N bars (Stable). \nWelford: Session-cumulative (Precise).")
+vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_4", tooltip="Rolling: Last N bars (Stable). \nWelford: Session-cumulative (Precise).")
 vwap_stdev_len      = input.int(100, "⠀Len", minval=2, group=grp_vwap, inline="vw_4")
 band_k1             = input.float(1.0, "K1", step=0.5, group=grp_vwap, inline="vw_6", tooltip="1st Band Multiplier (1σ).")
 band_k2             = input.float(2.0, "⠀K2", step=0.5, group=grp_vwap, inline="vw_6", tooltip="2nd Band Multiplier (2σ).")
@@ -265,7 +265,7 @@ z_th_ext            = input.float(3.0, "Ext Th", step=0.1, group=grp_vwap, inlin
 
 // Lite Value (POC/VAH/VAL)
 grp_lite_value           = "Lite Value (POC/VAH/VAL)"
-lite_value_enable        = input.bool(false, "Enable", group=grp_lite_value, tooltip="Lightweight value area levels (POC/VAH/VAL). 3 lines only.")
+lite_value_enable        = input.bool(false, "value Area Levels", group=grp_lite_value, tooltip="Lightweight value area levels (POC/VAH/VAL). 3 lines only.")
 lite_value_apply_to      = input.string("Map + Range only (recommended)", "Apply To", options=["Map + Range only (recommended)", "All Lenses", "Custom only"], group=grp_lite_value)
 lite_value_lookback      = input.int(400, "Lookback⠀⠀", minval=100, maxval=800, group=grp_lite_value, inline="lv_1")
 lite_value_bins          = input.int(32, "⠀⠀⠀Bins⠀⠀⠀⠀⠀⠀", minval=16, maxval=48, group=grp_lite_value, inline="lv_1")
