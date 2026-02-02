@@ -2068,141 +2068,79 @@ float m12_close = na
 // Gated Security Calls - Stage 5: Last Bar Optimization
 if barstate.islast
     if need_h1
-        [h1_high_t, h1_low_t, h1_close_t] = request.security(syminfo.tickerid, "60", [high[1], low[1], close[1]])
-        h1_high := h1_high_t
-        h1_low := h1_low_t
-        h1_close := h1_close_t
+        [t_h1, t_l1, t_c1] = request.security(syminfo.tickerid, "60", [high[1], low[1], close[1]])
+        h1_high := t_h1
+        h1_low := t_l1
+        h1_close := t_c1
         active_sec_calls += 1
 
     if need_h4
-        [h4_high_t, h4_low_t, h4_close_t] = request.security(syminfo.tickerid, "240", [high[1], low[1], close[1]])
-        h4_high := h4_high_t
-        h4_low := h4_low_t
-        h4_close := h4_close_t
+        [t_h4, t_l4, t_c4] = request.security(syminfo.tickerid, "240", [high[1], low[1], close[1]])
+        h4_high := t_h4
+        h4_low := t_l4
+        h4_close := t_c4
         active_sec_calls += 1
 
     if need_d
-        [d_high_t, d_low_t, d_close_t] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]])
-        d_high := d_high_t
-        d_low := d_low_t
-        d_close := d_close_t
+        [t_hd, t_ld, t_cd] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]])
+        d_high := t_hd
+        d_low := t_ld
+        d_close := t_cd
         active_sec_calls += 1
 
     if need_w
-        [w_high_t, w_low_t, w_close_t] = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]])
-        w_high := w_high_t
-        w_low := w_low_t
-        w_close := w_close_t
+        [t_hw, t_lw, t_cw] = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]])
+        w_high := t_hw
+        w_low := t_lw
+        w_close := t_cw
         active_sec_calls += 1
 
     if need_m
-        [m_high_t, m_low_t, m_close_t] = request.security(syminfo.tickerid, "M", [high[1], low[1], close[1]])
-        m_high := m_high_t
-        m_low := m_low_t
-        m_close := m_close_t
+        [t_hm, t_lm, t_cm] = request.security(syminfo.tickerid, "M", [high[1], low[1], close[1]])
+        m_high := t_hm
+        m_low := t_lm
+        m_close := t_cm
         active_sec_calls += 1
 
     if need_3m
-        [m3_high_t, m3_low_t, m3_close_t] = request.security(syminfo.tickerid, "3M", [high[1], low[1], close[1]])
-        m3_high := m3_high_t
-        m3_low := m3_low_t
-        m3_close := m3_close_t
+        [t_h3m, t_l3m, t_c3m] = request.security(syminfo.tickerid, "3M", [high[1], low[1], close[1]])
+        m3_high := t_h3m
+        m3_low := t_l3m
+        m3_close := t_c3m
         active_sec_calls += 1
 
     if need_12m
-        [m12_high_t, m12_low_t, m12_close_t] = request.security(syminfo.tickerid, "12M", [high[1], low[1], close[1]])
-        m12_high := m12_high_t
-        m12_low := m12_low_t
-        m12_close := m12_close_t
+        [t_h12m, t_l12m, t_c12m] = request.security(syminfo.tickerid, "12M", [high[1], low[1], close[1]])
+        m12_high := t_h12m
+        m12_low := t_l12m
+        m12_close := t_c12m
         active_sec_calls += 1
 
 // --- Calculations ---
 
-// H1 pivot points
-h1_PP           = (h1_high + h1_low + h1_close) / 3
-h1_R1           = h1_PP + h1_PP - h1_low
-h1_R2           = h1_PP + h1_high - h1_low
-h1_R3           = h1_high + 2 * (h1_PP - h1_low)
-h1_R4           = h1_PP + 3 * (h1_high - h1_low)
-h1_S1           = h1_PP - (h1_high - h1_PP)
-h1_S2           = h1_PP - (h1_high - h1_low)
-h1_S3           = h1_low - 2 * (h1_high - h1_PP)
-h1_S4           = h1_PP - 3 * (h1_high - h1_low)
+f_calc_classic_pivots(_h, _l, _c) =>
+    if na(_h) or na(_l) or na(_c)
+        [na, na, na, na, na, na, na, na, na]
+    else
+        float pp = (_h + _l + _c) / 3.0
+        float r1 = 2.0 * pp - _l
+        float r2 = pp + (_h - _l)
+        float r3 = _h + 2.0 * (pp - _l)
+        float r4 = pp + 3.0 * (_h - _l)
+        float s1 = 2.0 * pp - _h
+        float s2 = pp - (_h - _l)
+        float s3 = _l - 2.0 * (_h - pp)
+        float s4 = pp - 3.0 * (_h - _l)
+        [pp, r1, r2, r3, r4, s1, s2, s3, s4]
 
-// H4 pivot points
-h4_PP           = (h4_high + h4_low + h4_close) / 3
-h4_R1           = h4_PP + h4_PP - h4_low
-h4_R2           = h4_PP + h4_high - h4_low
-h4_R3           = h4_high + 2 * (h4_PP - h4_low)
-h4_R4           = h4_PP + 3 * (h4_high - h4_low)
-h4_S1           = h4_PP - (h4_high - h4_PP)
-h4_S2           = h4_PP - (h4_high - h4_low)
-h4_S3           = h4_low - 2 * (h4_high - h4_PP)
-h4_S4           = h4_PP - 3 * (h4_high - h4_low)
-
-// Daily pivot points
-d_PP            = (d_high + d_low + d_close) / 3
-
-w_PP            = (w_high + w_low + w_close) / 3
-m_PP            = (m_high + m_low + m_close) / 3
-m3_PP           = (m3_high + m3_low + m3_close) / 3
-m12_PP          = (m12_high + m12_low + m12_close) / 3
-
-// Daily R/S (extended to 4)
-d_R1            = d_PP + d_PP - d_low
-d_R2            = d_PP + d_high - d_low
-d_R3            = d_high + 2 * (d_PP - d_low)
-d_R4            = d_PP + 3 * (d_high - d_low)
-
-d_S1            = d_PP - (d_high - d_PP)
-d_S2            = d_PP - (d_high - d_low)
-d_S3            = d_low - 2 * (d_high - d_PP)
-d_S4            = d_PP - 3 * (d_high - d_low)
-
-// weekly R/S pivot points (extended to 4)
-w_R1            = w_PP + w_PP - w_low
-w_R2            = w_PP + w_high - w_low
-w_R3            = w_high + 2 * (w_PP - w_low)
-w_R4            = w_PP + 3 * (w_high - w_low)
-
-w_S1            = w_PP - (w_high - w_PP)
-w_S2            = w_PP - (w_high - w_low)
-w_S3            = w_low - 2 * (w_high - w_PP)
-w_S4            = w_PP - 3 * (w_high - w_low)
-
-// monthly R/S pivot points (extended to 4)
-m_R1            = m_PP + m_PP - m_low
-m_R2            = m_PP + m_high - m_low
-m_R3            = m_high + 2 * (m_PP - m_low)
-m_R4            = m_PP + 3 * (m_high - m_low)
-
-m_S1            = m_PP - (m_high - m_PP)
-m_S2            = m_PP - (m_high - m_low)
-m_S3            = m_low - 2 * (m_high - m_PP)
-m_S4            = m_PP - 3 * (m_high - m_low)
-
-// 3 month R/S pivot points (extended to 4)
-m3_R1           = m3_PP + m3_PP - m3_low
-m3_R2           = m3_PP + m3_high - m3_low
-m3_R3           = m3_high + 2 * (m3_PP - m3_low)
-m3_R4           = m3_PP + 3 * (m3_high - m3_low)
-
-m3_S1           = m3_PP - (m3_high - m3_PP)
-m3_S2           = m3_PP - (m3_high - m3_low)
-m3_S3           = m3_low - 2 * (m3_high - m3_PP)
-m3_S4           = m3_PP - 3 * (m3_high - m3_low)
-
-// 12 month R/S pivot points (extended to 4)
-m12_R1          = m12_PP + m12_PP - m12_low
-m12_R2          = m12_PP + m12_high - m12_low
-m12_R3          = m12_high + 2 * (m12_PP - m12_low)
-m12_R4          = m12_PP + 3 * (m12_high - m12_low)
-
-m12_S1          = m12_PP - (m12_high - m12_PP)
-m12_S2          = m12_PP - (m12_high - m12_low)
-m12_S3          = m12_low - 2 * (m12_high - m12_PP)
-m12_S4          = m12_PP - 3 * (m12_high - m12_low)
-
+// Classic pivots per timeframe (PP, R1-R4, S1-S4)
+[h1_PP, h1_R1, h1_R2, h1_R3, h1_R4, h1_S1, h1_S2, h1_S3, h1_S4] = f_calc_classic_pivots(h1_high, h1_low, h1_close)
+[h4_PP, h4_R1, h4_R2, h4_R3, h4_R4, h4_S1, h4_S2, h4_S3, h4_S4] = f_calc_classic_pivots(h4_high, h4_low, h4_close)
+[d_PP, d_R1, d_R2, d_R3, d_R4, d_S1, d_S2, d_S3, d_S4] = f_calc_classic_pivots(d_high, d_low, d_close)
+[w_PP, w_R1, w_R2, w_R3, w_R4, w_S1, w_S2, w_S3, w_S4] = f_calc_classic_pivots(w_high, w_low, w_close)
+[m_PP, m_R1, m_R2, m_R3, m_R4, m_S1, m_S2, m_S3, m_S4] = f_calc_classic_pivots(m_high, m_low, m_close)
+[m3_PP, m3_R1, m3_R2, m3_R3, m3_R4, m3_S1, m3_S2, m3_S3, m3_S4] = f_calc_classic_pivots(m3_high, m3_low, m3_close)
+[m12_PP, m12_R1, m12_R2, m12_R3, m12_R4, m12_S1, m12_S2, m12_S3, m12_S4] = f_calc_classic_pivots(m12_high, m12_low, m12_close)
 
 // --- ALL PIVOTS AS LINES (Visual Update) ---
 
