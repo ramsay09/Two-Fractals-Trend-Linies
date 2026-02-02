@@ -28,7 +28,7 @@ int W_O     = 1
 
 // --- TOP LEVEL UI ---
 // adx, hma and ema1 x ema2 mtf trend info panel
-panel_pos               = input.string(title='MTF Panel', inline="panel", defval='None', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
+panel_pos               = input.string(title='MTF Panel', inline="panel", defval='Bottom Right', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
                           tooltip='')
 panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update Mode", inline="panel", options=["Realtime Preview", "Strict Confirm"], tooltip="Provides an overview of multi time frame trends: FVG Close state, and Fractal Break state. Select position to enable.\n○ = developing (current candle not closed), \n● = confirmed (closed).
                           \nRealtime Preview: shows live/developing values (○). \nStrict Confirm: shows last confirmed close values only (●).")
@@ -225,7 +225,7 @@ show_pdl            = input.bool(true, "PDL⠀", inline="kl_1", group=grp_key, t
 show_pdc            = input.bool(false, "PDC⠀", inline="kl_1", group=grp_key, tooltip="Reversion target / magnet on range days.")
 show_wopen          = input.bool(true, "Weekly Open⠀", inline="kl_1", group=grp_key, tooltip="Higher timeframe bias line; watch reclaim/hold for continuation days.")
 show_mopen          = input.bool(false, "Monthly Open", inline="kl_1", group=grp_key, tooltip="Higher timeframe bias line; watch reclaim/hold for continuation days.")
-key_style           = input.string("Lines", "Style", options=["Lines", "Labels", "Both"], inline="kl_3", group=grp_key, tooltip="Visual style for levels.")
+key_style           = input.string("Both", "Style", options=["Lines", "Labels", "Both"], inline="kl_3", group=grp_key, tooltip="Visual style for levels.")
 key_extend          = input.bool(true, "Extend", inline="kl_3", group=grp_key, tooltip="Extend projects the level into the future; turn off to keep chart clean.")
 
 // RVOL Inputs
@@ -233,7 +233,7 @@ grp_rvol            = "Relative Volume (RVOL)"
 rvol_enabled        = input.bool(true, "RVOL Enabled", group=grp_rvol, tooltip="Relative Volume = Current Vol / Avg Vol. \nMeasures participation; confirms breakouts and reclaims. \n• ORB/Breakout: RVOL > 2.0 signals expansion. \n• Reclaim: RVOL pickup confirms strength.")
 rvol_len            = input.int(20, "Length", minval=1, group=grp_rvol, inline="rv_1", tooltip="Average window; 20 is common.")
 rvol_display        = input.string("Marker", "⠀Display", options=["None", "Marker", "Label", "Both"], group=grp_rvol, inline="rv_1", tooltip="Visual style.")
-rvol_points_enabled = input.bool(false, "Points", group=grp_rvol, inline="rv_1", tooltip="H/E only markers to reduce noise. \nEnabled by default in Breakout/ORB lenses.")
+rvol_points_enabled = input.bool(true, "Points", group=grp_rvol, inline="rv_1", tooltip="H/E only markers to reduce noise. \nEnabled by default in Breakout/ORB lenses.")
 rvol_th_1           = input.float(1.2, "Low", step=0.1, group=grp_rvol, inline="rv_2", tooltip="1.2x: Slightly elevated.")
 rvol_th_2           = input.float(2.0, "⠀Med", step=0.1, group=grp_rvol, inline="rv_2", tooltip="2.0x: Event / Breakout fuel.")
 rvol_th_3           = input.float(3.0, "⠀High", step=0.1, group=grp_rvol, inline="rv_2", tooltip="3.0x: Strong trend / News.")
@@ -288,7 +288,7 @@ ps_right            = input.int(2, title="⠀⠀⠀⠀Pivot Right", inline="pivo
 ps_max              = input.int(20, title="Max Active Levels ⠀", minval=1, maxval=50, group=grp_psr, tooltip="Limits the number of visible lines to prevent chart clutter. FIFO (First In, First Out).")
 ps_break_act        = input.string("Role Reversal", title="On Break Action ", options=["Keep", "Delete", "Role Reversal"], group=grp_psr, tooltip="How the script handles a level when price crosses it. \nKeep: Do nothing. \nDelete: Remove line. \nRole Reversal: Support becomes Resistance (Color change).")
 ps_merge_en         = input.bool(true, title="Merge Nearby Levels (Zones) ", group=grp_psr, inline="ps_m")
-ps_merge_pct        = input.float(0.1, title="Threshold %", minval=0.01, step=0.05, group=grp_psr, inline="ps_m", tooltip="If a new level appears within X% of an existing level, they are merged into a Zone.")
+ps_merge_pct        = input.float(0.1, title="Threshold %", minval=0.01, step=0.1, group=grp_psr, inline="ps_m", tooltip="If a new level appears within X% of an existing level, they are merged into a Zone.")
 ps_col_res          = input.color(color.new(color.red, 30), title="Res Color", group=grp_psr, inline="ps_c")
 ps_col_sup          = input.color(color.new(color.green, 30), title="⠀Sup Color", group=grp_psr, inline="ps_c")
 ps_col_zone         = input.color(color.new(color.blue, 85), title="⠀Zone Fill", group=grp_psr, inline="ps_c")
