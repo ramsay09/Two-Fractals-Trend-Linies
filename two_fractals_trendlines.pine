@@ -2023,8 +2023,8 @@ else
 // Strict Gating: request.security only if input is active AND timeframe is valid
 
 // Conditions (Visibility)
-cond_h1 = timeframe.isintraday and timeframe.multiplier <= 60
-cond_h4 = timeframe.isintraday and timeframe.multiplier <= 240
+cond_h1 = timeframe.isintraday and timeframe.multiplier < 60
+cond_h4 = timeframe.isintraday and timeframe.multiplier < 240
 
 
 // Need Flags
@@ -2228,25 +2228,25 @@ l_h1_s3 := f_draw_pivot(l_h1_s3, h1_S3, PIV_COL_S, 1, 1, cond_h1, plot_pivots_h1
 lb_h1_s3 := f_draw_pivot_tag(lb_h1_s3, h1_S3, "S3 H1", PIV_COL_S, 1, cond_h1, plot_pivots_h1)
 l_h1_s4 := f_draw_pivot(l_h1_s4, h1_S4, PIV_COL_S, 1, 1, cond_h1, plot_pivots_h1)
 lb_h1_s4 := f_draw_pivot_tag(lb_h1_s4, h1_S4, "S4 H1", PIV_COL_S, 1, cond_h1, plot_pivots_h1)
-// H4: Offset 2, Width 1
-l_h4_pp := f_draw_pivot(l_h4_pp, h4_PP, PIV_COL_P, 1, 2, cond_h4, plot_pivots_h4)
-lb_h4_pp := f_draw_pivot_tag(lb_h4_pp, h4_PP, "P H4", PIV_COL_P, 2, cond_h4, plot_pivots_h4)
-l_h4_r1 := f_draw_pivot(l_h4_r1, h4_R1, PIV_COL_R, 1, 2, cond_h4, plot_pivots_h4)
-lb_h4_r1 := f_draw_pivot_tag(lb_h4_r1, h4_R1, "R1 H4", PIV_COL_R, 2, cond_h4, plot_pivots_h4)
-l_h4_r2 := f_draw_pivot(l_h4_r2, h4_R2, PIV_COL_R, 1, 2, cond_h4, plot_pivots_h4)
-lb_h4_r2 := f_draw_pivot_tag(lb_h4_r2, h4_R2, "R2 H4", PIV_COL_R, 2, cond_h4, plot_pivots_h4)
-l_h4_r3 := f_draw_pivot(l_h4_r3, h4_R3, PIV_COL_R, 1, 2, cond_h4, plot_pivots_h4)
-lb_h4_r3 := f_draw_pivot_tag(lb_h4_r3, h4_R3, "R3 H4", PIV_COL_R, 2, cond_h4, plot_pivots_h4)
-l_h4_r4 := f_draw_pivot(l_h4_r4, h4_R4, PIV_COL_R, 1, 2, cond_h4, plot_pivots_h4)
-lb_h4_r4 := f_draw_pivot_tag(lb_h4_r4, h4_R4, "R4 H4", PIV_COL_R, 2, cond_h4, plot_pivots_h4)
-l_h4_s1 := f_draw_pivot(l_h4_s1, h4_S1, PIV_COL_S, 1, 2, cond_h4, plot_pivots_h4)
-lb_h4_s1 := f_draw_pivot_tag(lb_h4_s1, h4_S1, "S1 H4", PIV_COL_S, 2, cond_h4, plot_pivots_h4)
-l_h4_s2 := f_draw_pivot(l_h4_s2, h4_S2, PIV_COL_S, 1, 2, cond_h4, plot_pivots_h4)
-lb_h4_s2 := f_draw_pivot_tag(lb_h4_s2, h4_S2, "S2 H4", PIV_COL_S, 2, cond_h4, plot_pivots_h4)
-l_h4_s3 := f_draw_pivot(l_h4_s3, h4_S3, PIV_COL_S, 1, 2, cond_h4, plot_pivots_h4)
-lb_h4_s3 := f_draw_pivot_tag(lb_h4_s3, h4_S3, "S3 H4", PIV_COL_S, 2, cond_h4, plot_pivots_h4)
-l_h4_s4 := f_draw_pivot(l_h4_s4, h4_S4, PIV_COL_S, 1, 2, cond_h4, plot_pivots_h4)
-lb_h4_s4 := f_draw_pivot_tag(lb_h4_s4, h4_S4, "S4 H4", PIV_COL_S, 2, cond_h4, plot_pivots_h4)
+// H4: Offset 1, Width 1 (align with H1/D)
+l_h4_pp := f_draw_pivot(l_h4_pp, h4_PP, PIV_COL_P, 1, 1, cond_h4, plot_pivots_h4)
+lb_h4_pp := f_draw_pivot_tag(lb_h4_pp, h4_PP, "P H4", PIV_COL_P, 1, cond_h4, plot_pivots_h4)
+l_h4_r1 := f_draw_pivot(l_h4_r1, h4_R1, PIV_COL_R, 1, 1, cond_h4, plot_pivots_h4)
+lb_h4_r1 := f_draw_pivot_tag(lb_h4_r1, h4_R1, "R1 H4", PIV_COL_R, 1, cond_h4, plot_pivots_h4)
+l_h4_r2 := f_draw_pivot(l_h4_r2, h4_R2, PIV_COL_R, 1, 1, cond_h4, plot_pivots_h4)
+lb_h4_r2 := f_draw_pivot_tag(lb_h4_r2, h4_R2, "R2 H4", PIV_COL_R, 1, cond_h4, plot_pivots_h4)
+l_h4_r3 := f_draw_pivot(l_h4_r3, h4_R3, PIV_COL_R, 1, 1, cond_h4, plot_pivots_h4)
+lb_h4_r3 := f_draw_pivot_tag(lb_h4_r3, h4_R3, "R3 H4", PIV_COL_R, 1, cond_h4, plot_pivots_h4)
+l_h4_r4 := f_draw_pivot(l_h4_r4, h4_R4, PIV_COL_R, 1, 1, cond_h4, plot_pivots_h4)
+lb_h4_r4 := f_draw_pivot_tag(lb_h4_r4, h4_R4, "R4 H4", PIV_COL_R, 1, cond_h4, plot_pivots_h4)
+l_h4_s1 := f_draw_pivot(l_h4_s1, h4_S1, PIV_COL_S, 1, 1, cond_h4, plot_pivots_h4)
+lb_h4_s1 := f_draw_pivot_tag(lb_h4_s1, h4_S1, "S1 H4", PIV_COL_S, 1, cond_h4, plot_pivots_h4)
+l_h4_s2 := f_draw_pivot(l_h4_s2, h4_S2, PIV_COL_S, 1, 1, cond_h4, plot_pivots_h4)
+lb_h4_s2 := f_draw_pivot_tag(lb_h4_s2, h4_S2, "S2 H4", PIV_COL_S, 1, cond_h4, plot_pivots_h4)
+l_h4_s3 := f_draw_pivot(l_h4_s3, h4_S3, PIV_COL_S, 1, 1, cond_h4, plot_pivots_h4)
+lb_h4_s3 := f_draw_pivot_tag(lb_h4_s3, h4_S3, "S3 H4", PIV_COL_S, 1, cond_h4, plot_pivots_h4)
+l_h4_s4 := f_draw_pivot(l_h4_s4, h4_S4, PIV_COL_S, 1, 1, cond_h4, plot_pivots_h4)
+lb_h4_s4 := f_draw_pivot_tag(lb_h4_s4, h4_S4, "S4 H4", PIV_COL_S, 1, cond_h4, plot_pivots_h4)
 // D: Offset 1, Width 2
 l_d_pp := f_draw_pivot(l_d_pp, d_PP, PIV_COL_P, 2, 1, Intra, plot_pivots_d)
 lb_d_pp := f_draw_pivot_tag(lb_d_pp, d_PP, "P D", PIV_COL_P, 1, Intra, plot_pivots_d)
