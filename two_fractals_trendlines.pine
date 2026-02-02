@@ -1,6 +1,6 @@
 //@version=5
 
-indicator('Market Context & Confluence Suite', overlay=true, shorttitle='MCCS', max_bars_back=3000, max_lines_count=500, max_boxes_count=500, dynamic_requests=true)
+indicator('Market Context & Confluence Suite', overlay=true, shorttitle='MCCS', max_bars_back=3000, max_lines_count=500, max_boxes_count=500, max_labels_count=500, dynamic_requests=true)
 
 general_info   = input.bool(title='General Description', defval=false, tooltip='Use the signals in confluence and as an indication of market tension, which will discharged in higher volatility or trend continuation. ... context matters.
                  Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
@@ -427,7 +427,7 @@ plot_pivots_w       = input.bool(true, title= "1 Week Classic Pivot Points", gro
 plot_pivots_m       = input.bool(true, title='1 Month Classic Pivot Points', group=grp_pi, tooltip='1 month classic pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.')
 plot_pivots_3m      = input.bool(true, title='3 Month Classic Pivot Points', group=grp_pi, tooltip='3 month classic pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.')
 plot_pivots_12m     = input.bool(true, title='12 Month Classic Pivot Points', group=grp_pi, tooltip='12 month classic pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.')
-plot_pivot_labels   = input.bool(true, title='Show Pivot Labels (P/R/S + TF)', group=grp_pi, tooltip='Draws small text tags above the pivot dash on the right side (e.g., P H4, R2 W).')
+plot_pivot_labels   = input.bool(true, title='Show Pivot Labels (P/R/S + TF)', group=grp_pi, tooltip='Draws small text tags on the left edge of the pivot dash (e.g., P H4, R2 W).')
 // TRADING SESSIONS INPUTS ---
 grp_sess      = "Trading Sessions"
 sess_timezone = input.string("Europe/Berlin", title="Timezone", inline="ses", tooltip="", group=grp_sess)
@@ -2249,7 +2249,7 @@ f_draw_pivot_tag(_lb, _val, _txt, _col, _offset_start, _show_cond, _input_active
     label ret_lb = _lb
     bool show = barstate.islast and plot_pivot_labels and _input_active and _show_cond and not na(_val)
     if show
-        int x_tag = bar_index + _offset_start + 1
+        int x_tag = bar_index + _offset_start
         float y = _val
         if na(ret_lb)
             ret_lb := label.new(x=x_tag, y=y, text=_txt, xloc=xloc.bar_index, yloc=yloc.price, style=label.style_none, textcolor=_col, size=size.tiny, textalign=text.align_right)
@@ -2257,6 +2257,7 @@ f_draw_pivot_tag(_lb, _val, _txt, _col, _offset_start, _show_cond, _input_active
             label.set_xy(ret_lb, x_tag, y)
             label.set_text(ret_lb, _txt)
             label.set_textcolor(ret_lb, _col)
+            label.set_style(ret_lb, label.style_none)
     else
         if not na(ret_lb)
             label.delete(ret_lb)
