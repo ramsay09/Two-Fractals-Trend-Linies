@@ -52,6 +52,11 @@ auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=[
                      \n\nPlots the Confluence Signal background color.
                      \nAuto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
 
+// MTF CANDLE OVERLAY INPUTS
+//grp_mtf_candle    = "MTF Candle Overlay"
+show_mtf_candles  = input.bool(false, "MTF Candle Overlay", inline="mtf_ov", tooltip="")
+mtf_tf_sel        = input.string("1h", "", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], inline="mtf_ov")
+mtf_opacity       = input.int(15, "⠀Opacity %", inline="mtf_ov", minval=0, maxval=100, tooltip="Two timelines at one glance. It's like looking inside a candle with X-rays. \n0% = Invisible, 100% = Solid")
 
 // fractals input
 grp_adv_set     = "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀Advanced Settings"
@@ -186,12 +191,6 @@ f_resolve_auto_params(_tf_sec, _auto_tuning) =>
     [int(a_core_len), int(a_vol_len), a_enter_k, a_exit_k, int(a_persist), a_decay, a_clamp, a_adx_th, use_adr_gate, adr_warn, adr_hard]
 
 [eff_core_ema_len, eff_vol_len, eff_enter_k, eff_exit_k, eff_persist_bars, eff_ov_decay, eff_ov_clamp, eff_adx_th, eff_use_adr_gate, eff_adr_warn, eff_adr_hard] = f_resolve_auto_params(tf_sec, auto_tuning)
-
-// MTF CANDLE OVERLAY INPUTS
-grp_mtf_candle    = "MTF Candle Overlay"
-show_mtf_candles  = input.bool(false, "MTF Candle Overlay", group=grp_mtf_candle, inline="mtf_ov", tooltip="")
-mtf_tf_sel        = input.string("1h", "", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], inline="mtf_ov", group=grp_mtf_candle)
-mtf_opacity       = input.int(15, "⠀Opacity %", inline="mtf_ov", minval=0, maxval=100, group=grp_mtf_candle, tooltip="Two timelines at one glance. It's like looking inside a candle with X-rays. \n0% = Invisible, 100% = Solid")
 
 // Additional Context Inputs
 grp_add         = "Additional Context"
