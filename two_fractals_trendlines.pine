@@ -76,7 +76,7 @@ show_conf_meter     = input.bool(true, "CONF⠀⠀⠀", inline="conf_ui", group=
 show_conf_bg        = input.bool(false, "Confluence Meter BG", inline="conf_ui", group=grp_conf_reg, tooltip="Confluence Meter")
 
 show_regime_panel   = input.bool(true, "REG", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
-regime_bg_mode      = input.string("None", "⠀⠀⠀⠀Squeeze/Trend BG", options=["None", "Squeeze BG", "Trend BG", "Both"], inline="REGIME_UI", group=grp_conf_reg, tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
+regime_bg_enabled   = input.bool(false, "⠀⠀⠀⠀Squeeze/Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
 
 string M_FORM = "○"
 string M_CONF = "●"
@@ -706,7 +706,7 @@ ON_PS           = eff_ps_mode != "None"
 // Confluence & Regime are now strictly controlled by their inputs, ignoring Profile Mode
 bool eff_show_conf_meter = show_conf_meter
 bool eff_regime_panel    = show_regime_panel
-string eff_regime_bg_mode  = regime_bg_mode
+bool eff_regime_bg_enabled  = regime_bg_enabled
 
 // ADR/KC Logic (Mapped to Config Stage)
 // We map the legacy names to our new effective variables to minimize downstream changes
@@ -3862,13 +3862,9 @@ if eff_calc_conf
 // --- CENTRALIZED BACKGROUND ROUTING (Fix Bug #2) ---
 color bg_final = na
 
-// Logic to filter regime_bg based on mode
+// Logic to filter regime_bg (Squeeze/Trend only)
 color regime_bg_filtered = na
-if eff_regime_bg_mode == "Squeeze BG" and regime_state == "SQUEEZE"
-    regime_bg_filtered := regime_bg
-else if eff_regime_bg_mode == "Trend BG" and regime_state == "TREND"
-    regime_bg_filtered := regime_bg
-else if eff_regime_bg_mode == "Both"
+if eff_regime_bg_enabled and (regime_state == "SQUEEZE" or regime_state == "TREND")
     regime_bg_filtered := regime_bg
 
 // Logic for Confluence BG (New)
