@@ -72,7 +72,7 @@ conf_vwap_mode        = input.string("Auto", "VWAP Anchor", inline="conf", optio
 conf_z_penalty_mode   = input.string("Default", "⠀⠀Stretch Penalty", inline="conf", options=["Default","Conservative","Aggressive"], group=grp_conf_reg, tooltip="Which VWAP anchor CONF uses for quality. Auto: Session ≤ 60m, Weekly > 60m. \nHow strongly VWAP stretch reduces CONF quality.")
 
 show_conf_meter     = input.bool(true, "CONF⠀⠀⠀", inline="conf_ui", group=grp_conf_reg, tooltip="")
-show_conf_bg        = input.bool(false, "Confluence Meter BG⠀", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on CONF score thresholds (score > 55 = green, < 45 = red). Neutral stays transparent.")
+show_conf_bg        = input.bool(false, "Confluence Meter BG⠀", inline="conf_ui", group=grp_conf_reg, tooltip="Colors chart background based on CONF score thresholds (default: >55 green, <45 red). If Adaptive Neutral Zone is enabled, BG uses Score Color Hi/Lo.")
 show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui", group=grp_conf_reg, tooltip="BG from confirmed bias.")
 
 // CONF Panel: score-color thresholds + Confirmed Bias (hysteresis + persistence)
@@ -80,6 +80,7 @@ string grp_conf_bias = "CONF Confirmed Bias"
 conf_color_hi = input.float(52.0, "Score Color Hi", inline="cc", group=grp_conf_bias, step=1)
 conf_color_lo = input.float(48.0, "Score Color Lo", inline="cc", group=grp_conf_bias, step=1)
 adaptive_neutral_zone = input.bool(false, "Adaptive Neutral Zone", group=grp_conf_bias)
+conf_mtf_align_1h4h = input.bool(false, "MTF Alignment (1h+4h)", group=grp_conf_bias, tooltip="Score quality gate from 1h+4h direction alignment (uses security).")
 cb_enter_bull = input.float(55.0, "Enter BULL⠀⠀", inline="en", group=grp_conf_bias, step=1)
 cb_enter_bear = input.float(45.0, "Enter BEAR⠀⠀", inline="en", group=grp_conf_bias, step=1)
 cb_exit_bull  = input.float(52.0, "Exit BULL⠀⠀⠀", inline="ex", group=grp_conf_bias, step=1)
@@ -1814,6 +1815,11 @@ f_panel_state() =>
 
     [fvg_state, fvg_last_conf, fr_state, fr_last_conf, tf_conf_i, fvg_candidate_i, fr_pending_i]
 
+// MTF alignment helper: direction from confirmed FVG+FR states (-1/0/+1)
+f_mtf_dir_conf() =>
+    [fvg_s, fvg_l, fr_s, fr_l, tfc, fvcc, frp] = f_panel_state()
+    math.sign(fvg_l + fr_l)
+
 //colors
 color_blue_1    = color.new(color.blue, 30)
 color_red_1     = color.new(color.red, 30)
@@ -1886,6 +1892,21 @@ color fr_color_w   = na
 color fr_color_m   = na
 
 float mtf_align_conf = 1.0
+float mtf_align_conf_live = 1.0
+
+if conf_mtf_align_1h4h
+    float _dir_1h = request.security(syminfo.tickerid, '60',  f_mtf_dir_conf())
+    float _dir_4h = request.security(syminfo.tickerid, '240', f_mtf_dir_conf())
+    float _sum = 0.0
+    float _wsum = 0.0
+    if _dir_1h != 0
+        _sum += _dir_1h * 2.0
+        _wsum += 2.0
+    if _dir_4h != 0
+        _sum += _dir_4h * 3.0
+        _wsum += 3.0
+    mtf_align_conf_live := _wsum > 0 ? math.min(1.0, math.abs(_sum) / _wsum) : 1.0
+    active_sec_calls += 2
 
 // 2. Gated HTF & Table Update
 if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Security & Logic
@@ -3625,6 +3646,10 @@ if conf_use_vwap_quality
 //--------------------------------------------------------- CONF Engine v2: Core + Confirm + Regime Gate ---------------------------------------------------------
 
 float conf_score = 50.0
+float conf_color_hi_eff = conf_color_hi
+float conf_color_lo_eff = conf_color_lo
+float conf_bg_hi_eff = 55.0
+float conf_bg_lo_eff = 45.0
 string conf_bias = "NEUT"
 float final_raw = 0.0 // Exposed for Alerts
 
@@ -3740,7 +3765,7 @@ if eff_calc_conf
         conf_gate := conf_gate * 0.85
     if adr_hard
         conf_gate := conf_gate * 0.70
-    conf_gate := conf_gate * (0.5 + 0.5 * mtf_align_conf)
+    conf_gate := conf_gate * (0.5 + 0.5 * (conf_mtf_align_1h4h ? mtf_align_conf_live : mtf_align_conf))
 
     // Apply Gate to Magnitude relative to 50
     // Score 0-100. Center 50.
@@ -3749,12 +3774,15 @@ if eff_calc_conf
 
     // --- 4.5 Confirmed Bias (Hysteresis + Persistence) ---
     // Panel background is score-based; panel label is Confirmed Bias.
-    float _conf_color_hi = math.max(conf_color_hi, conf_color_lo + 0.1)
-    float _conf_color_lo = math.min(conf_color_lo, _conf_color_hi - 0.1)
+    conf_color_hi_eff := math.max(conf_color_hi, conf_color_lo + 0.1)
+    conf_color_lo_eff := math.min(conf_color_lo, conf_color_hi_eff - 0.1)
     if adaptive_neutral_zone
         float _nhw = regime_state == "SQUEEZE" ? 5.0 : regime_state == "RANGE" ? 4.0 : 2.0
-        _conf_color_hi := 50 + _nhw
-        _conf_color_lo := 50 - _nhw
+        conf_color_hi_eff := 50 + _nhw
+        conf_color_lo_eff := 50 - _nhw
+
+    conf_bg_hi_eff := adaptive_neutral_zone ? conf_color_hi_eff : 55.0
+    conf_bg_lo_eff := adaptive_neutral_zone ? conf_color_lo_eff : 45.0
 
     float _cb_enter_bull = math.max(cb_enter_bull, cb_exit_bull + 0.1)
     float _cb_exit_bull  = math.min(cb_exit_bull, _cb_enter_bull - 0.1)
@@ -3902,7 +3930,7 @@ if eff_calc_conf
         if align_flag != ""
             panel_txt_live := panel_txt_live + " " + align_flag
 
-        color c_conf_live = conf_score > _conf_color_hi ? color.new(color.green, 30) : conf_score < _conf_color_lo ? color.new(color.red, 30) : color.new(color.gray, 100)
+        color c_conf_live = conf_score > conf_color_hi_eff ? color.new(color.green, 30) : conf_score < conf_color_lo_eff ? color.new(color.red, 30) : color.new(color.gray, 100)
 
         // Neutral remains transparent
         var string conf_txt_conf = ""
@@ -3938,9 +3966,9 @@ if show_confirmed_bias_bg
     conf_bg_color := conf_state_engine == 1 ? color.new(color.green, transp_bg) : conf_state_engine == -1 ? color.new(color.red, transp_bg) : color.new(color.gray, 100)
 else if show_conf_bg
     // Score-driven background (early pressure / heat)
-    if conf_score > 55
+    if conf_score > conf_bg_hi_eff
         conf_bg_color := color.new(color.green, transp_bg)
-    else if conf_score < 45
+    else if conf_score < conf_bg_lo_eff
         conf_bg_color := color.new(color.red, transp_bg)
     else
         conf_bg_color := color.new(color.gray, 100) // Transparent Neutral
