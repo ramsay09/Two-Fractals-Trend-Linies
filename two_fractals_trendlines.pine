@@ -77,15 +77,15 @@ show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui
 
 // CONF Panel: score-color thresholds + Confirmed Bias (hysteresis + persistence)
 string grp_conf_bias = "CONF Confirmed Bias"
-conf_color_hi = input.float(52.0, "Score Color Hi", inline="cc", group=grp_conf_bias, step=0.5)
-conf_color_lo = input.float(48.0, "Score Color Lo", inline="cc", group=grp_conf_bias, step=0.5)
+conf_color_hi = input.float(52.0, "Score Color Hi", inline="cc", group=grp_conf_bias, step=1)
+conf_color_lo = input.float(48.0, "Score Color Lo", inline="cc", group=grp_conf_bias, step=1)
 adaptive_neutral_zone = input.bool(false, "Adaptive Neutral Zone", group=grp_conf_bias)
-cb_enter_bull = input.float(55.0, "Enter BULL⠀⠀", inline="en", group=grp_conf_bias, step=0.5)
-cb_enter_bear = input.float(45.0, "Enter BEAR⠀⠀", inline="en", group=grp_conf_bias, step=0.5)
-cb_exit_bull  = input.float(52.0, "Exit BULL⠀⠀⠀", inline="ex", group=grp_conf_bias, step=0.5)
-cb_exit_bear  = input.float(48.0, "Exit BEAR⠀⠀", inline="ex", group=grp_conf_bias, step=0.5)
-cb_enter_bars = input.int(2, "Enter Bars⠀⠀⠀", inline="bars", group=grp_conf_bias, minval=1, maxval=20)
-cb_exit_bars  = input.int(1, "Exit Bars", inline="bars", group=grp_conf_bias, minval=1, maxval=20)
+cb_enter_bull = input.float(55.0, "Enter BULL⠀⠀", inline="en", group=grp_conf_bias, step=1)
+cb_enter_bear = input.float(45.0, "Enter BEAR⠀⠀", inline="en", group=grp_conf_bias, step=1)
+cb_exit_bull  = input.float(52.0, "Exit BULL⠀⠀⠀", inline="ex", group=grp_conf_bias, step=1)
+cb_exit_bear  = input.float(48.0, "Exit BEAR⠀⠀⠀", inline="ex", group=grp_conf_bias, step=1)
+cb_enter_bars = input.int(2, "Enter Bars⠀⠀", inline="bars", group=grp_conf_bias, minval=1, maxval=20)
+cb_exit_bars  = input.int(1, "Exit Bars⠀⠀⠀⠀", inline="bars", group=grp_conf_bias, minval=1, maxval=20)
 cb_confirmed_only = input.bool(true, "Confirmed Bars Only", group=grp_conf_bias)
 
 show_regime_panel   = input.bool(true, "REG⠀⠀⠀⠀", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
