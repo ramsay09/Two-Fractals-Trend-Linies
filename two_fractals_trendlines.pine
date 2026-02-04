@@ -79,11 +79,11 @@ show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui
 string grp_conf_bias = "CONF Confirmed Bias"
 conf_color_hi = input.float(52.0, "Score Color Hi", inline="cc", group=grp_conf_bias, step=0.5, tooltip="CONF cell background: green above this score.")
 conf_color_lo = input.float(48.0, "Score Color Lo", inline="cc", group=grp_conf_bias, step=0.5, tooltip="CONF cell background: red below this score. Neutral in between.")
-cb_enter_bull = input.float(55.0, "Enter BULL", inline="en", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias enters BULL if score stays above this threshold for N bars.")
-cb_enter_bear = input.float(45.0, "Enter BEAR", inline="en", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias enters BEAR if score stays below this threshold for N bars.")
-cb_exit_bull  = input.float(52.0, "Exit BULL", inline="ex", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias exits BULL to NEUT if score stays below this threshold for N bars.")
-cb_exit_bear  = input.float(48.0, "Exit BEAR", inline="ex", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias exits BEAR to NEUT if score stays above this threshold for N bars.")
-cb_enter_bars = input.int(2, "Enter Bars", inline="bars", group=grp_conf_bias, minval=1, maxval=20, tooltip="Number of confirmed bars required to enter BULL/BEAR.")
+cb_enter_bull = input.float(55.0, "Enter BULL⠀⠀", inline="en", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias enters BULL if score stays above this threshold for N bars.")
+cb_enter_bear = input.float(45.0, "Enter BEAR⠀⠀", inline="en", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias enters BEAR if score stays below this threshold for N bars.")
+cb_exit_bull  = input.float(52.0, "Exit BULL⠀⠀⠀", inline="ex", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias exits BULL to NEUT if score stays below this threshold for N bars.")
+cb_exit_bear  = input.float(48.0, "Exit BEAR⠀⠀", inline="ex", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias exits BEAR to NEUT if score stays above this threshold for N bars.")
+cb_enter_bars = input.int(2, "Enter Bars⠀⠀⠀", inline="bars", group=grp_conf_bias, minval=1, maxval=20, tooltip="Number of confirmed bars required to enter BULL/BEAR.")
 cb_exit_bars  = input.int(1, "Exit Bars", inline="bars", group=grp_conf_bias, minval=1, maxval=20, tooltip="Number of confirmed bars required to exit to NEUT.")
 cb_confirmed_only = input.bool(true, "Confirmed Bars Only", group=grp_conf_bias, tooltip="If enabled, Confirmed Bias updates only on bar close (recommended).")
 
