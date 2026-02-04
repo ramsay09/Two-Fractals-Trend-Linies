@@ -1944,10 +1944,10 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
 
     float mtf_align_sum = 0.0
     float mtf_align_wsum = 0.0
-    int dir_15m = math.sign(fvg_disp_15m + fr_disp_15m)
-    int dir_1h = math.sign(fvg_disp_1h + fr_disp_1h)
-    int dir_4h = math.sign(fvg_disp_4h + fr_disp_4h)
-    int dir_d = math.sign(fvg_disp_d + fr_disp_d)
+    float dir_15m = math.sign(fvg_disp_15m + fr_disp_15m)
+    float dir_1h = math.sign(fvg_disp_1h + fr_disp_1h)
+    float dir_4h = math.sign(fvg_disp_4h + fr_disp_4h)
+    float dir_d = math.sign(fvg_disp_d + fr_disp_d)
 
     if dir_15m != 0
         mtf_align_sum += dir_15m * 1.0
