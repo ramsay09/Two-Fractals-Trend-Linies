@@ -3727,8 +3727,8 @@ if eff_calc_conf
     float exit_bull_th  = regime_state == "RANGE" ? 58.0 : 54.0
     float exit_bear_th  = regime_state == "RANGE" ? 42.0 : 46.0
 
-    float neut_lo = 46.0
-    float neut_hi = 54.0
+    float neut_lo = 45.0
+    float neut_hi = 55.0
     bool in_neut_band = score_exit >= neut_lo and score_exit <= neut_hi
     bool neut_snap = barstate.isconfirmed and in_neut_band
 
