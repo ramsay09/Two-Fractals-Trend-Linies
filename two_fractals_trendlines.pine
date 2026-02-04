@@ -3714,9 +3714,9 @@ if eff_calc_conf
     // - A small neutral snap band helps prevent "sticky" states in chop.
     // - In SQUEEZE the state is forced to NEUT.
     // - In RANGE the state requires extreme scores to activate.
-    // - Immediate NEUT on confirmed counter structure break (close beyond last fractal).
     float score_enter = ta.ema(conf_score, 14)
-    float score_exit  = ta.ema(conf_score, 5)
+    float score_exit_raw = ta.ema(conf_score, 5)
+    float score_exit = regime_state == "TREND" ? (50.0 + (score_exit_raw - 50.0) * 0.90) : score_exit_raw
 
     int persist_enter = math.min(3, math.max(2, eff_persist_bars))
 
@@ -3728,10 +3728,7 @@ if eff_calc_conf
     float neut_lo = 46.0
     float neut_hi = 54.0
     bool in_neut_band = score_exit >= neut_lo and score_exit <= neut_hi
-    bool neut_snap = math.sum(in_neut_band ? 1 : 0, 2) == 2
-
-    bool bull_struct_break = barstate.isconfirmed and not na(last_up_lvl_inf) and close > last_up_lvl_inf and close[1] <= last_up_lvl_inf
-    bool bear_struct_break = barstate.isconfirmed and not na(last_dn_lvl_inf) and close < last_dn_lvl_inf and close[1] >= last_dn_lvl_inf
+    bool neut_snap = barstate.isconfirmed and in_neut_band
 
     if regime_state == "SQUEEZE"
         conf_state_engine := 0
