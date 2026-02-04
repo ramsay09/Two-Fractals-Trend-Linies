@@ -3709,39 +3709,56 @@ if eff_calc_conf
 
     // --- 4.5 State Engine (Score-based, Smoothed + Hysteresis) ---
     // The state is designed to be stable and human-readable:
-    // - Uses an EMA-smoothed CONF score.
-    // - Hysteresis prevents frequent flips around the midline.
+    // - Entry uses a slower EMA for confirmation.
+    // - Exit uses a faster EMA to neutralize earlier.
+    // - A small neutral snap band helps prevent "sticky" states in chop.
     // - In SQUEEZE the state is forced to NEUT.
     // - In RANGE the state requires extreme scores to activate.
-    float score_smooth = ta.ema(conf_score, 14)
+    // - Immediate NEUT on confirmed counter structure break (close beyond last fractal).
+    float score_enter = ta.ema(conf_score, 14)
+    float score_exit  = ta.ema(conf_score, 5)
 
     int persist_enter = math.min(3, math.max(2, eff_persist_bars))
 
     float enter_bull_th = regime_state == "RANGE" ? 65.0 : 55.0
-    float exit_bull_th  = regime_state == "RANGE" ? 55.0 : 52.0
     float enter_bear_th = regime_state == "RANGE" ? 35.0 : 45.0
-    float exit_bear_th  = regime_state == "RANGE" ? 45.0 : 48.0
+    float exit_bull_th  = regime_state == "RANGE" ? 58.0 : 54.0
+    float exit_bear_th  = regime_state == "RANGE" ? 42.0 : 46.0
+
+    float neut_lo = 46.0
+    float neut_hi = 54.0
+    bool in_neut_band = score_exit >= neut_lo and score_exit <= neut_hi
+    bool neut_snap = math.sum(in_neut_band ? 1 : 0, 2) == 2
+
+    bool bull_struct_break = barstate.isconfirmed and not na(last_up_lvl_inf) and close > last_up_lvl_inf and close[1] <= last_up_lvl_inf
+    bool bear_struct_break = barstate.isconfirmed and not na(last_dn_lvl_inf) and close < last_dn_lvl_inf and close[1] >= last_dn_lvl_inf
 
     if regime_state == "SQUEEZE"
         conf_state_engine := 0
     else
-        bool enter_bull = score_smooth >= enter_bull_th
-        bool enter_bear = score_smooth <= enter_bear_th
+        // Immediate neutral on confirmed counter structure break (closed bar).
+        if conf_state_engine == 1 and bear_struct_break
+            conf_state_engine := 0
+        else if conf_state_engine == -1 and bull_struct_break
+            conf_state_engine := 0
+        else
+            bool enter_bull = score_enter >= enter_bull_th
+            bool enter_bear = score_enter <= enter_bear_th
 
-        bool enter_bull_p = math.sum(enter_bull ? 1 : 0, persist_enter) == persist_enter
-        bool enter_bear_p = math.sum(enter_bear ? 1 : 0, persist_enter) == persist_enter
+            bool enter_bull_p = math.sum(enter_bull ? 1 : 0, persist_enter) == persist_enter
+            bool enter_bear_p = math.sum(enter_bear ? 1 : 0, persist_enter) == persist_enter
 
-        if conf_state_engine == 0 // Neutral
-            if enter_bull_p
-                conf_state_engine := 1
-            else if enter_bear_p
-                conf_state_engine := -1
-        else if conf_state_engine == 1 // Bull
-            if score_smooth <= exit_bull_th
-                conf_state_engine := 0
-        else if conf_state_engine == -1 // Bear
-            if score_smooth >= exit_bear_th
-                conf_state_engine := 0
+            if conf_state_engine == 0 // Neutral
+                if enter_bull_p
+                    conf_state_engine := 1
+                else if enter_bear_p
+                    conf_state_engine := -1
+            else if conf_state_engine == 1 // Bull
+                if score_exit <= exit_bull_th or neut_snap
+                    conf_state_engine := 0
+            else if conf_state_engine == -1 // Bear
+                if score_exit >= exit_bear_th or neut_snap
+                    conf_state_engine := 0
 
     // Determine Display Bias based on ENGINE STATE, not just score
     conf_bias := conf_state_engine == 1 ? "BULL" : conf_state_engine == -1 ? "BEAR" : "NEUT"
