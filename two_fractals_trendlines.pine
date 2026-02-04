@@ -3789,7 +3789,7 @@ if eff_calc_conf
     float exit_bear_th  = regime_state == "RANGE" ? state_range_exit_bear  : state_exit_bear
 
     bool in_neut_band = score_exit >= neut_lo and score_exit <= neut_hi
-    bool neut_snap = state_neut_snap_enable and barstate.isconfirmed and ta.sum(in_neut_band ? 1 : 0, neut_snap_bars) == neut_snap_bars
+    bool neut_snap = state_neut_snap_enable and barstate.isconfirmed and (ta.sma(in_neut_band ? 1.0 : 0.0, neut_snap_bars) * neut_snap_bars) == neut_snap_bars
 
     if regime_state == "SQUEEZE"
         conf_state_engine := 0
@@ -3803,8 +3803,8 @@ if eff_calc_conf
             bool enter_bull = score_enter >= enter_bull_th
             bool enter_bear = score_enter <= enter_bear_th
 
-            bool enter_bull_p = ta.sum(enter_bull ? 1 : 0, persist_enter) == persist_enter
-            bool enter_bear_p = ta.sum(enter_bear ? 1 : 0, persist_enter) == persist_enter
+            bool enter_bull_p = (ta.sma(enter_bull ? 1.0 : 0.0, persist_enter) * persist_enter) == persist_enter
+            bool enter_bear_p = (ta.sma(enter_bear ? 1.0 : 0.0, persist_enter) * persist_enter) == persist_enter
 
             if conf_state_engine == 0 // Neutral
                 if enter_bull_p
