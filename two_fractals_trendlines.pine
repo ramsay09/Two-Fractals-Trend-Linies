@@ -76,12 +76,12 @@ show_conf_bg        = input.bool(false, "Confluence Meter BG⠀", inline="conf_u
 show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on Confirmed Bias (BULL/BEAR/NEUT). Useful to compare the stable filter vs the score background.")
 
 // CONF Panel: Confirmed Bias (profile + optional scalp optimization)
-string grp_conf_bias = "CONF Confirmed Bias"
-cb_profile = input.string("Standard", "Bias Confirmation Profile", options=["Stable","Standard","Fast"], group=grp_conf_bias, tooltip="Stable: fewer flips, stronger filter.\nStandard: allround.\nFast: quicker bias response (timing).")
-cb_scalp_opt = input.bool(false, "Scalp Optimize", group=grp_conf_bias, tooltip="Optimizes confirmed bias parameters for scalping (faster reaction).\nBias remains a direction gate; entries come from separate signals.")
+//string grp_conf_bias = "CONF Confirmed Bias"
+cb_profile = input.string("Standard", "Bias Confirmation Profile", options=["Stable","Standard","Fast"], tooltip="Stable: fewer flips, stronger filter.\nStandard: allround.\nFast: quicker bias response (timing).")
+cb_scalp_opt = input.bool(false, "Scalp Optimize", tooltip="Optimizes confirmed bias parameters for scalping (faster reaction).\nBias remains a direction gate; entries come from separate signals.")
 
 show_regime_panel   = input.bool(true, "REG⠀⠀⠀⠀", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
-regime_bg_enabled   = input.bool(false, "Squeeze/Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
+regime_bg_enabled   = input.bool(false, "Squeeze & Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
 
 string M_FORM = "○"
 string M_CONF = "●"
