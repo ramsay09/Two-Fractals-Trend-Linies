@@ -3728,8 +3728,8 @@ if eff_calc_conf
         bool enter_bull = score_smooth >= enter_bull_th
         bool enter_bear = score_smooth <= enter_bear_th
 
-        bool enter_bull_p = ta.sum(enter_bull ? 1 : 0, persist_enter) == persist_enter
-        bool enter_bear_p = ta.sum(enter_bear ? 1 : 0, persist_enter) == persist_enter
+        bool enter_bull_p = math.sum(enter_bull ? 1 : 0, persist_enter) == persist_enter
+        bool enter_bear_p = math.sum(enter_bear ? 1 : 0, persist_enter) == persist_enter
 
         if conf_state_engine == 0 // Neutral
             if enter_bull_p
