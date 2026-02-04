@@ -73,19 +73,20 @@ conf_z_penalty_mode   = input.string("Default", "⠀⠀Stretch Penalty", inline=
 
 show_conf_meter     = input.bool(true, "CONF⠀⠀⠀", inline="conf_ui", group=grp_conf_reg, tooltip="")
 show_conf_bg        = input.bool(false, "Confluence Meter BG⠀", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on CONF score thresholds (score > 55 = green, < 45 = red). Neutral stays transparent.")
-show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on Confirmed Bias (BULL/BEAR/NEUT). Useful to compare the stable filter vs the score background.")
+show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui", group=grp_conf_reg, tooltip="BG from confirmed bias.")
 
 // CONF Panel: score-color thresholds + Confirmed Bias (hysteresis + persistence)
 string grp_conf_bias = "CONF Confirmed Bias"
-conf_color_hi = input.float(52.0, "Score Color Hi", inline="cc", group=grp_conf_bias, step=0.5, tooltip="CONF cell background: green above this score.")
-conf_color_lo = input.float(48.0, "Score Color Lo", inline="cc", group=grp_conf_bias, step=0.5, tooltip="CONF cell background: red below this score. Neutral in between.")
-cb_enter_bull = input.float(55.0, "Enter BULL⠀⠀", inline="en", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias enters BULL if score stays above this threshold for N bars.")
-cb_enter_bear = input.float(45.0, "Enter BEAR⠀⠀", inline="en", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias enters BEAR if score stays below this threshold for N bars.")
-cb_exit_bull  = input.float(52.0, "Exit BULL⠀⠀⠀", inline="ex", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias exits BULL to NEUT if score stays below this threshold for N bars.")
-cb_exit_bear  = input.float(48.0, "Exit BEAR⠀⠀", inline="ex", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias exits BEAR to NEUT if score stays above this threshold for N bars.")
-cb_enter_bars = input.int(2, "Enter Bars⠀⠀⠀", inline="bars", group=grp_conf_bias, minval=1, maxval=20, tooltip="Number of confirmed bars required to enter BULL/BEAR.")
-cb_exit_bars  = input.int(1, "Exit Bars", inline="bars", group=grp_conf_bias, minval=1, maxval=20, tooltip="Number of confirmed bars required to exit to NEUT.")
-cb_confirmed_only = input.bool(true, "Confirmed Bars Only", group=grp_conf_bias, tooltip="If enabled, Confirmed Bias updates only on bar close (recommended).")
+conf_color_hi = input.float(52.0, "Score Color Hi", inline="cc", group=grp_conf_bias, step=0.5)
+conf_color_lo = input.float(48.0, "Score Color Lo", inline="cc", group=grp_conf_bias, step=0.5)
+adaptive_neutral_zone = input.bool(false, "Adaptive Neutral Zone", group=grp_conf_bias)
+cb_enter_bull = input.float(55.0, "Enter BULL⠀⠀", inline="en", group=grp_conf_bias, step=0.5)
+cb_enter_bear = input.float(45.0, "Enter BEAR⠀⠀", inline="en", group=grp_conf_bias, step=0.5)
+cb_exit_bull  = input.float(52.0, "Exit BULL⠀⠀⠀", inline="ex", group=grp_conf_bias, step=0.5)
+cb_exit_bear  = input.float(48.0, "Exit BEAR⠀⠀", inline="ex", group=grp_conf_bias, step=0.5)
+cb_enter_bars = input.int(2, "Enter Bars⠀⠀⠀", inline="bars", group=grp_conf_bias, minval=1, maxval=20)
+cb_exit_bars  = input.int(1, "Exit Bars", inline="bars", group=grp_conf_bias, minval=1, maxval=20)
+cb_confirmed_only = input.bool(true, "Confirmed Bars Only", group=grp_conf_bias)
 
 show_regime_panel   = input.bool(true, "REG⠀⠀⠀⠀", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
 regime_bg_enabled   = input.bool(false, "Squeeze/Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
@@ -1884,6 +1885,8 @@ color fr_color_d   = na
 color fr_color_w   = na
 color fr_color_m   = na
 
+float mtf_align_conf = 1.0
+
 // 2. Gated HTF & Table Update
 if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Security & Logic
     // Optimization: Combine security calls for Info Panel (7 calls)
@@ -1938,6 +1941,28 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
     int fr_disp_m = panel_show_live ? fr_m : fr_m_conf
     int fvg_disp_c = panel_show_live ? fvg_state_inf : fvg_c_conf
     int fr_disp_c = panel_show_live ? fr_state_inf : fr_c_conf
+
+    float mtf_align_sum = 0.0
+    float mtf_align_wsum = 0.0
+    int dir_15m = math.sign(fvg_disp_15m + fr_disp_15m)
+    int dir_1h = math.sign(fvg_disp_1h + fr_disp_1h)
+    int dir_4h = math.sign(fvg_disp_4h + fr_disp_4h)
+    int dir_d = math.sign(fvg_disp_d + fr_disp_d)
+
+    if dir_15m != 0
+        mtf_align_sum += dir_15m * 1.0
+        mtf_align_wsum += 1.0
+    if dir_1h != 0
+        mtf_align_sum += dir_1h * 2.0
+        mtf_align_wsum += 2.0
+    if dir_4h != 0
+        mtf_align_sum += dir_4h * 3.0
+        mtf_align_wsum += 3.0
+    if dir_d != 0
+        mtf_align_sum += dir_d * 4.0
+        mtf_align_wsum += 4.0
+
+    mtf_align_conf := mtf_align_wsum > 0 ? math.min(1.0, math.abs(mtf_align_sum) / mtf_align_wsum) : 1.0
 
     // --- Color Logic ---
     // FVG
@@ -3600,7 +3625,7 @@ if conf_use_vwap_quality
 //--------------------------------------------------------- CONF Engine v2: Core + Confirm + Regime Gate ---------------------------------------------------------
 
 float conf_score = 50.0
-string conf_bias = "Neutral"
+string conf_bias = "NEUT"
 float final_raw = 0.0 // Exposed for Alerts
 
 bool eff_calc_conf = eff_show_conf_meter or show_conf_bg or show_confirmed_bias_bg
@@ -3715,6 +3740,7 @@ if eff_calc_conf
         conf_gate := conf_gate * 0.85
     if adr_hard
         conf_gate := conf_gate * 0.70
+    conf_gate := conf_gate * (0.5 + 0.5 * mtf_align_conf)
 
     // Apply Gate to Magnitude relative to 50
     // Score 0-100. Center 50.
@@ -3725,6 +3751,10 @@ if eff_calc_conf
     // Panel background is score-based; panel label is Confirmed Bias.
     float _conf_color_hi = math.max(conf_color_hi, conf_color_lo + 0.1)
     float _conf_color_lo = math.min(conf_color_lo, _conf_color_hi - 0.1)
+    if adaptive_neutral_zone
+        float _nhw = regime_state == "SQUEEZE" ? 5.0 : regime_state == "RANGE" ? 4.0 : 2.0
+        _conf_color_hi := 50 + _nhw
+        _conf_color_lo := 50 - _nhw
 
     float _cb_enter_bull = math.max(cb_enter_bull, cb_exit_bull + 0.1)
     float _cb_exit_bull  = math.min(cb_exit_bull, _cb_enter_bull - 0.1)
