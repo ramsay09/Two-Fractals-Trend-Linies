@@ -75,30 +75,6 @@ show_conf_meter     = input.bool(true, "CONF⠀⠀⠀", inline="conf_ui", group=
 show_conf_bg        = input.bool(false, "Confluence Meter BG⠀", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on CONF score thresholds (score > 55 = green, < 45 = red). Neutral stays transparent.")
 show_conf_state_bg  = input.bool(false, "CONF State BG", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on the CONF state engine (BULL/BEAR/NEUT). Useful to compare confirmed bias vs the score background.")
 
-// TEMP: CONF State Engine tuning controls (spinboxes). These are intended for calibration and may be removed later.
-string grp_conf_state_tmp = "CONF State Engine (TEMP)"
-bool state_tmp_enable = input.bool(true, "Enable TEMP State Controls", group=grp_conf_state_tmp, tooltip="Temporary: exposes state engine damping/hold controls as spinboxes for tuning. Defaults match the current behavior.")
-
-int  state_enter_ema_len_in = input.int(14, "Entry EMA Len", group=grp_conf_state_tmp, minval=1, maxval=80, tooltip="Slower EMA = later entry, more stable.")
-int  state_exit_ema_len_in  = input.int(5, "Exit EMA Len", group=grp_conf_state_tmp, minval=1, maxval=40, tooltip="Faster EMA = earlier neutralization.")
-float state_trend_damp_in   = input.float(0.90, "Trend Exit Damp", group=grp_conf_state_tmp, minval=0.50, maxval=1.00, step=0.01, tooltip="Only in TREND: pulls the exit signal toward 50. Lower = earlier return to NEUT.")
-int  state_persist_enter_override = input.int(0, "Enter Persist (0=Auto)", group=grp_conf_state_tmp, minval=0, maxval=10, tooltip="Number of confirmed bars required to enter BULL/BEAR. 0 uses auto-tuned eff_persist_bars (clamped).")
-
-float state_enter_bull_in = input.float(55.0, "Enter BULL", group=grp_conf_state_tmp, minval=50.0, maxval=95.0, step=0.5, tooltip="Entry threshold for BULL on the smoothed score.")
-float state_exit_bull_in  = input.float(54.0, "Exit BULL", group=grp_conf_state_tmp, minval=50.0, maxval=95.0, step=0.5, tooltip="Exit threshold for BULL on the fast exit signal. Higher = earlier neutral.")
-float state_enter_bear_in = input.float(45.0, "Enter BEAR", group=grp_conf_state_tmp, minval=5.0,  maxval=50.0, step=0.5, tooltip="Entry threshold for BEAR on the smoothed score.")
-float state_exit_bear_in  = input.float(46.0, "Exit BEAR", group=grp_conf_state_tmp, minval=5.0,  maxval=50.0, step=0.5, tooltip="Exit threshold for BEAR on the fast exit signal. Lower = earlier neutral.")
-
-float state_range_enter_bull_in = input.float(65.0, "RANGE Enter BULL", group=grp_conf_state_tmp, minval=50.0, maxval=99.0, step=0.5, tooltip="In RANGE: require extreme scores to enter BULL.")
-float state_range_exit_bull_in  = input.float(58.0, "RANGE Exit BULL", group=grp_conf_state_tmp, minval=50.0, maxval=99.0, step=0.5, tooltip="In RANGE: exit threshold for BULL. Higher = earlier neutral.")
-float state_range_enter_bear_in = input.float(35.0, "RANGE Enter BEAR", group=grp_conf_state_tmp, minval=1.0,  maxval=50.0, step=0.5, tooltip="In RANGE: require extreme scores to enter BEAR.")
-float state_range_exit_bear_in  = input.float(42.0, "RANGE Exit BEAR", group=grp_conf_state_tmp, minval=1.0,  maxval=50.0, step=0.5, tooltip="In RANGE: exit threshold for BEAR. Lower = earlier neutral.")
-
-bool  state_neut_snap_enable_in = input.bool(true, "Neutral Snap", group=grp_conf_state_tmp, tooltip="If enabled, forces NEUT when the exit signal is inside the neutral band for N confirmed bars.")
-float state_neut_lo_in = input.float(45.0, "Neutral Lo", group=grp_conf_state_tmp, minval=0.0, maxval=100.0, step=0.5, tooltip="Neutral band lower bound (used for snap only).")
-float state_neut_hi_in = input.float(55.0, "Neutral Hi", group=grp_conf_state_tmp, minval=0.0, maxval=100.0, step=0.5, tooltip="Neutral band upper bound (used for snap only).")
-int   state_neut_snap_bars_in = input.int(1, "Neutral Bars", group=grp_conf_state_tmp, minval=1, maxval=10, tooltip="How many confirmed bars inside the neutral band are required to snap to NEUT.")
-
 show_regime_panel   = input.bool(true, "REG⠀⠀⠀⠀", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
 regime_bg_enabled   = input.bool(false, "Squeeze/Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
 
@@ -3740,56 +3716,21 @@ if eff_calc_conf
     // - A small neutral snap band helps prevent "sticky" states in chop.
     // - In SQUEEZE the state is forced to NEUT.
     // - In RANGE the state requires extreme scores to activate.
-    // Resolve TEMP tuning inputs (or fallback to defaults).
-    int state_enter_ema_len = state_tmp_enable ? state_enter_ema_len_in : 14
-    int state_exit_ema_len  = state_tmp_enable ? state_exit_ema_len_in  : 5
-    float state_trend_damp  = state_tmp_enable ? state_trend_damp_in    : 0.90
+    float score_enter = ta.ema(conf_score, 1)
+    float score_exit_raw = ta.ema(conf_score, 1)
+    float score_exit = regime_state == "TREND" ? (50.0 + (score_exit_raw - 50.0) * 0.90) : score_exit_raw
 
-    float state_enter_bull = state_tmp_enable ? state_enter_bull_in : 55.0
-    float state_exit_bull  = state_tmp_enable ? state_exit_bull_in  : 54.0
-    float state_enter_bear = state_tmp_enable ? state_enter_bear_in : 45.0
-    float state_exit_bear  = state_tmp_enable ? state_exit_bear_in  : 46.0
+    int persist_enter = math.min(3, math.max(2, eff_persist_bars))
 
-    float state_range_enter_bull = state_tmp_enable ? state_range_enter_bull_in : 65.0
-    float state_range_exit_bull  = state_tmp_enable ? state_range_exit_bull_in  : 58.0
-    float state_range_enter_bear = state_tmp_enable ? state_range_enter_bear_in : 35.0
-    float state_range_exit_bear  = state_tmp_enable ? state_range_exit_bear_in  : 42.0
+    float enter_bull_th = regime_state == "RANGE" ? 65.0 : 55.0
+    float enter_bear_th = regime_state == "RANGE" ? 35.0 : 45.0
+    float exit_bull_th  = regime_state == "RANGE" ? 58.0 : 54.0
+    float exit_bear_th  = regime_state == "RANGE" ? 42.0 : 46.0
 
-    bool state_neut_snap_enable = state_tmp_enable ? state_neut_snap_enable_in : true
-    float neut_lo_in = state_tmp_enable ? state_neut_lo_in : 45.0
-    float neut_hi_in = state_tmp_enable ? state_neut_hi_in : 55.0
-    int neut_snap_bars = state_tmp_enable ? state_neut_snap_bars_in : 1
-
-    // Guardrails: ensure consistent hysteresis ordering.
-    float eps = 0.1
-    state_enter_bull := math.max(state_enter_bull, state_exit_bull + eps)
-    state_exit_bull  := math.min(state_exit_bull, state_enter_bull - eps)
-    state_enter_bear := math.min(state_enter_bear, state_exit_bear - eps)
-    state_exit_bear  := math.max(state_exit_bear, state_enter_bear + eps)
-
-    state_range_enter_bull := math.max(state_range_enter_bull, state_range_exit_bull + eps)
-    state_range_exit_bull  := math.min(state_range_exit_bull, state_range_enter_bull - eps)
-    state_range_enter_bear := math.min(state_range_enter_bear, state_range_exit_bear - eps)
-    state_range_exit_bear  := math.max(state_range_exit_bear, state_range_enter_bear + eps)
-
-    float neut_lo = math.min(neut_lo_in, neut_hi_in)
-    float neut_hi = math.max(neut_lo_in, neut_hi_in)
-    neut_snap_bars := math.max(1, neut_snap_bars)
-
-    float score_enter = ta.ema(conf_score, state_enter_ema_len)
-    float score_exit_raw = ta.ema(conf_score, state_exit_ema_len)
-    float score_exit = regime_state == "TREND" ? (50.0 + (score_exit_raw - 50.0) * state_trend_damp) : score_exit_raw
-
-    int persist_enter_auto = math.min(3, math.max(2, eff_persist_bars))
-    int persist_enter = state_tmp_enable and state_persist_enter_override > 0 ? state_persist_enter_override : persist_enter_auto
-
-    float enter_bull_th = regime_state == "RANGE" ? state_range_enter_bull : state_enter_bull
-    float enter_bear_th = regime_state == "RANGE" ? state_range_enter_bear : state_enter_bear
-    float exit_bull_th  = regime_state == "RANGE" ? state_range_exit_bull  : state_exit_bull
-    float exit_bear_th  = regime_state == "RANGE" ? state_range_exit_bear  : state_exit_bear
-
+    float neut_lo = 48.0
+    float neut_hi = 52.0
     bool in_neut_band = score_exit >= neut_lo and score_exit <= neut_hi
-    bool neut_snap = state_neut_snap_enable and barstate.isconfirmed and ta.lowest(in_neut_band ? 1 : 0, neut_snap_bars) == 1
+    bool neut_snap = barstate.isconfirmed and in_neut_band
 
     if regime_state == "SQUEEZE"
         conf_state_engine := 0
@@ -3803,8 +3744,8 @@ if eff_calc_conf
             bool enter_bull = score_enter >= enter_bull_th
             bool enter_bear = score_enter <= enter_bear_th
 
-            bool enter_bull_p = ta.lowest(enter_bull ? 1 : 0, persist_enter) == 1
-            bool enter_bear_p = ta.lowest(enter_bear ? 1 : 0, persist_enter) == 1
+            bool enter_bull_p = math.sum(enter_bull ? 1 : 0, persist_enter) == persist_enter
+            bool enter_bear_p = math.sum(enter_bear ? 1 : 0, persist_enter) == persist_enter
 
             if conf_state_engine == 0 // Neutral
                 if enter_bull_p
