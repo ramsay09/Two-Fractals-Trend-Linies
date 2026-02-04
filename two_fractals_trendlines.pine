@@ -220,7 +220,7 @@ show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀", gr
 last_frac_tf    = input.timeframe("240", "", group=grp_add, inline="l_rf", tooltip="Draws lines at the last confirmed Up/Down Fractals. Every new trend begins with the breaking of a fractal. (Time Frame dependent). \nSelect the timeframe for the Last Fractal calculation.")
 
 show_vol        = input.bool(true, "High Volume Spikes", group=grp_add, inline="vol_sp", tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
-vol_mult        = input.float(2.0, "Threshold (x Avg)", inline="vol_sp", group=grp_add)
+vol_mult        = input.float(2.0, "⠀Threshold (x Avg)", inline="vol_sp", group=grp_add)
 
 // FVG Inputs
 grp_fvg1        = "Price Imbalance (Fair Value Gap) 1"
