@@ -73,7 +73,19 @@ conf_z_penalty_mode   = input.string("Default", "⠀⠀Stretch Penalty", inline=
 
 show_conf_meter     = input.bool(true, "CONF⠀⠀⠀", inline="conf_ui", group=grp_conf_reg, tooltip="")
 show_conf_bg        = input.bool(false, "Confluence Meter BG⠀", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on CONF score thresholds (score > 55 = green, < 45 = red). Neutral stays transparent.")
-show_conf_state_bg  = input.bool(false, "CONF State BG", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on the CONF state engine (BULL/BEAR/NEUT). Useful to compare confirmed bias vs the score background.")
+show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on Confirmed Bias (BULL/BEAR/NEUT). Useful to compare the stable filter vs the score background.")
+
+// CONF Panel: score-color thresholds + Confirmed Bias (hysteresis + persistence)
+string grp_conf_bias = "CONF Confirmed Bias"
+conf_color_hi = input.float(52.0, "Score Color Hi", inline="cc", group=grp_conf_bias, step=0.5, tooltip="CONF cell background: green above this score.")
+conf_color_lo = input.float(48.0, "Score Color Lo", inline="cc", group=grp_conf_bias, step=0.5, tooltip="CONF cell background: red below this score. Neutral in between.")
+cb_enter_bull = input.float(55.0, "Enter BULL", inline="en", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias enters BULL if score stays above this threshold for N bars.")
+cb_enter_bear = input.float(45.0, "Enter BEAR", inline="en", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias enters BEAR if score stays below this threshold for N bars.")
+cb_exit_bull  = input.float(52.0, "Exit BULL", inline="ex", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias exits BULL to NEUT if score stays below this threshold for N bars.")
+cb_exit_bear  = input.float(48.0, "Exit BEAR", inline="ex", group=grp_conf_bias, step=0.5, tooltip="Confirmed Bias exits BEAR to NEUT if score stays above this threshold for N bars.")
+cb_enter_bars = input.int(2, "Enter Bars", inline="bars", group=grp_conf_bias, minval=1, maxval=20, tooltip="Number of confirmed bars required to enter BULL/BEAR.")
+cb_exit_bars  = input.int(1, "Exit Bars", inline="bars", group=grp_conf_bias, minval=1, maxval=20, tooltip="Number of confirmed bars required to exit to NEUT.")
+cb_confirmed_only = input.bool(true, "Confirmed Bars Only", group=grp_conf_bias, tooltip="If enabled, Confirmed Bias updates only on bar close (recommended).")
 
 show_regime_panel   = input.bool(true, "REG⠀⠀⠀⠀", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
 regime_bg_enabled   = input.bool(false, "Squeeze/Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
@@ -3591,7 +3603,7 @@ float conf_score = 50.0
 string conf_bias = "Neutral"
 float final_raw = 0.0 // Exposed for Alerts
 
-bool eff_calc_conf = eff_show_conf_meter or show_conf_bg or show_conf_state_bg
+bool eff_calc_conf = eff_show_conf_meter or show_conf_bg or show_confirmed_bias_bg
 
 // Core Weights
 float W_FR_CORE = 4.0
@@ -3709,58 +3721,50 @@ if eff_calc_conf
     // 50 + (50 * final_raw * gate)
     conf_score := 50 + (50 * final_raw * conf_gate)
 
-    // --- 4.5 State Engine (Score-based, Smoothed + Hysteresis) ---
-    // The state is designed to be stable and human-readable:
-    // - Uses the already-aggregated CONF score directly (no additional smoothing / damping).
-    // - Hysteresis + neutral snap decide when the state enters/exits.
-    // - In SQUEEZE the state is forced to NEUT.
-    // - In RANGE the state requires extreme scores to activate.
-    float score_enter = conf_score
-    float score_exit  = conf_score
+    // --- 4.5 Confirmed Bias (Hysteresis + Persistence) ---
+    // Panel background is score-based; panel label is Confirmed Bias.
+    float _conf_color_hi = math.max(conf_color_hi, conf_color_lo + 0.1)
+    float _conf_color_lo = math.min(conf_color_lo, _conf_color_hi - 0.1)
 
-    int persist_enter = math.min(3, math.max(2, eff_persist_bars))
+    float _cb_enter_bull = math.max(cb_enter_bull, cb_exit_bull + 0.1)
+    float _cb_exit_bull  = math.min(cb_exit_bull, _cb_enter_bull - 0.1)
+    float _cb_enter_bear = math.min(cb_enter_bear, cb_exit_bear - 0.1)
+    float _cb_exit_bear  = math.max(cb_exit_bear, _cb_enter_bear + 0.1)
 
-    float enter_bull_th = regime_state == "RANGE" ? 65.0 : 55.0
-    float enter_bear_th = regime_state == "RANGE" ? 35.0 : 45.0
-    float exit_bull_th  = regime_state == "RANGE" ? 58.0 : 54.0
-    float exit_bear_th  = regime_state == "RANGE" ? 42.0 : 46.0
+    int _cb_enter_bars = math.max(1, cb_enter_bars)
+    int _cb_exit_bars  = math.max(1, cb_exit_bars)
 
-    float neut_lo = 48.0
-    float neut_hi = 52.0
-    bool in_neut_band = score_exit >= neut_lo and score_exit <= neut_hi
-    int bars_in_neut = nz(ta.barssince(not in_neut_band), 0)
-    bool neut_snap = barstate.isconfirmed and in_neut_band and bars_in_neut >= persist_enter
+    bool _cb_update = not cb_confirmed_only or barstate.isconfirmed
 
-    if regime_state == "SQUEEZE"
-        conf_state_engine := 0
-    else
-        // Immediate neutral on confirmed counter structure break (closed bar).
-        if conf_state_engine == 1 and bear_struct_break
-            conf_state_engine := 0
-        else if conf_state_engine == -1 and bull_struct_break
-            conf_state_engine := 0
-        else
-            bool enter_bull = score_enter >= enter_bull_th
-            bool enter_bear = score_enter <= enter_bear_th
+    if _cb_update
+        bool _enter_bull = conf_score >= _cb_enter_bull
+        bool _enter_bear = conf_score <= _cb_enter_bear
+        bool _exit_bull  = conf_score <= _cb_exit_bull
+        bool _exit_bear  = conf_score >= _cb_exit_bear
 
-            int bull_run = nz(ta.barssince(not enter_bull), 0)
-            int bear_run = nz(ta.barssince(not enter_bear), 0)
-            bool enter_bull_p = enter_bull and bull_run >= persist_enter
-            bool enter_bear_p = enter_bear and bear_run >= persist_enter
+        int _run_enter_bull = nz(ta.barssince(not _enter_bull), 0)
+        int _run_enter_bear = nz(ta.barssince(not _enter_bear), 0)
+        int _run_exit_bull  = nz(ta.barssince(not _exit_bull), 0)
+        int _run_exit_bear  = nz(ta.barssince(not _exit_bear), 0)
 
-            if conf_state_engine == 0 // Neutral
-                if enter_bull_p
-                    conf_state_engine := 1
-                else if enter_bear_p
-                    conf_state_engine := -1
-            else if conf_state_engine == 1 // Bull
-                if score_exit <= exit_bull_th or neut_snap
-                    conf_state_engine := 0
-            else if conf_state_engine == -1 // Bear
-                if score_exit >= exit_bear_th or neut_snap
-                    conf_state_engine := 0
+        bool _enter_bull_ok = _enter_bull and _run_enter_bull >= _cb_enter_bars
+        bool _enter_bear_ok = _enter_bear and _run_enter_bear >= _cb_enter_bars
+        bool _exit_bull_ok  = _exit_bull  and _run_exit_bull  >= _cb_exit_bars
+        bool _exit_bear_ok  = _exit_bear  and _run_exit_bear  >= _cb_exit_bars
 
-    // Determine Display Bias based on ENGINE STATE, not just score
+        if conf_state_engine == 0
+            if _enter_bull_ok
+                conf_state_engine := 1
+            else if _enter_bear_ok
+                conf_state_engine := -1
+        else if conf_state_engine == 1
+            if _exit_bull_ok
+                conf_state_engine := 0
+        else if conf_state_engine == -1
+            if _exit_bear_ok
+                conf_state_engine := 0
+
+    // Confirmed Bias string used in panel text.
     conf_bias := conf_state_engine == 1 ? "BULL" : conf_state_engine == -1 ? "BEAR" : "NEUT"
 
     // --- 5. Quality Tag (H/M/L) ---
@@ -3863,12 +3867,12 @@ if eff_calc_conf
     // --- 6. Visualization (Panel) ---
     // BULL 72 H / NEUT 50 L
     if barstate.islast and eff_show_conf_meter and not na(info_panel)
-        string conf_bias_panel = conf_state_engine == 1 ? "BULL" : conf_state_engine == -1 ? "BEAR" : "NEUT"
+        string conf_bias_panel = conf_bias
         string panel_txt_live = conf_bias_panel + " " + str.tostring(math.round(conf_score)) + " " + quality
         if align_flag != ""
             panel_txt_live := panel_txt_live + " " + align_flag
 
-        color c_conf_live = conf_state_engine == 1 ? color.new(color.green, 30) : conf_state_engine == -1 ? color.new(color.red, 30) : color.new(color.gray, 100)
+        color c_conf_live = conf_score > _conf_color_hi ? color.new(color.green, 30) : conf_score < _conf_color_lo ? color.new(color.red, 30) : color.new(color.gray, 100)
 
         // Neutral remains transparent
         var string conf_txt_conf = ""
@@ -3897,10 +3901,10 @@ color regime_bg_filtered = na
 if eff_regime_bg_enabled and (regime_state == "SQUEEZE" or regime_state == "TREND")
     regime_bg_filtered := regime_bg
 
-// Logic for Confluence BG (Score vs State)
+// Logic for Confluence BG (Score vs Confirmed Bias)
 color conf_bg_color = na
-if show_conf_state_bg
-    // State-driven background (confirmed bias)
+if show_confirmed_bias_bg
+    // Confirmed Bias-driven background (stable filter)
     conf_bg_color := conf_state_engine == 1 ? color.new(color.green, transp_bg) : conf_state_engine == -1 ? color.new(color.red, transp_bg) : color.new(color.gray, 100)
 else if show_conf_bg
     // Score-driven background (early pressure / heat)
@@ -3915,7 +3919,7 @@ else if show_conf_bg
 if eff_sess_bg_enable and not na(bg_sess_color)
     bg_final := bg_sess_color
 // Priority 2: Confluence BG (CONF)
-else if (show_conf_bg or show_conf_state_bg)
+else if (show_conf_bg or show_confirmed_bias_bg)
     bg_final := conf_bg_color
 // Priority 3: Regime
 else if not na(regime_bg_filtered)
