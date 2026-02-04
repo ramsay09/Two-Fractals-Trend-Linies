@@ -3728,7 +3728,8 @@ if eff_calc_conf
     float neut_lo = 48.0
     float neut_hi = 52.0
     bool in_neut_band = score_exit >= neut_lo and score_exit <= neut_hi
-    bool neut_snap = barstate.isconfirmed and in_neut_band
+    int bars_in_neut = nz(ta.barssince(not in_neut_band), 0)
+    bool neut_snap = barstate.isconfirmed and in_neut_band and bars_in_neut >= persist_enter
 
     if regime_state == "SQUEEZE"
         conf_state_engine := 0
@@ -3742,8 +3743,10 @@ if eff_calc_conf
             bool enter_bull = score_enter >= enter_bull_th
             bool enter_bear = score_enter <= enter_bear_th
 
-            bool enter_bull_p = ta.sum(enter_bull ? 1 : 0, persist_enter) == persist_enter
-            bool enter_bear_p = ta.sum(enter_bear ? 1 : 0, persist_enter) == persist_enter
+            int bull_run = nz(ta.barssince(not enter_bull), 0)
+            int bear_run = nz(ta.barssince(not enter_bear), 0)
+            bool enter_bull_p = enter_bull and bull_run >= persist_enter
+            bool enter_bear_p = enter_bear and bear_run >= persist_enter
 
             if conf_state_engine == 0 // Neutral
                 if enter_bull_p
