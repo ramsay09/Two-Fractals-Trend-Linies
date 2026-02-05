@@ -521,8 +521,8 @@ dbg_stress     = input.bool(false, "DBG: Stress preset (limits)", group="Debug")
 dbg_perf       = input.bool(false, "DBG: perf metrics", group="Debug")
 bool dbg_ops   = debug_on or dbg_perf or dbg_stress
 
-// attributes inputs
-grp_atri            = "Attributes of drawn objects"
+// Styles inputs
+grp_atri            = "Styles & Colors"
 color_fr            = input.color(color.white, "Fractal Color", group=grp_atri)
 transp_fr           = input.int(40, "Fractal Transparency", minval=1, maxval= 100, group=grp_atri)
 
