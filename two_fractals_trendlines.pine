@@ -2,8 +2,7 @@
 
 indicator('Market Context & Confluence Suite', overlay=true, shorttitle='MCCS', max_bars_back=3000, max_lines_count=500, max_boxes_count=500, max_labels_count=500, dynamic_requests=true)
 
-general_info   = input.bool(title='General Description', defval=false, tooltip='Use the signals in confluence and as an indication of market tension, which will discharged in higher volatility or trend continuation. ... context matters.
-                 Always keep in mind: the most direct indicator is the chart itself. Choose these tools wisely.')
+general_info   = input.bool(title='General Description', defval=false, tooltip='Overview of signals and context notes.')
 
 // Constants for Panel & Weights (Centralized)
 int PANEL_ROWS = 15
@@ -28,40 +27,26 @@ int W_O     = 1
 
 // --- TOP LEVEL UI ---
 // adx, hma and ema1 x ema2 mtf trend info panel
-trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Market Map", "Opening Auction", "Value Reversion", "Compression -> Expansion", "Trend Continuation", "Range Rotation"], tooltip="Applies focused defaults for a trading lens. Custom = manual.\n• Market Map: Sessions + key levels.\n• Opening Auction: OR/IB + RVOL.\n• Value Reversion: VWAP bands + BB touch.\n• Compression -> Expansion: Squeeze + RVOL.\n• Trend Continuation: Trend tools + weekly VWAP.\n• Range Rotation: VWAP zone + BB touch.")
+trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Market Map", "Opening Auction", "Value Reversion", "Compression -> Expansion", "Trend Continuation", "Range Rotation"], tooltip="Applies focused defaults per lens. Custom = manual.")
 
 
 panel_pos               = input.string(title='MTF Panel', inline="panel", defval='Bottom Right', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
                           tooltip='')
-panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update Mode", inline="panel", options=["Realtime Preview", "Strict Confirm"], tooltip="Provides an overview of multi time frame trends: FVG Close state, and Fractal Break state. Select position to enable.\n○ = developing (current candle not closed), \n● = confirmed (closed).\nRealtime Preview: shows live/developing values (○). \nStrict Confirm: shows last confirmed close values only (●).")
+panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update Mode", inline="panel", options=["Realtime Preview", "Strict Confirm"], tooltip="Realtime = developing values, Strict = confirmed values.")
 bool panel_show_live    = panel_update_mode == "Realtime Preview"
 
-auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="CONF (Trend Bias) shows the current dominant trend direction as a compact 0–100 score.
-                     \n• BULL / BEAR / NEUT = direction
-                     \n• Number = bias strength (50 = neutral)
-                     \n• H / M / L = quality / reliability (high / medium / low)
-                     \nHow CONF is built:
-                     \n• Core bias comes from structural trend components (mainly FVG state + fractal/structure + a trend filter).
-                     \n  The first FVG sets the bias and it stays valid until an opposite FVG appears.
-                     \n• Trendlines & Segments act only as short-lived confirmation (with decay) and cannot flip the bias on their own.
-                     \n• REG (SQUEEZE/TREND/RANGE) gates reliability: in SQUEEZE, CONF is intentionally dampened (FVG is not counted at full weight).
-                     \nVisuals:
-                     \n• Green/Red = Bull/Bear bias
-                     \n• NEUT is fully transparent (panel + chart background).
-                     \n\nPlots the Confluence Signal background color.
-                     \nAuto uses tuned parameters for CONF/REG. \nSensitivity of Auto Mode.\nConservative: Slower, safer.\nBalanced: Standard.\nAggressive: Faster, more signals.")
+auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Auto-tuned CONF/REG parameters. Conservative = slower, Aggressive = faster.")
 
 // MTF CANDLE OVERLAY INPUTS
 //grp_mtf_candle    = "MTF Candle Overlay"
 show_mtf_candles  = input.bool(false, "MTF Candle Overlay", inline="mtf_ov", tooltip="")
 mtf_tf_sel        = input.string("1h", "", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], inline="mtf_ov")
-mtf_opacity       = input.int(15, "⠀Opacity %", inline="mtf_ov", minval=0, maxval=100, tooltip="Two timelines at one glance. It's like looking inside a candle with X-rays. \n0% = Invisible, 100% = Solid")
+mtf_opacity       = input.int(15, "⠀Opacity %", inline="mtf_ov", minval=0, maxval=100, tooltip="MTF candle overlay opacity.")
 
 // fractals input
 grp_adv_set     = "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀Advanced Settings"
 fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, group=grp_adv_set, tooltip='')
-sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, group=grp_adv_set, tooltip='Bill Williams Fractals (five Candles): white triangle. Works as support and resistance level.
-                 \nSub Bill Williams Fractals (four Candles): Lightgray triangle. Works as support and resistance level. These are B. W. Fractals on a Lower Timeframe.')
+sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, group=grp_adv_set, tooltip='Lower-timeframe fractals (4-candle).')
 
 
 // Confluence & Regime Visuals
@@ -76,13 +61,12 @@ show_conf_bg        = input.bool(false, "Confluence Meter BG⠀", inline="conf_u
 show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on Confirmed Bias (BULL/BEAR/NEUT). Useful to compare the stable filter vs the score background.")
 
 show_regime_panel   = input.bool(true, "REG⠀⠀⠀⠀", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
-regime_bg_enabled   = input.bool(false, "Squeeze & Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
+regime_bg_enabled   = input.bool(false, "Squeeze & Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="Colors chart background by regime (Squeeze/Trend).")
 
 // CONF Panel: Confirmed Bias (profile + optional scalp optimization)
 //string grp_conf_bias = "CONF Confirmed Bias"
 cb_profile      = input.string("Standard", "Bias Confirmation Profile", inline="bias", options=["Stable","Standard","Fast"], tooltip="")
-cb_scalp_opt    = input.bool(false, "Scalp Optimize", inline="bias", tooltip="Stable: fewer flips, stronger filter.\nStandard: allround.\nFast: quicker bias response (timing).
-                  \nScalp Optimize: Optimizes confirmed bias parameters for scalping (faster reaction).\nBias remains a direction gate; entries come from separate signals.")
+cb_scalp_opt    = input.bool(false, "Scalp Optimize", inline="bias", tooltip="Faster confirmed-bias response for scalping.")
 
 string M_FORM = "○"
 string M_CONF = "●"
