@@ -2,7 +2,7 @@
 
 indicator('Market Context & Confluence Suite', overlay=true, shorttitle='MCCS', max_bars_back=3000, max_lines_count=500, max_boxes_count=500, max_labels_count=500, dynamic_requests=true)
 
-general_info   = input.bool(title='General Description', defval=false, tooltip='Overview of signals and context notes.')
+general_info   = input.bool(title='General Description', defval=false, tooltip='')
 
 // Constants for Panel & Weights (Centralized)
 int PANEL_ROWS = 15
@@ -27,46 +27,46 @@ int W_O     = 1
 
 // --- TOP LEVEL UI ---
 // adx, hma and ema1 x ema2 mtf trend info panel
-trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Market Map", "Opening Auction", "Value Reversion", "Compression -> Expansion", "Trend Continuation", "Range Rotation"], tooltip="Applies focused defaults per lens. Custom = manual.")
+trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Market Map", "Opening Auction", "Value Reversion", "Compression -> Expansion", "Trend Continuation", "Range Rotation"], tooltip="")
 
 
 panel_pos               = input.string(title='MTF Panel', inline="panel", defval='Bottom Right', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
                           tooltip='')
-panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update Mode", inline="panel", options=["Realtime Preview", "Strict Confirm"], tooltip="Realtime = developing values, Strict = confirmed values.")
+panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update Mode", inline="panel", options=["Realtime Preview", "Strict Confirm"], tooltip="")
 bool panel_show_live    = panel_update_mode == "Realtime Preview"
 
-auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="Auto-tuned CONF/REG parameters. Conservative = slower, Aggressive = faster.")
+auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="")
 
 // MTF CANDLE OVERLAY INPUTS
 //grp_mtf_candle    = "MTF Candle Overlay"
 show_mtf_candles  = input.bool(false, "MTF Candle Overlay", inline="mtf_ov", tooltip="")
 mtf_tf_sel        = input.string("1h", "", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], inline="mtf_ov")
-mtf_opacity       = input.int(15, "⠀Opacity %", inline="mtf_ov", minval=0, maxval=100, tooltip="MTF candle overlay opacity.")
+mtf_opacity       = input.int(15, "⠀Opacity %", inline="mtf_ov", minval=0, maxval=100, tooltip="")
 
 // fractals input
 grp_adv_set     = "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀Advanced Settings"
 fractals_plot   = input.bool(title='Bill Williams Fractals⠀', inline="fr_s", defval=true, group=grp_adv_set, tooltip='')
-sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, group=grp_adv_set, tooltip='Lower-timeframe fractals (4-candle).')
+sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, group=grp_adv_set, tooltip='')
 
 
 // Confluence & Regime Visuals
 grp_conf_reg    = "Confluence & Regime Visuals"
 
-conf_use_vwap_quality = input.bool(true, "CONF: VWAP Quality Gate", group=grp_conf_reg, tooltip="Adjust CONF quality via VWAP alignment/stretch.")
+conf_use_vwap_quality = input.bool(true, "CONF: VWAP Quality Gate", group=grp_conf_reg, tooltip="")
 conf_vwap_mode        = input.string("Auto", "VWAP Anchor", inline="conf", options=["Auto","Session VWAP","Weekly VWAP"], group=grp_conf_reg, tooltip="")
-conf_z_penalty_mode   = input.string("Default", "⠀Stretch Penalty", inline="conf", options=["Default","Conservative","Aggressive"], group=grp_conf_reg, tooltip="Stretch penalty strength.")
+conf_z_penalty_mode   = input.string("Default", "⠀Stretch Penalty", inline="conf", options=["Default","Conservative","Aggressive"], group=grp_conf_reg, tooltip="")
 
 show_conf_meter     = input.bool(true, "CONF⠀⠀⠀", inline="conf_ui", group=grp_conf_reg, tooltip="")
-show_conf_bg        = input.bool(false, "Confluence Meter BG⠀", inline="conf_ui", group=grp_conf_reg, tooltip="BG from CONF score thresholds.")
-show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui", group=grp_conf_reg, tooltip="BG from confirmed bias state.")
+show_conf_bg        = input.bool(false, "Confluence Meter BG⠀", inline="conf_ui", group=grp_conf_reg, tooltip="")
+show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui", group=grp_conf_reg, tooltip="")
 
 show_regime_panel   = input.bool(true, "REG⠀⠀⠀⠀", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
-regime_bg_enabled   = input.bool(false, "Squeeze & Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="Colors chart background by regime (Squeeze/Trend).")
+regime_bg_enabled   = input.bool(false, "Squeeze & Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
 
 // CONF Panel: Confirmed Bias (profile + optional scalp optimization)
 //string grp_conf_bias = "CONF Confirmed Bias"
 cb_profile      = input.string("Standard", "Bias Confirmation Profile", inline="bias", options=["Stable","Standard","Fast"], tooltip="")
-cb_scalp_opt    = input.bool(false, "Scalp Optimize", inline="bias", tooltip="Faster confirmed-bias response for scalping.")
+cb_scalp_opt    = input.bool(false, "Scalp Optimize", inline="bias", tooltip="")
 
 string M_FORM = "○"
 string M_CONF = "●"
@@ -243,7 +243,7 @@ f_resolve_bias_confirm_params(string _profile, bool _scalp_opt) =>
 // FVG Inputs
 grp_fvg1        = "Price Imbalance (Fair Value Gap) 1"
 plot_fvg1       = input.bool(true, title="FVG 1 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg1, inline="f1_1", tooltip="")
-fvg1_tf_sel     = input.timeframe("", title="TF", group=grp_fvg1, inline="f1_1", tooltip="Timeframe for FVG detection.")
+fvg1_tf_sel     = input.timeframe("", title="TF", group=grp_fvg1, inline="f1_1", tooltip="")
 fvg1_len        = input.int(1, title="Box Length", minval=1, group=grp_fvg1, inline="f1_2")
 fvg1_limit      = input.int(50, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg1, inline="f1_2")
 col_fvg1_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg1, inline="f1_3")
@@ -251,7 +251,7 @@ col_fvg1_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀�
 
 grp_fvg2        = "Price Imbalance (Fair Value Gap) 2"
 plot_fvg2       = input.bool(false, title="FVG 2 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg2, inline="f2_1", tooltip="")
-fvg2_tf_sel     = input.timeframe("", title="TF", group=grp_fvg2, inline="f2_1", tooltip="Timeframe for FVG detection.")
+fvg2_tf_sel     = input.timeframe("", title="TF", group=grp_fvg2, inline="f2_1", tooltip="")
 fvg2_len        = input.int(1, title="Box Length", minval=1, group=grp_fvg2, inline="f2_2")
 fvg2_limit      = input.int(5, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg2, inline="f2_2")
 col_fvg2_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg2, inline="f2_3")
@@ -259,55 +259,55 @@ col_fvg2_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀�
 
 // Key Levels Inputs
 grp_key             = "Key Levels"
-key_levels_enabled  = input.bool(true, "Key Levels", group=grp_key, tooltip="PDH/PDL/PDC + weekly/monthly open levels.")
-show_pdh            = input.bool(true, "PDH⠀", inline="kl_1", group=grp_key, tooltip="Prior day high.")
-show_pdl            = input.bool(true, "PDL⠀", inline="kl_1", group=grp_key, tooltip="Prior day low.")
-show_pdc            = input.bool(false, "PDC⠀", inline="kl_1", group=grp_key, tooltip="Prior day close.")
-show_wopen          = input.bool(true, "Weekly Open⠀", inline="kl_1", group=grp_key, tooltip="Weekly open level.")
-show_mopen          = input.bool(false, "Monthly Open", inline="kl_1", group=grp_key, tooltip="Monthly open level.")
-key_style           = input.string("Both", "Style", options=["Lines", "Labels", "Both"], inline="kl_3", group=grp_key, tooltip="Level style.")
-key_extend          = input.bool(true, "Extend", inline="kl_3", group=grp_key, tooltip="Extend levels forward.")
+key_levels_enabled  = input.bool(true, "Key Levels", group=grp_key, tooltip="")
+show_pdh            = input.bool(true, "PDH⠀", inline="kl_1", group=grp_key, tooltip="")
+show_pdl            = input.bool(true, "PDL⠀", inline="kl_1", group=grp_key, tooltip="")
+show_pdc            = input.bool(false, "PDC⠀", inline="kl_1", group=grp_key, tooltip="")
+show_wopen          = input.bool(true, "Weekly Open⠀", inline="kl_1", group=grp_key, tooltip="")
+show_mopen          = input.bool(false, "Monthly Open", inline="kl_1", group=grp_key, tooltip="")
+key_style           = input.string("Both", "Style", options=["Lines", "Labels", "Both"], inline="kl_3", group=grp_key, tooltip="")
+key_extend          = input.bool(true, "Extend", inline="kl_3", group=grp_key, tooltip="")
 
 // RVOL Inputs
 grp_rvol            = "Relative Volume & High Volume Spikes"
-rvol_enabled        = input.bool(true, "RVOL Enabled", group=grp_rvol, tooltip="Relative volume vs average.")
-rvol_len            = input.int(20, "Length", minval=1, group=grp_rvol, inline="rv_1", tooltip="Average length.")
-rvol_display        = input.string("Marker", "⠀Display", options=["None", "Marker", "Label", "Both"], group=grp_rvol, inline="rv_1", tooltip="Display style.")
-rvol_points_enabled = input.bool(true, "Points", group=grp_rvol, inline="rv_1", tooltip="Show only high/extra markers.")
-rvol_th_1           = input.float(1.2, "Low⠀", step=0.1, group=grp_rvol, inline="rv_2", tooltip="Low threshold.")
-rvol_th_2           = input.float(2.0, "⠀Med", step=0.1, group=grp_rvol, inline="rv_2", tooltip="Medium threshold.")
-rvol_th_3           = input.float(3.0, "⠀High", step=0.1, group=grp_rvol, inline="rv_2", tooltip="High threshold.")
+rvol_enabled        = input.bool(true, "RVOL Enabled", group=grp_rvol, tooltip="")
+rvol_len            = input.int(20, "Length", minval=1, group=grp_rvol, inline="rv_1", tooltip="")
+rvol_display        = input.string("Marker", "⠀Display", options=["None", "Marker", "Label", "Both"], group=grp_rvol, inline="rv_1", tooltip="")
+rvol_points_enabled = input.bool(true, "Points", group=grp_rvol, inline="rv_1", tooltip="")
+rvol_th_1           = input.float(1.2, "Low⠀", step=0.1, group=grp_rvol, inline="rv_2", tooltip="")
+rvol_th_2           = input.float(2.0, "⠀Med", step=0.1, group=grp_rvol, inline="rv_2", tooltip="")
+rvol_th_3           = input.float(3.0, "⠀High", step=0.1, group=grp_rvol, inline="rv_2", tooltip="")
 
-show_vol            = input.bool(true, "High Volume Spikes⠀", group=grp_rvol, inline="vol_sp", tooltip="Highlight volume spikes.")
+show_vol            = input.bool(true, "High Volume Spikes⠀", group=grp_rvol, inline="vol_sp", tooltip="")
 vol_mult            = input.float(2.0, "Threshold (x Avg)", inline="vol_sp", group=grp_rvol)
 
 // VWAP Inputs
 grp_vwap            = "VWAP / Value Zone"
-vwap_enabled        = input.bool(false, "VWAP Enabled", group=grp_vwap, tooltip="Volume-weighted price.")
-vwap_anchor         = input.string("Session (Daily Reset)", "Anchor", options=["Session (Daily Reset)", "Weekly"], group=grp_vwap, inline="vw_1", tooltip="Anchor selection.")
-vwap_src_opt        = input.string("HLC3", "⠀Source", options=["HLC3", "HL2", "Close", "OHLC4"], group=grp_vwap, inline="vw_1", tooltip="VWAP source.")
+vwap_enabled        = input.bool(false, "VWAP Enabled", group=grp_vwap, tooltip="")
+vwap_anchor         = input.string("Session (Daily Reset)", "Anchor", options=["Session (Daily Reset)", "Weekly"], group=grp_vwap, inline="vw_1", tooltip="")
+vwap_src_opt        = input.string("HLC3", "⠀Source", options=["HLC3", "HL2", "Close", "OHLC4"], group=grp_vwap, inline="vw_1", tooltip="")
 vwap_show_line      = input.bool(true, "Show Line⠀", group=grp_vwap, inline="vw_2")
-vwap_only_sess      = input.bool(false, "Calc Only in Sessions", group=grp_vwap, inline="vw_2", tooltip="Pause VWAP outside sessions.")
+vwap_only_sess      = input.bool(false, "Calc Only in Sessions", group=grp_vwap, inline="vw_2", tooltip="")
 
-vwap_display_mode   = input.string("Value Zone (±1σ)", "Display", options=["Line only", "Value Zone (±1σ)", "Full Bands (B1–B3)"], group=grp_vwap, inline="vw_3", tooltip="VWAP display style.")
-vwap_bands_enabled  = input.bool(true, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="Enable VWAP bands.")
-vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_4", tooltip="Sigma calculation mode.")
+vwap_display_mode   = input.string("Value Zone (±1σ)", "Display", options=["Line only", "Value Zone (±1σ)", "Full Bands (B1–B3)"], group=grp_vwap, inline="vw_3", tooltip="")
+vwap_bands_enabled  = input.bool(true, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="")
+vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_4", tooltip="")
 vwap_stdev_len      = input.int(100, "⠀Len", minval=2, group=grp_vwap, inline="vw_4")
-band_k1             = input.float(1.0, "K1", step=0.5, group=grp_vwap, inline="vw_6", tooltip="1st Band Multiplier (1σ).")
-band_k2             = input.float(2.0, "⠀K2", step=0.5, group=grp_vwap, inline="vw_6", tooltip="2nd Band Multiplier (2σ).")
-band_k3             = input.float(3.0, "⠀K3", step=0.5, group=grp_vwap, inline="vw_6", tooltip="3rd Band Multiplier (3σ).")
+band_k1             = input.float(1.0, "K1", step=0.5, group=grp_vwap, inline="vw_6", tooltip="")
+band_k2             = input.float(2.0, "⠀K2", step=0.5, group=grp_vwap, inline="vw_6", tooltip="")
+band_k3             = input.float(3.0, "⠀K3", step=0.5, group=grp_vwap, inline="vw_6", tooltip="")
 
-vwap_z_enabled      = input.bool(true, "Z-Score Enabled", group=grp_vwap, inline="vw_5", tooltip="Enable VWAP Z-score.")
-z_th_entry          = input.float(2.0, "⠀Entry Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="Entry threshold.")
-z_th_tp             = input.float(2.5, "⠀TP Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="Take-profit threshold.")
-z_th_ext            = input.float(3.0, "Ext Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="Extreme threshold.")
+vwap_z_enabled      = input.bool(true, "Z-Score Enabled", group=grp_vwap, inline="vw_5", tooltip="")
+z_th_entry          = input.float(2.0, "⠀Entry Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="")
+z_th_tp             = input.float(2.5, "⠀TP Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="")
+z_th_ext            = input.float(3.0, "Ext Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="")
 
 // Lite Value (POC/VAH/VAL)
 grp_lite_value           = "Lite Value (POC/VAH/VAL)"
-lite_value_enable        = input.bool(false, "value Area Levels", group=grp_lite_value, tooltip="POC/VAH/VAL levels.")
+lite_value_enable        = input.bool(false, "value Area Levels", group=grp_lite_value, tooltip="")
 lite_value_apply_to      = input.string("Map + Range only (recommended)", "Apply To", options=["Map + Range only (recommended)", "All Lenses", "Custom only"], group=grp_lite_value)
 lite_value_lookback      = input.int(200, "Lookback⠀⠀", minval=10, maxval=3000, group=grp_lite_value, inline="lv_1")
-lite_value_bins          = input.int(200, "⠀⠀⠀Bins⠀⠀⠀⠀⠀⠀", minval=10, maxval=490, group=grp_lite_value, inline="lv_1", tooltip="Profile bins.")
+lite_value_bins          = input.int(200, "⠀⠀⠀Bins⠀⠀⠀⠀⠀⠀", minval=10, maxval=490, group=grp_lite_value, inline="lv_1", tooltip="")
 lite_value_area_pct      = input.float(70.0, "Value Area %", minval=50, maxval=85, step=0.5, group=grp_lite_value, inline="lv_2")
 lite_value_src           = input.string("HLC3", "⠀⠀⠀Source⠀⠀⠀⠀", options=["HL2", "HLC3", "Close"], group=grp_lite_value, inline="lv_2")
 lite_value_update        = input.string("On last bar", "Update⠀⠀⠀", options=["On last bar", "Every N bars"], group=grp_lite_value, inline="lv_3")
@@ -317,34 +317,34 @@ lite_value_line_transp   = input.int(30, "⠀⠀⠀Transparency", minval=0, maxv
 
 // OR/IB Inputs
 grp_or              = "Opening Range / Initial Balance"
-or_enabled          = input.bool(false, "OR/IB Enabled", group=grp_or, tooltip="Opening range / initial balance.")
+or_enabled          = input.bool(false, "OR/IB Enabled", group=grp_or, tooltip="")
 
 use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", inline="sess_1st", group=grp_or, tooltip="")
-sess_1st_tf     = input.timeframe("5", "", inline="sess_1st", group=grp_or, tooltip="Timeframe for 1st session candle.")
+sess_1st_tf     = input.timeframe("5", "", inline="sess_1st", group=grp_or, tooltip="")
 
-or_type             = input.string("Opening Range", "Type", options=["Opening Range", "Initial Balance"], group=grp_or, inline="or_1", tooltip="OR minutes or 60-min IB.")
-or_sess             = input.string("New York", "⠀Session", options=["London", "New York", "Custom"], group=grp_or, inline="or_1", tooltip="Session.")
+or_type             = input.string("Opening Range", "Type", options=["Opening Range", "Initial Balance"], group=grp_or, inline="or_1", tooltip="")
+or_sess             = input.string("New York", "⠀Session", options=["London", "New York", "Custom"], group=grp_or, inline="or_1", tooltip="")
 or_cust             = input.session("0930-1600", "Custom Sess", group=grp_or, inline="or_2")
-or_min              = input.int(15, "Duration", inline="or_2", minval=1, group=grp_or, inline="or_2", tooltip="Window size in minutes (for OR).")
-or_display          = input.string("Box+Lines", "Display", options=["Box+Lines", "Box", "Lines"], group=grp_or, inline="or_3", tooltip="Display style.")
-or_lock             = input.bool(true, "Lock after Window", group=grp_or, inline="or_3", tooltip="Lock levels after window.")
+or_min              = input.int(15, "Duration", inline="or_2", minval=1, group=grp_or, inline="or_2", tooltip="")
+or_display          = input.string("Box+Lines", "Display", options=["Box+Lines", "Box", "Lines"], group=grp_or, inline="or_3", tooltip="")
+or_lock             = input.bool(true, "Lock after Window", group=grp_or, inline="or_3", tooltip="")
 
 // Squeeze Box
 grp_sq              = "Squeeze Box"
-sq_box_enabled      = input.bool(false, "Squeeze Box⠀", inline="sq_b", group=grp_sq, tooltip="Box during squeeze regime.")
-sq_lock             = input.bool(true, "Lock on Release", inline="sq_b", group=grp_sq, tooltip="Lock box on release.")
+sq_box_enabled      = input.bool(false, "Squeeze Box⠀", inline="sq_b", group=grp_sq, tooltip="")
+sq_lock             = input.bool(true, "Lock on Release", inline="sq_b", group=grp_sq, tooltip="")
 
 
 // Smart MTF S&R
 grp_psr             = "Smart S&R (Support & Resistance)"
 ps_mode             = input.string("None", title="Smart S&R", options=["None", "Auto", "Manuell"], group=grp_psr, inline="en_tf", tooltip="")
-ps_tf               = input.timeframe("D", title="⠀⠀⠀⠀Pivot TF⠀⠀", inline="en_tf", group=grp_psr, tooltip="Higher timeframe for Smart S&R pivots.")
-ps_left             = input.int(2, title="Pivot Left", inline="pivot", minval=1, group=grp_psr, tooltip="Pivot left bars.")
-ps_right            = input.int(2, title="⠀⠀⠀⠀Pivot Right", inline="pivot", minval=1, group=grp_psr, tooltip="Pivot right bars.")
-ps_max              = input.int(20, title="Max Active Levels ⠀", minval=1, maxval=50, group=grp_psr, tooltip="Max visible levels.")
-ps_break_act        = input.string("Role Reversal", title="On Break Action ", options=["Keep", "Delete", "Role Reversal"], group=grp_psr, tooltip="Action on break.")
+ps_tf               = input.timeframe("D", title="⠀⠀⠀⠀Pivot TF⠀⠀", inline="en_tf", group=grp_psr, tooltip="")
+ps_left             = input.int(2, title="Pivot Left", inline="pivot", minval=1, group=grp_psr, tooltip="")
+ps_right            = input.int(2, title="⠀⠀⠀⠀Pivot Right", inline="pivot", minval=1, group=grp_psr, tooltip="")
+ps_max              = input.int(20, title="Max Active Levels ⠀", minval=1, maxval=50, group=grp_psr, tooltip="")
+ps_break_act        = input.string("Role Reversal", title="On Break Action ", options=["Keep", "Delete", "Role Reversal"], group=grp_psr, tooltip="")
 ps_merge_en         = input.bool(true, title="Merge Nearby Levels (Zones) ", group=grp_psr, inline="ps_m")
-ps_merge_pct        = input.float(0.1, title="Threshold %", minval=0.01, step=0.1, group=grp_psr, inline="ps_m", tooltip="Merge threshold.")
+ps_merge_pct        = input.float(0.1, title="Threshold %", minval=0.01, step=0.1, group=grp_psr, inline="ps_m", tooltip="")
 ps_col_res          = input.color(color.new(color.red, 30), title="Res Color", group=grp_psr, inline="ps_c")
 ps_col_sup          = input.color(color.new(color.green, 30), title="⠀Sup Color", group=grp_psr, inline="ps_c")
 ps_col_zone         = input.color(color.new(color.blue, 85), title="⠀Zone Fill", group=grp_psr, inline="ps_c")
@@ -398,7 +398,7 @@ type SqState
 // Bollinger Bands
 grp_bb              = 'Bollinger Bands'
 BB_plot             = input.bool(true, title='Bollinger Bands⠀', inline="bb_t", group=grp_bb, tooltip='')
-near_bb             = input.bool(true, title='Touched BBs only', inline="bb_t", group=grp_bb, tooltip='Show only touched bands.')
+near_bb             = input.bool(true, title='Touched BBs only', inline="bb_t", group=grp_bb, tooltip='')
 // BB_length_1 & BB_sdev_1 moved to Advanced: REG
 BB_sdev_2           = 3
 BB_sdev_3           = 4
@@ -407,7 +407,7 @@ BB_sdev_4           = 5
 // ema cloud and ma inputs
 grp_ma              = 'EMA cloud and MA'
 en_cloud            = input.bool(false, title='EMA Cloud⠀', inline="ema_c", group=grp_ma, tooltip='')
-sig_plot            = input.bool(true, title='Cloud Color Signal', inline="ema_c", group=grp_ma, tooltip='EMA cross color signal.')
+sig_plot            = input.bool(true, title='Cloud Color Signal', inline="ema_c", group=grp_ma, tooltip='')
 
 ema_inp1            = input.int(8, title='EMA1 Length', inline="ema_l", minval=1, group=grp_ma, tooltip="")
 ema_inp2            = input.int(21, title='⠀EMA2 Length', inline="ema_l", minval=1, group=grp_ma, tooltip="")
@@ -430,52 +430,52 @@ kama_slow           = 30
 // two fractal trendlines inputs
 grp_fr              = 'Fractal Trend lines'
 plot_trendline      = input.bool(false, title='Fractal Trend Lines⠀', inline="fr_tr", group=grp_fr, tooltip='')
-fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group=grp_fr, tooltip="Bars left/right for fractal trendlines.")
+fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group=grp_fr, tooltip="")
 show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fr, inline="l_rf", tooltip="")
-last_frac_tf    = input.timeframe("240", "", group=grp_fr, inline="l_rf", tooltip="Timeframe for last fractal lines.")
+last_frac_tf    = input.timeframe("240", "", group=grp_fr, inline="l_rf", tooltip="")
 
 
 // divergence signal inputs
 grp_div             = 'Divergences'
-plot_div            = input.bool(true, title='Divergences', group=grp_div, tooltip='Show classic/hidden divergences.')
-div_indi            = input.string('rsi', title='Divergence Indicator', options=['rsi', 'macd(fast_line)', 'macd(slow_line)'], tooltip='Select an Indicator for divergence calculation.', group=grp_div)
+plot_div            = input.bool(true, title='Divergences', group=grp_div, tooltip='')
+div_indi            = input.string('rsi', title='Divergence Indicator', options=['rsi', 'macd(fast_line)', 'macd(slow_line)'], tooltip='', group=grp_div)
 rsi_length          = input.int(14, title='RSI Length', inline="rsi_p", minval=1, step=2, group=grp_div)
-bar_div_p           = input.int(25, title='⠀⠀⠀⠀Bar Period', inline="rsi_p", minval=1, step=1, tooltip='Divergence lookback bars.', group=grp_div)
-src_div             = input.string('high/low', title='Bar Divergence Source', options=['high/low', 'close'], tooltip='The bar source for divergence calculation.', group=grp_div)
+bar_div_p           = input.int(25, title='⠀⠀⠀⠀Bar Period', inline="rsi_p", minval=1, step=1, tooltip='', group=grp_div)
+src_div             = input.string('high/low', title='Bar Divergence Source', options=['high/low', 'close'], tooltip='', group=grp_div)
 
 // bar signals inputs
 grp_bar             = 'Bar signals'
 plot_l12_bar        = input.bool(true, title='Last 12 Bar (L12) ⠀', inline="l12", tooltip='', group=grp_bar)
-L12_input           = input.int(12, minval=1, title='Bar count', inline="l12", group=grp_bar, tooltip="L12 bar count.")
-plot_nr_bar         = input.bool(true, title='Narrow Range Bar (NR7)', tooltip='NR7 marker.', group=grp_bar)
-plot_i_bar          = input.bool(true, title='Inside Bar', tooltip='Inside bar marker.', group=grp_bar)
-plot_o_bar          = input.bool(true, title='Outside Bar', tooltip='Outside bar marker.', group=grp_bar)
-plot_s_bar          = input.bool(true, title='Sandwich Bar', tooltip='Sandwich bar marker.', group=grp_bar)
-plot_f_bar          = input.bool(true, title='Fakey', tooltip='Fakey marker.', group=grp_bar)
+L12_input           = input.int(12, minval=1, title='Bar count', inline="l12", group=grp_bar, tooltip="")
+plot_nr_bar         = input.bool(true, title='Narrow Range Bar (NR7)', tooltip='', group=grp_bar)
+plot_i_bar          = input.bool(true, title='Inside Bar', tooltip='', group=grp_bar)
+plot_o_bar          = input.bool(true, title='Outside Bar', tooltip='', group=grp_bar)
+plot_s_bar          = input.bool(true, title='Sandwich Bar', tooltip='', group=grp_bar)
+plot_f_bar          = input.bool(true, title='Fakey', tooltip='', group=grp_bar)
 
 // segments inputs
 grp_seg             = 'Segment signal'
 plot_segments       = input.bool(false, title='Segments ⠀', inline="seg", tooltip='', group=grp_seg)
-sb                  = input.int(10 ,title='Max Bars', inline="seg", minval=0, step=1, tooltip='Max segment bars.', group=grp_seg)
+sb                  = input.int(10 ,title='Max Bars', inline="seg", minval=0, step=1, tooltip='', group=grp_seg)
 
 
 // pivot points inputs
 grp_pi              = 'Pivot points'
-plot_pivots_h1      = input.bool(false, title= "1 Hour Classic Pivot Points", group=grp_pi, tooltip= "1 Hour Pivot points (P, R1-R4, S1-S4). Only visible on charts < 1H.")
-plot_pivots_h4      = input.bool(true, title= "4 Hour Classic Pivot Points", group=grp_pi, tooltip= "4 Hour Pivot points (P, R1-R4, S1-S4). Only visible on charts < 4H.")
-plot_pivots_d       = input.bool(true, title= "1 Day Classic Pivot Points", group=grp_pi, tooltip= "Daily Pivot points (P, R1-R4, S1-S4). Only visible on intraday charts.")
-plot_pivots_w       = input.bool(true, title= "1 Week Classic Pivot Points", group=grp_pi, tooltip= "Weekly pivots.")
-plot_pivots_m       = input.bool(true, title='1 Month Classic Pivot Points', group=grp_pi, tooltip='Monthly pivots.')
-plot_pivots_3m      = input.bool(true, title='3 Month Classic Pivot Points', group=grp_pi, tooltip='Quarterly pivots.')
-plot_pivots_12m     = input.bool(true, title='12 Month Classic Pivot Points', group=grp_pi, tooltip='Yearly pivots.')
-plot_pivot_labels   = input.bool(false, title='Pivot Labels (P/R/S + TF)', group=grp_pi, tooltip='Pivot labels.')
+plot_pivots_h1      = input.bool(false, title= "1 Hour Classic Pivot Points", group=grp_pi, tooltip="")
+plot_pivots_h4      = input.bool(true, title= "4 Hour Classic Pivot Points", group=grp_pi, tooltip="")
+plot_pivots_d       = input.bool(true, title= "1 Day Classic Pivot Points", group=grp_pi, tooltip="")
+plot_pivots_w       = input.bool(true, title= "1 Week Classic Pivot Points", group=grp_pi, tooltip="")
+plot_pivots_m       = input.bool(true, title='1 Month Classic Pivot Points', group=grp_pi, tooltip='')
+plot_pivots_3m      = input.bool(true, title='3 Month Classic Pivot Points', group=grp_pi, tooltip='')
+plot_pivots_12m     = input.bool(true, title='12 Month Classic Pivot Points', group=grp_pi, tooltip='')
+plot_pivot_labels   = input.bool(false, title='Pivot Labels (P/R/S + TF)', group=grp_pi, tooltip='')
 // TRADING SESSIONS INPUTS ---
 grp_sess      = "Trading Sessions"
 sess_timezone = input.string("Europe/Berlin", title="Timezone", inline="ses", tooltip="", group=grp_sess)
-sess_style    = input.string("Vertical Line", title="⠀Session Style", inline="ses", options=["Vertical Line", "Box", "Background", "Inv. Background"], group=grp_sess, tooltip="Session display style.")
+sess_style    = input.string("Vertical Line", title="⠀Session Style", inline="ses", options=["Vertical Line", "Box", "Background", "Inv. Background"], group=grp_sess, tooltip="")
 
 use_sess_rest   = input.bool(false, title="Session Restriction", inline="ses_rest", group=grp_sess)
-sess_rest_time  = input.int(60, title="⠀⠀⠀⠀Time", inline="ses_rest", tooltip="Session rest time.", group=grp_sess)
+sess_rest_time  = input.int(60, title="⠀⠀⠀⠀Time", inline="ses_rest", tooltip="", group=grp_sess)
 
 // London - ORANGE
 london_show   = input.bool(true, title="London Session ⠀⠀", group=grp_sess, inline="lon")
@@ -496,13 +496,13 @@ tokyo_col     = input.color(color.new(color.yellow, 90), title="", group=grp_ses
 sydney_show     = input.bool(false, title="Sydney Session ⠀⠀", group=grp_sess, inline="syd")
 sydney_sess     = input.session("2200-0700", title="", group=grp_sess, inline="syd")
 sydney_col      = input.color(color.new(color.red, 90), title="", group=grp_sess, inline="syd")
-sess_line_limit = input.int(150, "Max Session Lines (FIFO)", group=grp_sess, minval=20, tooltip="Limit session lines.")
+sess_line_limit = input.int(150, "Max Session Lines (FIFO)", group=grp_sess, minval=20, tooltip="")
 
 // Alerts
 grp_alerts      = "🔔 Alerts"
-alert_profile   = input.string("Normal", "Alert Profile", options=["Off", "Minimal","Normal","Moderate"], group=grp_alerts, tooltip="Alert verbosity.")
-alert_cooldown  = input.int(5, "Cooldown (Bars)", minval=1, group=grp_alerts, tooltip="Cooldown between alerts.")
-use_rt_alert   = input.bool(false, title="Alert on 5th Fractal Candle (Real-time)", group=grp_alerts, tooltip="Realtime fractal alert.")
+alert_profile   = input.string("Normal", "Alert Profile", options=["Off", "Minimal","Normal","Moderate"], group=grp_alerts, tooltip="")
+alert_cooldown  = input.int(5, "Cooldown (Bars)", minval=1, group=grp_alerts, tooltip="")
+use_rt_alert   = input.bool(false, title="Alert on 5th Fractal Candle (Real-time)", group=grp_alerts, tooltip="")
 
 // Debug (Performance)
 debug_on       = input.bool(false, "Debug (Perf)", group="Debug")
@@ -3330,7 +3330,7 @@ label.delete(lbl_adr)
 if not na(info_panel) and barstate.islast
     string adr_txt = "ADR% " + (not na(adr_pct) ? str.tostring(adr_pct, "#.#") + "%" : "n/a")
     table.merge_cells(info_panel, 0, f_panel_row(9), 2, f_panel_row(9))
-    table.cell(table_id=info_panel, column=0, row=f_panel_row(9), text=adr_txt, text_size=size.small, text_color=color.silver, tooltip="ADR% progress within ADR.")
+    table.cell(table_id=info_panel, column=0, row=f_panel_row(9), text=adr_txt, text_size=size.small, text_color=color.silver, tooltip="")
 
 
 // -------------------------------------------------------------------------
