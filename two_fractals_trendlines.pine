@@ -536,7 +536,6 @@ transp_tr           = input.int(50, 'Trend Line Transparency', minval=1, maxval=
 color_seg           = input.color(color.white, 'Segment Line Color', group=grp_atri)
 transp_seg          = input.int(65, 'Segment Line Transparency', minval=1, maxval= 100, group=grp_atri)
 
-vwap_band_opacity   = input.int(70, 'VWAP Bands Opacity', minval=0, maxval=100, group=grp_atri)
 transp_bg           = input.int(85, 'Background Color Transparency', minval=1, maxval= 100, group=grp_atri)
 
 
@@ -2644,12 +2643,12 @@ if eff_vwap_enabled
 plot(vwap_show_line ? vwap_val : na, color=color.new(color.orange, 0), title="VWAP")
 
 // Bands
-plot((eff_vwap_zone or eff_vwap_fullbands) and not na(sigma_val) ? vwap_val + band_k1 * sigma_val : na, "B1 Up", color.new(color.gray, vwap_band_opacity))
-plot((eff_vwap_zone or eff_vwap_fullbands) and not na(sigma_val) ? vwap_val - band_k1 * sigma_val : na, "B1 Dn", color.new(color.gray, vwap_band_opacity))
-plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val + band_k2 * sigma_val : na, "B2 Up", color.new(color.gray, vwap_band_opacity))
-plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val - band_k2 * sigma_val : na, "B2 Dn", color.new(color.gray, vwap_band_opacity))
-plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val + band_k3 * sigma_val : na, "B3 Up", color.new(color.gray, vwap_band_opacity))
-plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val - band_k3 * sigma_val : na, "B3 Dn", color.new(color.gray, vwap_band_opacity))
+plot((eff_vwap_zone or eff_vwap_fullbands) and not na(sigma_val) ? vwap_val + band_k1 * sigma_val : na, "B1 Up", color.new(color.gray, 70))
+plot((eff_vwap_zone or eff_vwap_fullbands) and not na(sigma_val) ? vwap_val - band_k1 * sigma_val : na, "B1 Dn", color.new(color.gray, 70))
+plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val + band_k2 * sigma_val : na, "B2 Up", color.new(color.gray, 50))
+plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val - band_k2 * sigma_val : na, "B2 Dn", color.new(color.gray, 50))
+plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val + band_k3 * sigma_val : na, "B3 Up", color.new(color.gray, 30))
+plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val - band_k3 * sigma_val : na, "B3 Dn", color.new(color.gray, 30))
 
 // Label for Z
 var label lb_vwap_z = na
