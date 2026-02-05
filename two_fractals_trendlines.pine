@@ -52,13 +52,13 @@ sub_fractals    = input.bool(title='Sub Fractals', inline="fr_s", defval=false, 
 // Confluence & Regime Visuals
 grp_conf_reg    = "Confluence & Regime Visuals"
 
-conf_use_vwap_quality = input.bool(true, "CONF: VWAP Quality Gate", group=grp_conf_reg, tooltip="Adjusts CONF quality using VWAP alignment + stretch (anti-chase). State remains unchanged.")
+conf_use_vwap_quality = input.bool(true, "CONF: VWAP Quality Gate", group=grp_conf_reg, tooltip="Adjust CONF quality via VWAP alignment/stretch.")
 conf_vwap_mode        = input.string("Auto", "VWAP Anchor", inline="conf", options=["Auto","Session VWAP","Weekly VWAP"], group=grp_conf_reg, tooltip="")
-conf_z_penalty_mode   = input.string("Default", "⠀Stretch Penalty", inline="conf", options=["Default","Conservative","Aggressive"], group=grp_conf_reg, tooltip="Which VWAP anchor CONF uses for quality. Auto: Session ≤ 60m, Weekly > 60m. \nHow strongly VWAP stretch reduces CONF quality.")
+conf_z_penalty_mode   = input.string("Default", "⠀Stretch Penalty", inline="conf", options=["Default","Conservative","Aggressive"], group=grp_conf_reg, tooltip="Stretch penalty strength.")
 
 show_conf_meter     = input.bool(true, "CONF⠀⠀⠀", inline="conf_ui", group=grp_conf_reg, tooltip="")
-show_conf_bg        = input.bool(false, "Confluence Meter BG⠀", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on CONF score thresholds (score > 55 = green, < 45 = red). Neutral stays transparent.")
-show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on Confirmed Bias (BULL/BEAR/NEUT). Useful to compare the stable filter vs the score background.")
+show_conf_bg        = input.bool(false, "Confluence Meter BG⠀", inline="conf_ui", group=grp_conf_reg, tooltip="BG from CONF score thresholds.")
+show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui", group=grp_conf_reg, tooltip="BG from confirmed bias state.")
 
 show_regime_panel   = input.bool(true, "REG⠀⠀⠀⠀", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
 regime_bg_enabled   = input.bool(false, "Squeeze & Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="Colors chart background by regime (Squeeze/Trend).")
@@ -243,7 +243,7 @@ f_resolve_bias_confirm_params(string _profile, bool _scalp_opt) =>
 // FVG Inputs
 grp_fvg1        = "Price Imbalance (Fair Value Gap) 1"
 plot_fvg1       = input.bool(true, title="FVG 1 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg1, inline="f1_1", tooltip="")
-fvg1_tf_sel     = input.timeframe("", title="TF", group=grp_fvg1, inline="f1_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement). Also reveals institutional interest (new trend). \nSelect the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
+fvg1_tf_sel     = input.timeframe("", title="TF", group=grp_fvg1, inline="f1_1", tooltip="Timeframe for FVG detection.")
 fvg1_len        = input.int(1, title="Box Length", minval=1, group=grp_fvg1, inline="f1_2")
 fvg1_limit      = input.int(50, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg1, inline="f1_2")
 col_fvg1_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg1, inline="f1_3")
@@ -251,7 +251,7 @@ col_fvg1_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀�
 
 grp_fvg2        = "Price Imbalance (Fair Value Gap) 2"
 plot_fvg2       = input.bool(false, title="FVG 2 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg2, inline="f2_1", tooltip="")
-fvg2_tf_sel     = input.timeframe("", title="TF", group=grp_fvg2, inline="f2_1", tooltip="Indicates a potential pullback area after an strong price movement (Displacement). Also reveals institutional interest (new trend). \nSelect the timeframe for Price Imbalance detection. Chart = Current Chart Timeframe.")
+fvg2_tf_sel     = input.timeframe("", title="TF", group=grp_fvg2, inline="f2_1", tooltip="Timeframe for FVG detection.")
 fvg2_len        = input.int(1, title="Box Length", minval=1, group=grp_fvg2, inline="f2_2")
 fvg2_limit      = input.int(5, title="⠀⠀ Visible Boxes", minval=1, maxval=500, group=grp_fvg2, inline="f2_2")
 col_fvg2_bull   = input.color(color.new(color.green, 80), title="Bullish Color", group=grp_fvg2, inline="f2_3")
@@ -259,55 +259,55 @@ col_fvg2_bear   = input.color(color.new(color.red, 80), title="⠀⠀⠀⠀⠀�
 
 // Key Levels Inputs
 grp_key             = "Key Levels"
-key_levels_enabled  = input.bool(true, "Key Levels", group=grp_key, tooltip="Previous Day High/Low/Close, Weekly/Monthly Open. \nKey reference levels for intraday structure, targets, and invalidation. \n\n• PDH/PDL: Liquidity Magnets; Break/Reject helps Bias. \n• PDC: Mean-reversion reference. \n• Weekly/Monthly Open: Trend-Bias; Market above = Bull, below = Bear. \n\nOrigin-anchored: Lines start at the bar where the level formed.")
-show_pdh            = input.bool(true, "PDH⠀", inline="kl_1", group=grp_key, tooltip="Prior Day High = liquidity pool; break+hold → continuation, sweep+reclaim → trap.")
-show_pdl            = input.bool(true, "PDL⠀", inline="kl_1", group=grp_key, tooltip="Prior Day Low = liquidity pool; break+hold → continuation, sweep+reclaim → trap.")
-show_pdc            = input.bool(false, "PDC⠀", inline="kl_1", group=grp_key, tooltip="Reversion target / magnet on range days.")
-show_wopen          = input.bool(true, "Weekly Open⠀", inline="kl_1", group=grp_key, tooltip="Higher timeframe bias line; watch reclaim/hold for continuation days.")
-show_mopen          = input.bool(false, "Monthly Open", inline="kl_1", group=grp_key, tooltip="Higher timeframe bias line; watch reclaim/hold for continuation days.")
-key_style           = input.string("Both", "Style", options=["Lines", "Labels", "Both"], inline="kl_3", group=grp_key, tooltip="Visual style for levels.")
-key_extend          = input.bool(true, "Extend", inline="kl_3", group=grp_key, tooltip="Extend projects the level into the future; turn off to keep chart clean.")
+key_levels_enabled  = input.bool(true, "Key Levels", group=grp_key, tooltip="PDH/PDL/PDC + weekly/monthly open levels.")
+show_pdh            = input.bool(true, "PDH⠀", inline="kl_1", group=grp_key, tooltip="Prior day high.")
+show_pdl            = input.bool(true, "PDL⠀", inline="kl_1", group=grp_key, tooltip="Prior day low.")
+show_pdc            = input.bool(false, "PDC⠀", inline="kl_1", group=grp_key, tooltip="Prior day close.")
+show_wopen          = input.bool(true, "Weekly Open⠀", inline="kl_1", group=grp_key, tooltip="Weekly open level.")
+show_mopen          = input.bool(false, "Monthly Open", inline="kl_1", group=grp_key, tooltip="Monthly open level.")
+key_style           = input.string("Both", "Style", options=["Lines", "Labels", "Both"], inline="kl_3", group=grp_key, tooltip="Level style.")
+key_extend          = input.bool(true, "Extend", inline="kl_3", group=grp_key, tooltip="Extend levels forward.")
 
 // RVOL Inputs
 grp_rvol            = "Relative Volume & High Volume Spikes"
-rvol_enabled        = input.bool(true, "RVOL Enabled", group=grp_rvol, tooltip="Relative Volume = Current Vol / Avg Vol. \nMeasures participation; confirms breakouts and reclaims. \n• Opening Auction / Expansion: RVOL > 2.0 signals expansion. \n• Reclaim: RVOL pickup confirms strength.")
-rvol_len            = input.int(20, "Length", minval=1, group=grp_rvol, inline="rv_1", tooltip="Average window; 20 is common.")
-rvol_display        = input.string("Marker", "⠀Display", options=["None", "Marker", "Label", "Both"], group=grp_rvol, inline="rv_1", tooltip="Visual style.")
-rvol_points_enabled = input.bool(true, "Points", group=grp_rvol, inline="rv_1", tooltip="H/E only markers to reduce noise. \nEnabled by default in Opening Auction / Expansion lenses.")
-rvol_th_1           = input.float(1.2, "Low⠀", step=0.1, group=grp_rvol, inline="rv_2", tooltip="1.2x: Slightly elevated.")
-rvol_th_2           = input.float(2.0, "⠀Med", step=0.1, group=grp_rvol, inline="rv_2", tooltip="2.0x: Event / Breakout fuel.")
-rvol_th_3           = input.float(3.0, "⠀High", step=0.1, group=grp_rvol, inline="rv_2", tooltip="3.0x: Strong trend / News.")
+rvol_enabled        = input.bool(true, "RVOL Enabled", group=grp_rvol, tooltip="Relative volume vs average.")
+rvol_len            = input.int(20, "Length", minval=1, group=grp_rvol, inline="rv_1", tooltip="Average length.")
+rvol_display        = input.string("Marker", "⠀Display", options=["None", "Marker", "Label", "Both"], group=grp_rvol, inline="rv_1", tooltip="Display style.")
+rvol_points_enabled = input.bool(true, "Points", group=grp_rvol, inline="rv_1", tooltip="Show only high/extra markers.")
+rvol_th_1           = input.float(1.2, "Low⠀", step=0.1, group=grp_rvol, inline="rv_2", tooltip="Low threshold.")
+rvol_th_2           = input.float(2.0, "⠀Med", step=0.1, group=grp_rvol, inline="rv_2", tooltip="Medium threshold.")
+rvol_th_3           = input.float(3.0, "⠀High", step=0.1, group=grp_rvol, inline="rv_2", tooltip="High threshold.")
 
-show_vol            = input.bool(true, "High Volume Spikes⠀", group=grp_rvol, inline="vol_sp", tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
+show_vol            = input.bool(true, "High Volume Spikes⠀", group=grp_rvol, inline="vol_sp", tooltip="Highlight volume spikes.")
 vol_mult            = input.float(2.0, "Threshold (x Avg)", inline="vol_sp", group=grp_rvol)
 
 // VWAP Inputs
 grp_vwap            = "VWAP / Value Zone"
-vwap_enabled        = input.bool(false, "VWAP Enabled", group=grp_vwap, tooltip="Volume-weighted fair value. \n• Trend: Above=Bull, Below=Bear. \n• Reversion: Far from VWAP = Stretched.")
-vwap_anchor         = input.string("Session (Daily Reset)", "Anchor", options=["Session (Daily Reset)", "Weekly"], group=grp_vwap, inline="vw_1", tooltip="Session: Intraday fair value. \nWeekly: Swing bias filter.")
-vwap_src_opt        = input.string("HLC3", "⠀Source", options=["HLC3", "HL2", "Close", "OHLC4"], group=grp_vwap, inline="vw_1", tooltip="HLC3 standard for fair value, HL2 for range focus, Close simplest; choose one—avoid overfitting.")
+vwap_enabled        = input.bool(false, "VWAP Enabled", group=grp_vwap, tooltip="Volume-weighted price.")
+vwap_anchor         = input.string("Session (Daily Reset)", "Anchor", options=["Session (Daily Reset)", "Weekly"], group=grp_vwap, inline="vw_1", tooltip="Anchor selection.")
+vwap_src_opt        = input.string("HLC3", "⠀Source", options=["HLC3", "HL2", "Close", "OHLC4"], group=grp_vwap, inline="vw_1", tooltip="VWAP source.")
 vwap_show_line      = input.bool(true, "Show Line⠀", group=grp_vwap, inline="vw_2")
-vwap_only_sess      = input.bool(false, "Calc Only in Sessions", group=grp_vwap, inline="vw_2", tooltip="If enabled, VWAP pauses outside selected sessions.")
+vwap_only_sess      = input.bool(false, "Calc Only in Sessions", group=grp_vwap, inline="vw_2", tooltip="Pause VWAP outside sessions.")
 
-vwap_display_mode   = input.string("Value Zone (±1σ)", "Display", options=["Line only", "Value Zone (±1σ)", "Full Bands (B1–B3)"], group=grp_vwap, inline="vw_3", tooltip="Line only: clean bias filter. \nValue Zone: VWAP ±1σ. \nFull: bands B1–B3.")
-vwap_bands_enabled  = input.bool(true, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="Standard Deviation Bands (K1/K2/K3). \nUsage: 'Don't chase' zones and Take Profit targets.")
-vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_4", tooltip="Rolling: Last N bars (Stable). \nWelford: Session-cumulative (Precise).")
+vwap_display_mode   = input.string("Value Zone (±1σ)", "Display", options=["Line only", "Value Zone (±1σ)", "Full Bands (B1–B3)"], group=grp_vwap, inline="vw_3", tooltip="VWAP display style.")
+vwap_bands_enabled  = input.bool(true, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="Enable VWAP bands.")
+vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_4", tooltip="Sigma calculation mode.")
 vwap_stdev_len      = input.int(100, "⠀Len", minval=2, group=grp_vwap, inline="vw_4")
 band_k1             = input.float(1.0, "K1", step=0.5, group=grp_vwap, inline="vw_6", tooltip="1st Band Multiplier (1σ).")
 band_k2             = input.float(2.0, "⠀K2", step=0.5, group=grp_vwap, inline="vw_6", tooltip="2nd Band Multiplier (2σ).")
 band_k3             = input.float(3.0, "⠀K3", step=0.5, group=grp_vwap, inline="vw_6", tooltip="3rd Band Multiplier (3σ).")
 
-vwap_z_enabled      = input.bool(true, "Z-Score Enabled", group=grp_vwap, inline="vw_5", tooltip="Z-Score = Distance to VWAP in Sigmas. \nUsed for Value Reversion signals.")
-z_th_entry          = input.float(2.0, "⠀Entry Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="Avoid entries when stretched > Entry Th.")
-z_th_tp             = input.float(2.5, "⠀TP Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="Scale out when Z reaches TP Th.")
-z_th_ext            = input.float(3.0, "Ext Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="Extreme extension; look for reversals.")
+vwap_z_enabled      = input.bool(true, "Z-Score Enabled", group=grp_vwap, inline="vw_5", tooltip="Enable VWAP Z-score.")
+z_th_entry          = input.float(2.0, "⠀Entry Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="Entry threshold.")
+z_th_tp             = input.float(2.5, "⠀TP Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="Take-profit threshold.")
+z_th_ext            = input.float(3.0, "Ext Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="Extreme threshold.")
 
 // Lite Value (POC/VAH/VAL)
 grp_lite_value           = "Lite Value (POC/VAH/VAL)"
-lite_value_enable        = input.bool(false, "value Area Levels", group=grp_lite_value, tooltip="Lightweight value area levels (POC/VAH/VAL). 3 lines only.")
+lite_value_enable        = input.bool(false, "value Area Levels", group=grp_lite_value, tooltip="POC/VAH/VAL levels.")
 lite_value_apply_to      = input.string("Map + Range only (recommended)", "Apply To", options=["Map + Range only (recommended)", "All Lenses", "Custom only"], group=grp_lite_value)
 lite_value_lookback      = input.int(200, "Lookback⠀⠀", minval=10, maxval=3000, group=grp_lite_value, inline="lv_1")
-lite_value_bins          = input.int(200, "⠀⠀⠀Bins⠀⠀⠀⠀⠀⠀", minval=10, maxval=490, group=grp_lite_value, inline="lv_1", tooltip="Higher bins = better placement, more CPU. Typical: 100–250.")
+lite_value_bins          = input.int(200, "⠀⠀⠀Bins⠀⠀⠀⠀⠀⠀", minval=10, maxval=490, group=grp_lite_value, inline="lv_1", tooltip="Profile bins.")
 lite_value_area_pct      = input.float(70.0, "Value Area %", minval=50, maxval=85, step=0.5, group=grp_lite_value, inline="lv_2")
 lite_value_src           = input.string("HLC3", "⠀⠀⠀Source⠀⠀⠀⠀", options=["HL2", "HLC3", "Close"], group=grp_lite_value, inline="lv_2")
 lite_value_update        = input.string("On last bar", "Update⠀⠀⠀", options=["On last bar", "Every N bars"], group=grp_lite_value, inline="lv_3")
@@ -317,39 +317,34 @@ lite_value_line_transp   = input.int(30, "⠀⠀⠀Transparency", minval=0, maxv
 
 // OR/IB Inputs
 grp_or              = "Opening Range / Initial Balance"
-or_enabled          = input.bool(false, "OR/IB Enabled", group=grp_or, tooltip="Defines the first battle zone; key for trend vs range days.")
+or_enabled          = input.bool(false, "OR/IB Enabled", group=grp_or, tooltip="Opening range / initial balance.")
 
 use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", inline="sess_1st", group=grp_or, tooltip="")
-sess_1st_tf     = input.timeframe("5", "", inline="sess_1st", group=grp_or, tooltip="Lines remain at the high and low of the first candle of the running trading session. \nSelect the timeframe for the 1st Session Candle calculation.")
+sess_1st_tf     = input.timeframe("5", "", inline="sess_1st", group=grp_or, tooltip="Timeframe for 1st session candle.")
 
-or_type             = input.string("Opening Range", "Type", options=["Opening Range", "Initial Balance"], group=grp_or, inline="or_1", tooltip="OR: User defined minutes. \nIB: First 60 minutes.")
-or_sess             = input.string("New York", "⠀Session", options=["London", "New York", "Custom"], group=grp_or, inline="or_1", tooltip="Market open context.")
+or_type             = input.string("Opening Range", "Type", options=["Opening Range", "Initial Balance"], group=grp_or, inline="or_1", tooltip="OR minutes or 60-min IB.")
+or_sess             = input.string("New York", "⠀Session", options=["London", "New York", "Custom"], group=grp_or, inline="or_1", tooltip="Session.")
 or_cust             = input.session("0930-1600", "Custom Sess", group=grp_or, inline="or_2")
 or_min              = input.int(15, "Duration", inline="or_2", minval=1, group=grp_or, inline="or_2", tooltip="Window size in minutes (for OR).")
-or_display          = input.string("Box+Lines", "Display", options=["Box+Lines", "Box", "Lines"], group=grp_or, inline="or_3", tooltip="Visual style.")
-or_lock             = input.bool(true, "Lock after Window", group=grp_or, inline="or_3", tooltip="Freeze levels after window ends (required for breakouts).")
+or_display          = input.string("Box+Lines", "Display", options=["Box+Lines", "Box", "Lines"], group=grp_or, inline="or_3", tooltip="Display style.")
+or_lock             = input.bool(true, "Lock after Window", group=grp_or, inline="or_3", tooltip="Lock levels after window.")
 
 // Squeeze Box
 grp_sq              = "Squeeze Box"
-sq_box_enabled      = input.bool(false, "Squeeze Box⠀", inline="sq_b", group=grp_sq, tooltip="Builds a box during squeeze regime. Trade release/break with RVOL confirmation.")
-sq_lock             = input.bool(true, "Lock on Release", inline="sq_b", group=grp_sq, tooltip="Locks the box levels when the squeeze ends to provide breakout references.")
+sq_box_enabled      = input.bool(false, "Squeeze Box⠀", inline="sq_b", group=grp_sq, tooltip="Box during squeeze regime.")
+sq_lock             = input.bool(true, "Lock on Release", inline="sq_b", group=grp_sq, tooltip="Lock box on release.")
 
 
 // Smart MTF S&R
 grp_psr             = "Smart S&R (Support & Resistance)"
 ps_mode             = input.string("None", title="Smart S&R", options=["None", "Auto", "Manuell"], group=grp_psr, inline="en_tf", tooltip="")
-ps_tf               = input.timeframe("D", title="⠀⠀⠀⠀Pivot TF⠀⠀", inline="en_tf", group=grp_psr, tooltip="Activates the 'Smart Market Structure' system:
-                      \n• Multi-Timeframe Analysis: Identifies significant Swing Highs/Lows from a higher timeframe (e.g., 4H levels on a 15m chart).
-                      \n• Noise Filtering: Uses adjustable pivot strength to ignore minor price fluctuations.
-                      \n• Smart Zones: Automatically merges levels that are close together into a single 'Zone' (Box) to reduce clutter.
-                      \n• Dynamic State: Tracks confirmed breakouts and can automatically flip Support to Resistance (Role Reversal) or remove broken levels.
-                      \n• Clutter Control: Manages a fixed number of active levels, removing old or irrelevant ones automatically. \nSelect the Higher Timeframe to scan for significant Swing Highs/Lows. \nSmart S&R 'Auto' affects 'Pivot TF' only.")
-ps_left             = input.int(2, title="Pivot Left", inline="pivot", minval=1, group=grp_psr, tooltip="Higher values filter out minor market noise. Left Standard=2 (Bill Williams Fractal).")
-ps_right            = input.int(2, title="⠀⠀⠀⠀Pivot Right", inline="pivot", minval=1, group=grp_psr, tooltip="Higher values filter out minor market noise. Right Standard=2 (Bill Williams Fractal).")
-ps_max              = input.int(20, title="Max Active Levels ⠀", minval=1, maxval=50, group=grp_psr, tooltip="Limits the number of visible lines to prevent chart clutter. FIFO (First In, First Out).")
-ps_break_act        = input.string("Role Reversal", title="On Break Action ", options=["Keep", "Delete", "Role Reversal"], group=grp_psr, tooltip="How the script handles a level when price crosses it. \nKeep: Do nothing. \nDelete: Remove line. \nRole Reversal: Support becomes Resistance (Color change).")
+ps_tf               = input.timeframe("D", title="⠀⠀⠀⠀Pivot TF⠀⠀", inline="en_tf", group=grp_psr, tooltip="Higher timeframe for Smart S&R pivots.")
+ps_left             = input.int(2, title="Pivot Left", inline="pivot", minval=1, group=grp_psr, tooltip="Pivot left bars.")
+ps_right            = input.int(2, title="⠀⠀⠀⠀Pivot Right", inline="pivot", minval=1, group=grp_psr, tooltip="Pivot right bars.")
+ps_max              = input.int(20, title="Max Active Levels ⠀", minval=1, maxval=50, group=grp_psr, tooltip="Max visible levels.")
+ps_break_act        = input.string("Role Reversal", title="On Break Action ", options=["Keep", "Delete", "Role Reversal"], group=grp_psr, tooltip="Action on break.")
 ps_merge_en         = input.bool(true, title="Merge Nearby Levels (Zones) ", group=grp_psr, inline="ps_m")
-ps_merge_pct        = input.float(0.1, title="Threshold %", minval=0.01, step=0.1, group=grp_psr, inline="ps_m", tooltip="If a new level appears within X% of an existing level, they are merged into a Zone.")
+ps_merge_pct        = input.float(0.1, title="Threshold %", minval=0.01, step=0.1, group=grp_psr, inline="ps_m", tooltip="Merge threshold.")
 ps_col_res          = input.color(color.new(color.red, 30), title="Res Color", group=grp_psr, inline="ps_c")
 ps_col_sup          = input.color(color.new(color.green, 30), title="⠀Sup Color", group=grp_psr, inline="ps_c")
 ps_col_zone         = input.color(color.new(color.blue, 85), title="⠀Zone Fill", group=grp_psr, inline="ps_c")
@@ -403,8 +398,7 @@ type SqState
 // Bollinger Bands
 grp_bb              = 'Bollinger Bands'
 BB_plot             = input.bool(true, title='Bollinger Bands⠀', inline="bb_t", group=grp_bb, tooltip='')
-near_bb             = input.bool(true, title='Touched BBs only', inline="bb_t", group=grp_bb, tooltip='This maintains a better chart overview and works as reversal zone indicator.
-                      \nWorks as support and resistence, as reversal zone and as squeeze indicator.')
+near_bb             = input.bool(true, title='Touched BBs only', inline="bb_t", group=grp_bb, tooltip='Show only touched bands.')
 // BB_length_1 & BB_sdev_1 moved to Advanced: REG
 BB_sdev_2           = 3
 BB_sdev_3           = 4
@@ -413,8 +407,7 @@ BB_sdev_4           = 5
 // ema cloud and ma inputs
 grp_ma              = 'EMA cloud and MA'
 en_cloud            = input.bool(false, title='EMA Cloud⠀', inline="ema_c", group=grp_ma, tooltip='')
-sig_plot            = input.bool(true, title='Cloud Color Signal', inline="ema_c", group=grp_ma, tooltip='EMA1 cross EMA2 color signal.
-                      \nThis EMA cloud works as dynamic support and resistance and as trend indication. A wide cloud indicates high volatility, a narrow cloud indicates low volatility and breakout potential. Interesting pairs: 8/21, 40/97')
+sig_plot            = input.bool(true, title='Cloud Color Signal', inline="ema_c", group=grp_ma, tooltip='EMA cross color signal.')
 
 ema_inp1            = input.int(8, title='EMA1 Length', inline="ema_l", minval=1, group=grp_ma, tooltip="")
 ema_inp2            = input.int(21, title='⠀EMA2 Length', inline="ema_l", minval=1, group=grp_ma, tooltip="")
@@ -437,35 +430,33 @@ kama_slow           = 30
 // two fractal trendlines inputs
 grp_fr              = 'Fractal Trend lines'
 plot_trendline      = input.bool(false, title='Fractal Trend Lines⠀', inline="fr_tr", group=grp_fr, tooltip='')
-fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group=grp_fr, tooltip="The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal. \nNumber of bars to the left and right of the fractal bar for trendlines. Default is 2 (5-bar fractal).
-                     Min=0 (Fractal(2) using anchored linear regression, follow the highs/lows of the subsequent candles to align with the current trend), Max=10 (21 bars).")
+fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group=grp_fr, tooltip="Bars left/right for fractal trendlines.")
 show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fr, inline="l_rf", tooltip="")
-last_frac_tf    = input.timeframe("240", "", group=grp_fr, inline="l_rf", tooltip="Draws lines at the last confirmed Up/Down Fractals. Every new trend begins with the breaking of a fractal. (Time Frame dependent). \nSelect the timeframe for the Last Fractal calculation.")
+last_frac_tf    = input.timeframe("240", "", group=grp_fr, inline="l_rf", tooltip="Timeframe for last fractal lines.")
 
 
 // divergence signal inputs
 grp_div             = 'Divergences'
-plot_div            = input.bool(true, title='Divergences', group=grp_div, tooltip='These divergences are very early signals and must be used in confluence with other signals. Hidden and classic divergence are used')
+plot_div            = input.bool(true, title='Divergences', group=grp_div, tooltip='Show classic/hidden divergences.')
 div_indi            = input.string('rsi', title='Divergence Indicator', options=['rsi', 'macd(fast_line)', 'macd(slow_line)'], tooltip='Select an Indicator for divergence calculation.', group=grp_div)
 rsi_length          = input.int(14, title='RSI Length', inline="rsi_p", minval=1, step=2, group=grp_div)
-bar_div_p           = input.int(25, title='⠀⠀⠀⠀Bar Period', inline="rsi_p", minval=1, step=1, tooltip='RSI Length. \nThe number of bars in which divergences are detected.', group=grp_div)
+bar_div_p           = input.int(25, title='⠀⠀⠀⠀Bar Period', inline="rsi_p", minval=1, step=1, tooltip='Divergence lookback bars.', group=grp_div)
 src_div             = input.string('high/low', title='Bar Divergence Source', options=['high/low', 'close'], tooltip='The bar source for divergence calculation.', group=grp_div)
 
 // bar signals inputs
 grp_bar             = 'Bar signals'
 plot_l12_bar        = input.bool(true, title='Last 12 Bar (L12) ⠀', inline="l12", tooltip='', group=grp_bar)
-L12_input           = input.int(12, minval=1, title='Bar count', inline="l12", group=grp_bar, tooltip='"Letter: L, L12 => highest low of last 12 bars -> long. Lowest high of last 12 bars -> short. Indicates a new trend. \nLast 12 Bar" Bar count.')
-plot_nr_bar         = input.bool(true, title='Narrow Range Bar (NR7)', tooltip='Letter: n, NR7 = narrowest range of a bar of the last seven bars. Indicates market tension.', group=grp_bar)
-plot_i_bar          = input.bool(true, title='Inside Bar', tooltip='Letter: i. An inside bar is a triangle formation on smaller time frame.', group=grp_bar)
-plot_o_bar          = input.bool(true, title='Outside Bar', tooltip='Letter: o. An outside bar is an opening funnel formation on smaller time frames. gray-> normal outside bar, valid at least for the next bar: red-> short, green-> long', group=grp_bar)
-plot_s_bar          = input.bool(true, title='Sandwich Bar', tooltip='Letter: s. Indicates market tension.', group=grp_bar)
-plot_f_bar          = input.bool(true, title='Fakey', tooltip='Letter: F. An inside bar false breakout.', group=grp_bar)
+L12_input           = input.int(12, minval=1, title='Bar count', inline="l12", group=grp_bar, tooltip="L12 bar count.")
+plot_nr_bar         = input.bool(true, title='Narrow Range Bar (NR7)', tooltip='NR7 marker.', group=grp_bar)
+plot_i_bar          = input.bool(true, title='Inside Bar', tooltip='Inside bar marker.', group=grp_bar)
+plot_o_bar          = input.bool(true, title='Outside Bar', tooltip='Outside bar marker.', group=grp_bar)
+plot_s_bar          = input.bool(true, title='Sandwich Bar', tooltip='Sandwich bar marker.', group=grp_bar)
+plot_f_bar          = input.bool(true, title='Fakey', tooltip='Fakey marker.', group=grp_bar)
 
 // segments inputs
 grp_seg             = 'Segment signal'
 plot_segments       = input.bool(false, title='Segments ⠀', inline="seg", tooltip='', group=grp_seg)
-sb                  = input.int(10 ,title='Max Bars', inline="seg", minval=0, step=1, tooltip='Gray lines that follow the highest highs and lowest lows. This is a subtle way to detect a new trend. The higher the timeframe the more reliable the signal.
-                      \nMax bars between two segment highs or segment lows.', group=grp_seg)
+sb                  = input.int(10 ,title='Max Bars', inline="seg", minval=0, step=1, tooltip='Max segment bars.', group=grp_seg)
 
 
 // pivot points inputs
@@ -473,18 +464,18 @@ grp_pi              = 'Pivot points'
 plot_pivots_h1      = input.bool(false, title= "1 Hour Classic Pivot Points", group=grp_pi, tooltip= "1 Hour Pivot points (P, R1-R4, S1-S4). Only visible on charts < 1H.")
 plot_pivots_h4      = input.bool(true, title= "4 Hour Classic Pivot Points", group=grp_pi, tooltip= "4 Hour Pivot points (P, R1-R4, S1-S4). Only visible on charts < 4H.")
 plot_pivots_d       = input.bool(true, title= "1 Day Classic Pivot Points", group=grp_pi, tooltip= "Daily Pivot points (P, R1-R4, S1-S4). Only visible on intraday charts.")
-plot_pivots_w       = input.bool(true, title= "1 Week Classic Pivot Points", group=grp_pi, tooltip= "1 week classic Pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.")
-plot_pivots_m       = input.bool(true, title='1 Month Classic Pivot Points', group=grp_pi, tooltip='1 month classic pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.')
-plot_pivots_3m      = input.bool(true, title='3 Month Classic Pivot Points', group=grp_pi, tooltip='3 month classic pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.')
-plot_pivots_12m     = input.bool(true, title='12 Month Classic Pivot Points', group=grp_pi, tooltip='12 month classic pivot points are plotted (P, R1-R4, S1-4). Pivot points are used as support and resistance levels. Watch out for clusters.')
-plot_pivot_labels   = input.bool(false, title='Pivot Labels (P/R/S + TF)', group=grp_pi, tooltip='Draws small text tags on the pivot dash (e.g., P H4, R2 W).')
+plot_pivots_w       = input.bool(true, title= "1 Week Classic Pivot Points", group=grp_pi, tooltip= "Weekly pivots.")
+plot_pivots_m       = input.bool(true, title='1 Month Classic Pivot Points', group=grp_pi, tooltip='Monthly pivots.')
+plot_pivots_3m      = input.bool(true, title='3 Month Classic Pivot Points', group=grp_pi, tooltip='Quarterly pivots.')
+plot_pivots_12m     = input.bool(true, title='12 Month Classic Pivot Points', group=grp_pi, tooltip='Yearly pivots.')
+plot_pivot_labels   = input.bool(false, title='Pivot Labels (P/R/S + TF)', group=grp_pi, tooltip='Pivot labels.')
 // TRADING SESSIONS INPUTS ---
 grp_sess      = "Trading Sessions"
 sess_timezone = input.string("Europe/Berlin", title="Timezone", inline="ses", tooltip="", group=grp_sess)
-sess_style    = input.string("Vertical Line", title="⠀Session Style", inline="ses", options=["Vertical Line", "Box", "Background", "Inv. Background"], group=grp_sess, tooltip="Standard: Europe/Berlin. Change to 'UTC' or 'America/New_York' if needed. \nVisual style for trading sessions: \n• Vertical Line: Start/End lines. \n• Box: High/Low Range. \n• Background: Session Time Window (Highest Priority Layer). \n• Inv. Background: Unified Color (Blue 50%) during 'Off-Hours'.")
+sess_style    = input.string("Vertical Line", title="⠀Session Style", inline="ses", options=["Vertical Line", "Box", "Background", "Inv. Background"], group=grp_sess, tooltip="Session display style.")
 
 use_sess_rest   = input.bool(false, title="Session Restriction", inline="ses_rest", group=grp_sess)
-sess_rest_time  = input.int(60, title="⠀⠀⠀⠀Time", inline="ses_rest", tooltip="Rstricts Session Trading Time (Default 1 hour).", group=grp_sess)
+sess_rest_time  = input.int(60, title="⠀⠀⠀⠀Time", inline="ses_rest", tooltip="Session rest time.", group=grp_sess)
 
 // London - ORANGE
 london_show   = input.bool(true, title="London Session ⠀⠀", group=grp_sess, inline="lon")
@@ -505,13 +496,13 @@ tokyo_col     = input.color(color.new(color.yellow, 90), title="", group=grp_ses
 sydney_show     = input.bool(false, title="Sydney Session ⠀⠀", group=grp_sess, inline="syd")
 sydney_sess     = input.session("2200-0700", title="", group=grp_sess, inline="syd")
 sydney_col      = input.color(color.new(color.red, 90), title="", group=grp_sess, inline="syd")
-sess_line_limit = input.int(150, "Max Session Lines (FIFO)", group=grp_sess, minval=20, tooltip="Limits total number of vertical session lines to prevent 'Max lines' error.")
+sess_line_limit = input.int(150, "Max Session Lines (FIFO)", group=grp_sess, minval=20, tooltip="Limit session lines.")
 
 // Alerts
 grp_alerts      = "🔔 Alerts"
-alert_profile   = input.string("Normal", "Alert Profile", options=["Off", "Minimal","Normal","Moderate"], group=grp_alerts, tooltip="Controls the complexity of alert triggers to avoid spam. \n• Off: No alerts. \n• Minimal: Trendline Breakouts only. \n• Normal: Adds Divergences. \n• Moderate: Adds Regime Changes & High Confluence Events.")
-alert_cooldown  = input.int(5, "Cooldown (Bars)", minval=1, group=grp_alerts, tooltip="Wait period (in bars) after an alert is triggered before the same alert type can trigger again. Prevents repetitive alerts during the same market event.")
-use_rt_alert   = input.bool(false, title="Alert on 5th Fractal Candle (Real-time)", group=grp_alerts, tooltip="Triggers an alert signal while the 5th candle of a fractal pattern is forming (Real-time). Select 'Any function call' when creating the alert.")
+alert_profile   = input.string("Normal", "Alert Profile", options=["Off", "Minimal","Normal","Moderate"], group=grp_alerts, tooltip="Alert verbosity.")
+alert_cooldown  = input.int(5, "Cooldown (Bars)", minval=1, group=grp_alerts, tooltip="Cooldown between alerts.")
+use_rt_alert   = input.bool(false, title="Alert on 5th Fractal Candle (Real-time)", group=grp_alerts, tooltip="Realtime fractal alert.")
 
 // Debug (Performance)
 debug_on       = input.bool(false, "Debug (Perf)", group="Debug")
@@ -3339,7 +3330,7 @@ label.delete(lbl_adr)
 if not na(info_panel) and barstate.islast
     string adr_txt = "ADR% " + (not na(adr_pct) ? str.tostring(adr_pct, "#.#") + "%" : "n/a")
     table.merge_cells(info_panel, 0, f_panel_row(9), 2, f_panel_row(9))
-    table.cell(table_id=info_panel, column=0, row=f_panel_row(9), text=adr_txt, text_size=size.small, text_color=color.silver, tooltip="ADR% = progress within Average Daily Range; helps avoid entering near exhaustion.")
+    table.cell(table_id=info_panel, column=0, row=f_panel_row(9), text=adr_txt, text_size=size.small, text_color=color.silver, tooltip="ADR% progress within ADR.")
 
 
 // -------------------------------------------------------------------------
