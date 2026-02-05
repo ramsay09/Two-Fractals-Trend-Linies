@@ -3581,11 +3581,11 @@ int sq_t0_mtf = na
 if sq_use_mtf
     [sq_in_mtf, sq_hi_mtf, sq_lo_mtf, sq_t0_mtf] = request.security(syminfo.tickerid, sq_tf_eff, f_sq_mtf_pack(), lookahead=panel_update_mode == "Realtime Preview" ? barmerge.lookahead_on : barmerge.lookahead_off)
 
-bool in_sq_condition = sq_use_mtf ? (na(sq_in_mtf) ? false : sq_in_mtf) : (regime_state == "SQUEEZE")
+bool in_sq_condition = sq_use_mtf ? nz(sq_in_mtf, false) : (regime_state == "SQUEEZE")
 
-float sq_src_hi = sq_use_mtf ? (na(sq_hi_mtf) ? high : sq_hi_mtf) : high
-float sq_src_lo = sq_use_mtf ? (na(sq_lo_mtf) ? low : sq_lo_mtf) : low
-int sq_src_t0 = sq_use_mtf ? (na(sq_t0_mtf) ? time : sq_t0_mtf) : time
+float sq_src_hi = sq_use_mtf ? nz(sq_hi_mtf, high) : high
+float sq_src_lo = sq_use_mtf ? nz(sq_lo_mtf, low) : low
+int sq_src_t0 = sq_use_mtf ? nz(sq_t0_mtf, time) : time
 
 bool sq_start = in_sq_condition and not in_sq_condition[1]
 bool sq_end = not in_sq_condition and in_sq_condition[1]
