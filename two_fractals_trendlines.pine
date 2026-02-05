@@ -3572,7 +3572,7 @@ f_sq_mtf_pack() =>
 string sq_tf_eff = sq_tf == "" ? timeframe.period : sq_tf
 int sq_tf_sec = timeframe.in_seconds(sq_tf_eff)
 bool sq_use_mtf = (sq_tf != "") and (not na(sq_tf_sec)) and (sq_tf_sec > tf_sec)
-barmerge.lookahead sq_lookahead = panel_update_mode == "Realtime Preview" ? barmerge.lookahead_on : barmerge.lookahead_off
+sq_lookahead = panel_update_mode == "Realtime Preview" ? barmerge.lookahead_on : barmerge.lookahead_off
 
 bool sq_in_mtf = false
 float sq_hi_mtf = na
