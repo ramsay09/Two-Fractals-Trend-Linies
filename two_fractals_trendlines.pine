@@ -3531,6 +3531,8 @@ if lens_changed and not eff_sq_box_enabled
     sqs.locked := false
 
 // Condition (Chart TF or MTF via sq_tf)
+int sq_bar_ms = timeframe.in_seconds(timeframe.period) * 1000
+
 f_sq_mtf_pack() =>
     float kc_mid_tf = ta.ema(close, eff_kc_len)
     float kc_range_tf = ta.atr(eff_kc_len)
@@ -3556,29 +3558,35 @@ f_sq_mtf_pack() =>
 
     var float r_hi = na
     var float r_lo = na
+    var int r_t0 = na
     if is_squeeze_tf and not is_squeeze_tf[1]
+        r_t0 := time
         r_hi := high
         r_lo := low
     else if is_squeeze_tf
         r_hi := na(r_hi) ? high : math.max(r_hi, high)
         r_lo := na(r_lo) ? low : math.min(r_lo, low)
 
-    [is_squeeze_tf, r_hi, r_lo]
+    [is_squeeze_tf, r_hi, r_lo, r_t0]
 
 string sq_tf_eff = sq_tf == "" ? timeframe.period : sq_tf
-bool sq_use_mtf = (sq_tf != "") and (timeframe.in_seconds(sq_tf_eff) >= timeframe.in_seconds(timeframe.period))
+int sq_tf_sec = timeframe.in_seconds(sq_tf_eff)
+bool sq_use_mtf = (sq_tf != "") and (not na(sq_tf_sec)) and (sq_tf_sec > tf_sec)
+int sq_lookahead = panel_update_mode == "Realtime Preview" ? barmerge.lookahead_on : barmerge.lookahead_off
 
 bool sq_in_mtf = false
 float sq_hi_mtf = na
 float sq_lo_mtf = na
+int sq_t0_mtf = na
 
 if sq_use_mtf
-    [sq_in_mtf, sq_hi_mtf, sq_lo_mtf] = request.security(syminfo.tickerid, sq_tf_eff, f_sq_mtf_pack(), lookahead=barmerge.lookahead_off)
+    [sq_in_mtf, sq_hi_mtf, sq_lo_mtf, sq_t0_mtf] = request.security(syminfo.tickerid, sq_tf_eff, f_sq_mtf_pack(), lookahead=sq_lookahead)
 
 bool in_sq_condition = sq_use_mtf ? (na(sq_in_mtf) ? false : sq_in_mtf) : (regime_state == "SQUEEZE")
 
 float sq_src_hi = sq_use_mtf ? (na(sq_hi_mtf) ? high : sq_hi_mtf) : high
 float sq_src_lo = sq_use_mtf ? (na(sq_lo_mtf) ? low : sq_lo_mtf) : low
+int sq_src_t0 = sq_use_mtf ? (na(sq_t0_mtf) ? time : sq_t0_mtf) : time
 
 bool sq_start = in_sq_condition and not in_sq_condition[1]
 bool sq_end = not in_sq_condition and in_sq_condition[1]
@@ -3596,10 +3604,10 @@ if eff_sq_box_enabled
 
         // Init/Reset (Single Object Recycle)
         if na(sqs.id_box)
-            sqs.id_box := box.new(bar_index, sq_src_hi, bar_index, sq_src_lo, border_color=color.new(color.yellow, 30), bgcolor=color.new(color.yellow, 90))
+            sqs.id_box := box.new(sq_src_t0, sq_src_hi, time_close, sq_src_lo, xloc=xloc.bar_time, border_color=color.new(color.yellow, 30), bgcolor=color.new(color.yellow, 90))
         else
-            box.set_left(sqs.id_box, bar_index)
-            box.set_right(sqs.id_box, bar_index)
+            box.set_left(sqs.id_box, sq_src_t0)
+            box.set_right(sqs.id_box, time_close)
             box.set_top(sqs.id_box, sq_src_hi)
             box.set_bottom(sqs.id_box, sq_src_lo)
             box.set_border_style(sqs.id_box, line.style_solid)
@@ -3615,18 +3623,18 @@ if eff_sq_box_enabled
 
         box.set_top(sqs.id_box, sqs.hi)
         box.set_bottom(sqs.id_box, sqs.lo)
-        box.set_right(sqs.id_box, bar_index + 1)
+        box.set_right(sqs.id_box, time_close)
 
         if sq_end
             sqs.active := false
             if sq_lock
                 sqs.locked := true
-                box.set_right(sqs.id_box, bar_index + 5)
+                box.set_right(sqs.id_box, time_close + (sq_bar_ms * 5))
                 box.set_border_style(sqs.id_box, line.style_dashed)
 
     else if sqs.locked
         if barstate.islast
-            box.set_right(sqs.id_box, bar_index + 5)
+            box.set_right(sqs.id_box, time_close + (sq_bar_ms * 5))
 
         // Break Events
         if close > sqs.hi and close[1] <= sqs.hi
