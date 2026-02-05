@@ -256,14 +256,6 @@ f_resolve_bias_confirm_params(string _profile, bool _scalp_opt) =>
 
 [eff_cb_enter_bull, eff_cb_enter_bear, eff_cb_exit_bull, eff_cb_exit_bear, eff_cb_enter_bars, eff_cb_exit_bars] = f_resolve_bias_confirm_params(cb_profile, cb_scalp_opt)
 
-// Additional Context Inputs
-grp_add         = "Additional Context"
-show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀", group=grp_add, inline="l_rf", tooltip="")
-last_frac_tf    = input.timeframe("240", "", group=grp_add, inline="l_rf", tooltip="Draws lines at the last confirmed Up/Down Fractals. Every new trend begins with the breaking of a fractal. (Time Frame dependent). \nSelect the timeframe for the Last Fractal calculation.")
-
-show_vol        = input.bool(true, "High Volume Spikes⠀", group=grp_add, inline="vol_sp", tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
-vol_mult        = input.float(2.0, "Threshold (x Avg)", inline="vol_sp", group=grp_add)
-
 // FVG Inputs
 grp_fvg1        = "Price Imbalance (Fair Value Gap) 1"
 plot_fvg1       = input.bool(true, title="FVG 1 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fvg1, inline="f1_1", tooltip="")
@@ -293,14 +285,18 @@ key_style           = input.string("Both", "Style", options=["Lines", "Labels", 
 key_extend          = input.bool(true, "Extend", inline="kl_3", group=grp_key, tooltip="Extend projects the level into the future; turn off to keep chart clean.")
 
 // RVOL Inputs
-grp_rvol            = "Relative Volume (RVOL)"
+grp_rvol            = "Relative Volume & High Volume Spikes"
 rvol_enabled        = input.bool(true, "RVOL Enabled", group=grp_rvol, tooltip="Relative Volume = Current Vol / Avg Vol. \nMeasures participation; confirms breakouts and reclaims. \n• Opening Auction / Expansion: RVOL > 2.0 signals expansion. \n• Reclaim: RVOL pickup confirms strength.")
 rvol_len            = input.int(20, "Length", minval=1, group=grp_rvol, inline="rv_1", tooltip="Average window; 20 is common.")
 rvol_display        = input.string("Marker", "⠀Display", options=["None", "Marker", "Label", "Both"], group=grp_rvol, inline="rv_1", tooltip="Visual style.")
 rvol_points_enabled = input.bool(true, "Points", group=grp_rvol, inline="rv_1", tooltip="H/E only markers to reduce noise. \nEnabled by default in Opening Auction / Expansion lenses.")
-rvol_th_1           = input.float(1.2, "Low", step=0.1, group=grp_rvol, inline="rv_2", tooltip="1.2x: Slightly elevated.")
-rvol_th_2           = input.float(2.0, "⠀⠀Med", step=0.1, group=grp_rvol, inline="rv_2", tooltip="2.0x: Event / Breakout fuel.")
+rvol_th_1           = input.float(1.2, "Low⠀", step=0.1, group=grp_rvol, inline="rv_2", tooltip="1.2x: Slightly elevated.")
+rvol_th_2           = input.float(2.0, "⠀Med", step=0.1, group=grp_rvol, inline="rv_2", tooltip="2.0x: Event / Breakout fuel.")
 rvol_th_3           = input.float(3.0, "⠀High", step=0.1, group=grp_rvol, inline="rv_2", tooltip="3.0x: Strong trend / News.")
+
+show_vol            = input.bool(true, "High Volume Spikes⠀", group=grp_rvol, inline="vol_sp", tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
+vol_mult            = input.float(2.0, "Threshold (x Avg)", inline="vol_sp", group=grp_rvol)
+
 
 // VWAP Inputs
 grp_vwap            = "VWAP / Value Zone"
@@ -358,7 +354,7 @@ sq_lock             = input.bool(true, "Lock on Release", inline="sq_b", group=g
 
 // Smart MTF S&R
 grp_psr             = "Smart S&R (Support & Resistance)"
-ps_mode             = input.string("None", title="Smart S&R", options=["None", "Manuell", "Auto"], group=grp_psr, inline="en_tf", tooltip="")
+ps_mode             = input.string("None", title="Smart S&R", options=["None", "Auto", "Manuell"], group=grp_psr, inline="en_tf", tooltip="")
 ps_tf               = input.timeframe("D", title="⠀⠀⠀⠀Pivot TF⠀⠀", inline="en_tf", group=grp_psr, tooltip="Activates the 'Smart Market Structure' system:
                       \n• Multi-Timeframe Analysis: Identifies significant Swing Highs/Lows from a higher timeframe (e.g., 4H levels on a 15m chart).
                       \n• Noise Filtering: Uses adjustable pivot strength to ignore minor price fluctuations.
@@ -455,11 +451,14 @@ kama_len            = 10
 kama_fast           = 2
 kama_slow           = 30
 
-// two fractals trendlines inputs
-grp_fr              = 'Trend lines'
+// two fractal trendlines inputs
+grp_fr              = 'Fractal Trend lines'
 plot_trendline      = input.bool(false, title='Fractal Trend Lines⠀', inline="fr_tr", group=grp_fr, tooltip='')
 fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group=grp_fr, tooltip="The trend lines connect two up- and two down-Bill-Williams-Fractals. Works as price action/pattern breakout signal. \nNumber of bars to the left and right of the fractal bar for trendlines. Default is 2 (5-bar fractal).
                      Min=0 (Fractal(2) using anchored linear regression, follow the highs/lows of the subsequent candles to align with the current trend), Max=10 (21 bars).")
+show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fr, inline="l_rf", tooltip="")
+last_frac_tf    = input.timeframe("240", "", group=grp_fr, inline="l_rf", tooltip="Draws lines at the last confirmed Up/Down Fractals. Every new trend begins with the breaking of a fractal. (Time Frame dependent). \nSelect the timeframe for the Last Fractal calculation.")
+
 
 // divergence signal inputs
 grp_div             = 'Divergences'
