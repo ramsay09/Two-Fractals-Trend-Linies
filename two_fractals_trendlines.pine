@@ -323,7 +323,7 @@ grp_lite_value           = "Lite Value (POC/VAH/VAL)"
 lite_value_enable        = input.bool(false, "value Area Levels", group=grp_lite_value, tooltip="Lightweight value area levels (POC/VAH/VAL). 3 lines only.")
 lite_value_apply_to      = input.string("Map + Range only (recommended)", "Apply To", options=["Map + Range only (recommended)", "All Lenses", "Custom only"], group=grp_lite_value)
 lite_value_lookback      = input.int(400, "Lookback⠀⠀", minval=100, maxval=800, group=grp_lite_value, inline="lv_1")
-lite_value_bins          = input.int(32, "⠀⠀⠀Bins⠀⠀⠀⠀⠀⠀", minval=16, maxval=48, group=grp_lite_value, inline="lv_1")
+lite_value_bins          = input.int(32, "⠀⠀⠀Bins⠀⠀⠀⠀⠀⠀", minval=16, maxval=256, group=grp_lite_value, inline="lv_1", tooltip="Higher bins = better placement, more CPU. Recommended: 64–192.")
 lite_value_area_pct      = input.float(70.0, "Value Area %", minval=50, maxval=85, step=0.5, group=grp_lite_value, inline="lv_2")
 lite_value_src           = input.string("HLC3", "⠀⠀⠀Source⠀⠀⠀⠀", options=["HL2", "HLC3", "Close"], group=grp_lite_value, inline="lv_2")
 lite_value_update        = input.string("On last bar", "Update⠀⠀⠀", options=["On last bar", "Every N bars"], group=grp_lite_value, inline="lv_3")
@@ -2581,7 +2581,7 @@ f_calc_lite_value_levels(_lookback, _bins, _area_pct, _src_choice) =>
     float lo = ta.lowest(low, _lookback)
     float span = hi - lo
     float step = span / _bins
-    if step <= 0
+    if step <= 0 or _bins <= 0
         [na, na, na]
     else
         float[] hist = array.new_float(_bins, 0.0)
@@ -2597,28 +2597,25 @@ f_calc_lite_value_levels(_lookback, _bins, _area_pct, _src_choice) =>
                     int idx = math.min(_bins - 1, math.max(0, int(math.floor((p - lo) / step))))
                     array.set(hist, idx, array.get(hist, idx) + v)
                 else
-                    int first = math.min(_bins - 1, math.max(0, int(math.floor((bar_lo - lo) / step))))
-                    int last  = math.min(_bins - 1, math.max(0, int(math.floor((bar_hi - lo) / step))))
-                    if last < first
-                        last := first
-                    for b = first to last
+                    float inv_r = 1.0 / r
+                    for b = 0 to _bins - 1
                         float bin_lo = lo + b * step
                         float bin_hi = bin_lo + step
                         float overlap = math.max(0.0, math.min(bar_hi, bin_hi) - math.max(bar_lo, bin_lo))
                         if overlap > 0
-                            float share = v * (overlap / r)
-                            array.set(hist, b, array.get(hist, b) + share)
+                            float add_v = v * overlap * inv_r
+                            array.set(hist, b, array.get(hist, b) + add_v)
                 total += v
         if total <= 0
             [na, na, na]
         else
             float maxv = -1.0
             int poc_idx = 0
-            for i = 0 to _bins - 1
-                float hv = array.get(hist, i)
+            for k = 0 to _bins - 1
+                float hv = array.get(hist, k)
                 if hv > maxv
                     maxv := hv
-                    poc_idx := i
+                    poc_idx := k
             float target = total * _area_pct / 100.0
             float cum = array.get(hist, poc_idx)
             int left = poc_idx
@@ -2626,6 +2623,8 @@ f_calc_lite_value_levels(_lookback, _bins, _area_pct, _src_choice) =>
             while cum < target and (left > 0 or right < _bins - 1)
                 float lv = left > 0 ? array.get(hist, left - 1) : -1.0
                 float rv = right < _bins - 1 ? array.get(hist, right + 1) : -1.0
+                if lv < 0 and rv < 0
+                    break
                 if rv > lv
                     right += 1
                     cum += rv
