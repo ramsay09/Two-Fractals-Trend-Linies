@@ -3542,8 +3542,10 @@ f_sq_mtf_pack() =>
     bool squeeze_kc_tf = (s_bb_up_tf < kc_up_tf) and (s_bb_dn_tf > kc_dn_tf)
 
     float bbw_tf = (s_bb_up_tf - s_bb_dn_tf) / s_bb_mid_tf
-    float avg_bbw_tf = ta.sma(bbw_tf, 50)
-    bool is_squeeze_bbw_tf = bbw_tf < (avg_bbw_tf * 0.7)
+    float avg_bbw_tf_50 = ta.sma(bbw_tf, 50)
+    float avg_bbw_tf_20 = ta.sma(bbw_tf, 20)
+    float avg_bbw_tf = na(avg_bbw_tf_50) ? avg_bbw_tf_20 : avg_bbw_tf_50
+    bool is_squeeze_bbw_tf = (not na(avg_bbw_tf)) and (bbw_tf < (avg_bbw_tf * 0.7))
 
     bool is_squeeze_tf = is_squeeze_bbw_tf
     if eff_use_kc_squeeze
@@ -3571,7 +3573,7 @@ float sq_hi_mtf = na
 float sq_lo_mtf = na
 
 if sq_use_mtf
-    [sq_in_mtf, sq_hi_mtf, sq_lo_mtf] = request.security(syminfo.tickerid, sq_tf_eff, f_sq_mtf_pack(), lookahead=barmerge.lookahead_on)
+    [sq_in_mtf, sq_hi_mtf, sq_lo_mtf] = request.security(syminfo.tickerid, sq_tf_eff, f_sq_mtf_pack(), lookahead=barmerge.lookahead_off)
 
 bool in_sq_condition = sq_use_mtf ? (na(sq_in_mtf) ? false : sq_in_mtf) : (regime_state == "SQUEEZE")
 
