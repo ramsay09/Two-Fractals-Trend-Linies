@@ -297,7 +297,6 @@ rvol_th_3           = input.float(3.0, "⠀High", step=0.1, group=grp_rvol, inli
 show_vol            = input.bool(true, "High Volume Spikes⠀", group=grp_rvol, inline="vol_sp", tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
 vol_mult            = input.float(2.0, "Threshold (x Avg)", inline="vol_sp", group=grp_rvol)
 
-
 // VWAP Inputs
 grp_vwap            = "VWAP / Value Zone"
 vwap_enabled        = input.bool(false, "VWAP Enabled", group=grp_vwap, tooltip="Volume-weighted fair value. \n• Trend: Above=Bull, Below=Bear. \n• Reversion: Far from VWAP = Stretched.")
@@ -3548,7 +3547,7 @@ if eff_sq_box_enabled
 
         // Init/Reset (Single Object Recycle)
         if na(sqs.id_box)
-            sqs.id_box := box.new(bar_index, high, bar_index, low, border_color=color.new(color.yellow, 30), bgcolor=color.new(color.yellow, 90))
+            sqs.id_box := box.new(bar_index, high, bar_index, low, border_color=color.new(color.yellow, 30), bgcolor=color.new(color.yellow, 99))
         else
             box.set_left(sqs.id_box, bar_index)
             box.set_right(sqs.id_box, bar_index)
