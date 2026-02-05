@@ -511,8 +511,6 @@ sess_line_limit = input.int(150, "Max Session Lines (FIFO)", group=grp_sess, min
 
 // Alerts
 grp_alerts      = "🔔 Alerts"
-alert_profile   = input.string("Normal", "Alert Profile", options=["Off", "Minimal","Normal","Moderate"], group=grp_alerts, tooltip="Controls the complexity of alert triggers to avoid spam. \n• Off: No alerts. \n• Minimal: Trendline Breakouts only. \n• Normal: Adds Divergences. \n• Moderate: Adds Regime Changes & High Confluence Events.")
-alert_cooldown  = input.int(5, "Cooldown (Bars)", minval=1, group=grp_alerts, tooltip="Wait period (in bars) after an alert is triggered before the same alert type can trigger again. Prevents repetitive alerts during the same market event.")
 use_rt_alert   = input.bool(false, title="New Fractal", group=grp_alerts, tooltip="Triggers an alert signal while the 5th candle of a fractal pattern is forming (Real-time). Select 'Any function call' when creating the alert.")
 
 // Debug (Performance)
@@ -538,6 +536,7 @@ transp_tr           = input.int(50, 'Trend Line Transparency', minval=1, maxval=
 color_seg           = input.color(color.white, 'Segment Line Color', group=grp_atri)
 transp_seg          = input.int(65, 'Segment Line Transparency', minval=1, maxval= 100, group=grp_atri)
 
+vwap_band_opacity   = input.int(70, 'VWAP Bands Opacity', minval=0, maxval=100, group=grp_atri)
 transp_bg           = input.int(85, 'Background Color Transparency', minval=1, maxval= 100, group=grp_atri)
 
 
@@ -1524,7 +1523,7 @@ if eff_plot_trendline
     x1_u = use_special_trend ? x0_up : x1_up
     y1_u = use_special_trend ? y0_up : y1_up
 
-    x2_u = use_special_trend ? bar_index - 1 : x0_up
+    x2_u = use_special_trend ? bar_index : x0_up
     // Calculate Y2 based on Slope for Mode 0, or plain value for Mode >0
     float y2_u = na
     if use_special_trend
@@ -1537,7 +1536,7 @@ if eff_plot_trendline
     // Draw
     if not na(x1_u) and not na(x2_u) and x1_u != x2_u and not na(y2_u)
         if na(upper_line)
-            upper_line := line.new(x1 = x1_u, y1 = y1_u, x2 = x2_u, y2 = y2_u, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
+            upper_line := line.new(x1 = x1_u, y1 = y1_u, x2 = x2_u, y2 = y2_u, extend = extend.none, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
         else
             line.set_xy1(upper_line, x1_u, y1_u)
             line.set_xy2(upper_line, x2_u, y2_u)
@@ -1548,7 +1547,7 @@ if eff_plot_trendline
     x1_d = use_special_trend ? x0_dn : x1_dn
     y1_d = use_special_trend ? y0_dn : y1_dn
 
-    x2_d = use_special_trend ? bar_index - 1 : x0_dn
+    x2_d = use_special_trend ? bar_index : x0_dn
     float y2_d = na
     if use_special_trend
         if not na(slope_dn) and not na(x0_dn)
@@ -1558,7 +1557,7 @@ if eff_plot_trendline
 
     if not na(x1_d) and not na(x2_d) and x1_d != x2_d and not na(y2_d)
         if na(lower_line)
-            lower_line := line.new(x1 = x1_d, y1 = y1_d, x2 = x2_d, y2 = y2_d, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
+            lower_line := line.new(x1 = x1_d, y1 = y1_d, x2 = x2_d, y2 = y2_d, extend = extend.none, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
         else
             line.set_xy1(lower_line, x1_d, y1_d)
             line.set_xy2(lower_line, x2_d, y2_d)
@@ -2645,12 +2644,12 @@ if eff_vwap_enabled
 plot(vwap_show_line ? vwap_val : na, color=color.new(color.orange, 0), title="VWAP")
 
 // Bands
-plot((eff_vwap_zone or eff_vwap_fullbands) and not na(sigma_val) ? vwap_val + band_k1 * sigma_val : na, "B1 Up", color.new(color.gray, 80))
-plot((eff_vwap_zone or eff_vwap_fullbands) and not na(sigma_val) ? vwap_val - band_k1 * sigma_val : na, "B1 Dn", color.new(color.gray, 80))
-plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val + band_k2 * sigma_val : na, "B2 Up", color.new(color.gray, 60))
-plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val - band_k2 * sigma_val : na, "B2 Dn", color.new(color.gray, 60))
-plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val + band_k3 * sigma_val : na, "B3 Up", color.new(color.gray, 40))
-plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val - band_k3 * sigma_val : na, "B3 Dn", color.new(color.gray, 40))
+plot((eff_vwap_zone or eff_vwap_fullbands) and not na(sigma_val) ? vwap_val + band_k1 * sigma_val : na, "B1 Up", color.new(color.gray, vwap_band_opacity))
+plot((eff_vwap_zone or eff_vwap_fullbands) and not na(sigma_val) ? vwap_val - band_k1 * sigma_val : na, "B1 Dn", color.new(color.gray, vwap_band_opacity))
+plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val + band_k2 * sigma_val : na, "B2 Up", color.new(color.gray, vwap_band_opacity))
+plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val - band_k2 * sigma_val : na, "B2 Dn", color.new(color.gray, vwap_band_opacity))
+plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val + band_k3 * sigma_val : na, "B3 Up", color.new(color.gray, vwap_band_opacity))
+plot(eff_vwap_fullbands and not na(sigma_val) ? vwap_val - band_k3 * sigma_val : na, "B3 Dn", color.new(color.gray, vwap_band_opacity))
 
 // Label for Z
 var label lb_vwap_z = na
@@ -3887,7 +3886,6 @@ if barstate.islast
 
 
 // --- Stage 5: Alerts (Centralized) ---
-// alert_profile: Minimal, Normal, Moderate
 // Events based on registry
 
 // 1. Prepare Conditions
@@ -3895,36 +3893,6 @@ bool al_tl_break = (sig.tl_bull and not sig.tl_bull[1]) or (sig.tl_bear and not 
 bool al_div      = (sig.div_bull and not sig.div_bull[1]) or (sig.div_bear and not sig.div_bear[1])
 bool al_conf_cross = ta.crossover(conf_score, 75) or ta.crossunder(conf_score, 25) // Tighter Thresholds for Alerts
 bool al_regime_chg = regime_state != regime_state[1]
-
-// 2. Cooldown Logic
-var int last_alert_time_tl = 0
-var int last_alert_time_div = 0
-var int last_alert_time_reg = 0
-var int last_alert_time_conf = 0
-
-// 3. Execution
-if alert_profile != "Off"
-    // TL Break (Minimal+)
-    if (alert_profile == "Minimal" or alert_profile == "Normal" or alert_profile == "Moderate")
-        if al_tl_break and (bar_index - last_alert_time_tl > alert_cooldown)
-            alert("MCCS: Trendline Breakout Detected", alert.freq_once_per_bar_close)
-            last_alert_time_tl := bar_index
-
-    // Normal + Moderate
-    if (alert_profile == "Normal" or alert_profile == "Moderate")
-        if al_div and (bar_index - last_alert_time_div > alert_cooldown)
-            alert("MCCS: Divergence Detected", alert.freq_once_per_bar_close)
-            last_alert_time_div := bar_index
-
-    // Moderate Only
-    if alert_profile == "Moderate"
-        if al_regime_chg and (bar_index - last_alert_time_reg > alert_cooldown)
-            alert("MCCS: Regime Change to " + regime_state, alert.freq_once_per_bar_close)
-            last_alert_time_reg := bar_index
-
-        if al_conf_cross and (bar_index - last_alert_time_conf > alert_cooldown)
-            alert("MCCS: High Confluence Event (Score: " + str.tostring(conf_score) + ")", alert.freq_once_per_bar_close)
-            last_alert_time_conf := bar_index
 
 // Alert Conditions (For TradingView Setup)
 // Consolidated for easy selection
