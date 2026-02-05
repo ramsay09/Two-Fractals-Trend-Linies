@@ -2579,42 +2579,63 @@ if show_sess_on_tf
 f_calc_lite_value_levels(_lookback, _bins, _area_pct, _src_choice) =>
     float hi = ta.highest(high, _lookback)
     float lo = ta.lowest(low, _lookback)
-    float step = (hi - lo) / _bins
+    float span = hi - lo
+    float step = span / _bins
     if step <= 0
         [na, na, na]
     else
         float[] hist = array.new_float(_bins, 0.0)
         float total = 0.0
         for i = 0 to _lookback - 1
-            float price = _src_choice == "HL2" ? hl2[i] : _src_choice == "Close" ? close[i] : hlc3[i]
-            int idx = math.min(_bins - 1, math.max(0, int(math.floor((price - lo) / step))))
-            float vol = volume[i]
-            array.set(hist, idx, array.get(hist, idx) + vol)
-            total += vol
-        float maxv = -1.0
-        int poc_idx = 0
-        for i = 0 to _bins - 1
-            float v = array.get(hist, i)
-            if v > maxv
-                maxv := v
-                poc_idx := i
-        float target = total * _area_pct / 100.0
-        float cum = array.get(hist, poc_idx)
-        int left = poc_idx
-        int right = poc_idx
-        while cum < target and (left > 0 or right < _bins - 1)
-            float left_vol = left > 0 ? array.get(hist, left - 1) : -1
-            float right_vol = right < _bins - 1 ? array.get(hist, right + 1) : -1
-            if right_vol > left_vol
-                right += 1
-                cum += right_vol
-            else
-                left -= 1
-                cum += left_vol
-        float poc_price = lo + (poc_idx + 0.5) * step
-        float val_price = lo + left * step
-        float vah_price = lo + (right + 1) * step
-        [poc_price, vah_price, val_price]
+            float v = nz(volume[i], 0.0)
+            if v > 0
+                float bar_lo = low[i]
+                float bar_hi = high[i]
+                float r = bar_hi - bar_lo
+                if r <= 0
+                    float p = _src_choice == "HL2" ? hl2[i] : _src_choice == "Close" ? close[i] : hlc3[i]
+                    int idx = math.min(_bins - 1, math.max(0, int(math.floor((p - lo) / step))))
+                    array.set(hist, idx, array.get(hist, idx) + v)
+                else
+                    int first = math.min(_bins - 1, math.max(0, int(math.floor((bar_lo - lo) / step))))
+                    int last  = math.min(_bins - 1, math.max(0, int(math.floor((bar_hi - lo) / step))))
+                    if last < first
+                        last := first
+                    for b = first to last
+                        float bin_lo = lo + b * step
+                        float bin_hi = bin_lo + step
+                        float overlap = math.max(0.0, math.min(bar_hi, bin_hi) - math.max(bar_lo, bin_lo))
+                        if overlap > 0
+                            float share = v * (overlap / r)
+                            array.set(hist, b, array.get(hist, b) + share)
+                total += v
+        if total <= 0
+            [na, na, na]
+        else
+            float maxv = -1.0
+            int poc_idx = 0
+            for i = 0 to _bins - 1
+                float hv = array.get(hist, i)
+                if hv > maxv
+                    maxv := hv
+                    poc_idx := i
+            float target = total * _area_pct / 100.0
+            float cum = array.get(hist, poc_idx)
+            int left = poc_idx
+            int right = poc_idx
+            while cum < target and (left > 0 or right < _bins - 1)
+                float lv = left > 0 ? array.get(hist, left - 1) : -1.0
+                float rv = right < _bins - 1 ? array.get(hist, right + 1) : -1.0
+                if rv > lv
+                    right += 1
+                    cum += rv
+                else
+                    left -= 1
+                    cum += lv
+            float poc_price = lo + (poc_idx + 0.5) * step
+            float val_price = lo + left * step
+            float vah_price = lo + (right + 1) * step
+            [poc_price, vah_price, val_price]
 
 
 //------------------------------------------------------- VWAP Core & Bands -------------------------------------------------------
