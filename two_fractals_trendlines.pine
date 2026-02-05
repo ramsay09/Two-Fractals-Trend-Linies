@@ -75,14 +75,14 @@ show_conf_meter     = input.bool(true, "CONF⠀⠀⠀", inline="conf_ui", group=
 show_conf_bg        = input.bool(false, "Confluence Meter BG⠀", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on CONF score thresholds (score > 55 = green, < 45 = red). Neutral stays transparent.")
 show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui", group=grp_conf_reg, tooltip="Colors the chart background based on Confirmed Bias (BULL/BEAR/NEUT). Useful to compare the stable filter vs the score background.")
 
+show_regime_panel   = input.bool(true, "REG⠀⠀⠀⠀", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
+regime_bg_enabled   = input.bool(false, "Squeeze & Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
+
 // CONF Panel: Confirmed Bias (profile + optional scalp optimization)
 //string grp_conf_bias = "CONF Confirmed Bias"
 cb_profile      = input.string("Standard", "Bias Confirmation Profile", inline="bias", options=["Stable","Standard","Fast"], tooltip="")
 cb_scalp_opt    = input.bool(false, "Scalp Optimize", inline="bias", tooltip="Stable: fewer flips, stronger filter.\nStandard: allround.\nFast: quicker bias response (timing).
                   \nScalp Optimize: Optimizes confirmed bias parameters for scalping (faster reaction).\nBias remains a direction gate; entries come from separate signals.")
-
-show_regime_panel   = input.bool(true, "REG⠀⠀⠀⠀", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
-regime_bg_enabled   = input.bool(false, "Squeeze & Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="Market Regime Detection (Squeeze/Trend/Range). \n• Panel: Displays state in Info Table. \n• BG: Colors chart background (Gold=Squeeze, Blue=Trend). \n\nPanel Codes: \n• RVOL: L(<Low), M(Low-Med), H(Med-High), E(>High) \n• VWAP Z: N(Normal), S(Stretch), T(TP), E(Extreme)\n○ = developing (current candle not closed), ● = confirmed (closed).")
 
 string M_FORM = "○"
 string M_CONF = "●"
@@ -258,9 +258,6 @@ f_resolve_bias_confirm_params(string _profile, bool _scalp_opt) =>
 
 // Additional Context Inputs
 grp_add         = "Additional Context"
-use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", group=grp_add, inline="sess_1st", tooltip="")
-sess_1st_tf     = input.timeframe("5", "", group=grp_add, inline="sess_1st", tooltip="Lines remain at the high and low of the first candle of the running trading session. \nSelect the timeframe for the 1st Session Candle calculation.")
-
 show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀", group=grp_add, inline="l_rf", tooltip="")
 last_frac_tf    = input.timeframe("240", "", group=grp_add, inline="l_rf", tooltip="Draws lines at the last confirmed Up/Down Fractals. Every new trend begins with the breaking of a fractal. (Time Frame dependent). \nSelect the timeframe for the Last Fractal calculation.")
 
@@ -342,6 +339,10 @@ lite_value_line_transp   = input.int(30, "⠀⠀⠀Transparency", minval=0, maxv
 // OR/IB Inputs
 grp_or              = "Opening Range / Initial Balance"
 or_enabled          = input.bool(false, "OR/IB Enabled", group=grp_or, tooltip="Defines the first battle zone; key for trend vs range days.")
+
+use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", inline="sess_1st", group=grp_or, tooltip="")
+sess_1st_tf     = input.timeframe("5", "", inline="sess_1st", group=grp_or, tooltip="Lines remain at the high and low of the first candle of the running trading session. \nSelect the timeframe for the 1st Session Candle calculation.")
+
 or_type             = input.string("Opening Range", "Type", options=["Opening Range", "Initial Balance"], group=grp_or, inline="or_1", tooltip="OR: User defined minutes. \nIB: First 60 minutes.")
 or_sess             = input.string("New York", "⠀Session", options=["London", "New York", "Custom"], group=grp_or, inline="or_1", tooltip="Market open context.")
 or_cust             = input.session("0930-1600", "Custom Sess", group=grp_or, inline="or_2")
@@ -2808,7 +2809,7 @@ if eff_or_enabled
 
         // Colors
         color c_or_border = color.new(color.blue, 30)
-        color c_or_bg = color.new(color.blue, 92)
+        color c_or_bg = color.new(color.blue, 99)
         color c_or_hi = color.new(color.green, 30)
         color c_or_lo = color.new(color.red, 30)
 
