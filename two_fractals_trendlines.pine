@@ -1989,11 +1989,11 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
     string pos_input = panel_pos == "Top Right" ? position.top_right : panel_pos == "Bottom Right" ? position.bottom_right : position.bottom_left
     info_panel := na(info_panel) ? table.new(position = pos_input, columns = PANEL_COLS, rows = PANEL_ROWS, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50)) : info_panel
     // Legend (Row 0)
-    string legend_txt = "CONF: BULL/BEAR/\nNEUT = bias\n• L/M/H/E = quality\n• A = aligned\n• X = misaligned\n\n" +
-        "REG: RANGE/TREND/\nSQUEEZE = regime\n\n" +
-        "RVOL:\n• L/M/H/E = quality\n\n" +
-        "VWP (Z):\n• N/S/T/E = zone/state\n  N=normal S=stretched\n  T=TP  E=extreme\n\n" +
-        "• ○ = developing\n• ● = confirmed\n• C = current tf"
+    string legend_txt = "CONF: BULL/BEAR/\nNEUT = bias\n• L/M/H/E = quality\n• A = aligned\n• X = misaligned\n\n"
+    legend_txt += "REG: RANGE/TREND/\nSQUEEZE = regime\n\n"
+    legend_txt += "RVOL:\n• L/M/H/E = quality\n\n"
+    legend_txt += "VWP (Z):\n• N/S/T/E = zone/state\n  N=normal S=stretched\n  T=TP  E=extreme\n\n"
+    legend_txt += "• ○ = developing\n• ● = confirmed\n• C = current tf"
     table.merge_cells(info_panel, 0, f_panel_row(0), 2, f_panel_row(0))
     table.cell(table_id=info_panel, column=0, row=f_panel_row(0), text=panel_show_legend ? legend_txt : "", text_size=size.small, text_color=color.silver, text_halign=text.align_left)
 
