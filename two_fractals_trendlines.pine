@@ -27,16 +27,20 @@ int W_O     = 1
 
 // --- TOP LEVEL UI ---
 // adx, hma and ema1 x ema2 mtf trend info panel
-trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Market Map", "Opening Auction", "Value Reversion", "Compression -> Expansion", "Trend Continuation", "Range Rotation"], tooltip="Applies focused defaults for a trading lens. Custom = manual.\n• Market Map: Sessions + key levels.\n• Opening Auction: OR/IB + RVOL.\n• Value Reversion: VWAP bands + BB touch.\n• Compression -> Expansion: Squeeze + RVOL.\n• Trend Continuation: Trend tools + weekly VWAP.\n• Range Rotation: VWAP zone + BB touch.")
+trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Market Map", "Opening Auction", "Value Reversion", "Compression -> Expansion", "Trend Continuation", "Range Rotation"],
+                          tooltip="Applies focused defaults for a trading lens. Custom = manual.\n• Market Map: Sessions + key levels.\n• Opening Auction: OR/IB + RVOL.\n• Value Reversion: VWAP bands + BB touch.\n• Compression -> Expansion: Squeeze + RVOL.\n• Trend Continuation: Trend tools + weekly VWAP.\n• Range Rotation: VWAP zone + BB touch.")
 
 
 panel_pos               = input.string(title='MTF Panel', inline="panel", defval='Bottom Right', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
                           tooltip="")
-panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update", inline="panel", options=["Realtime Preview", "Strict Confirm"], tooltip="• MTF Panel position: choose where the panel is shown (None disables it).\n• Update Mode controls whether values are live (○) or only confirmed (●).\n• Realtime Preview shows developing values; Strict Confirm shows only closed-bar values.")
+panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update", inline="panel", options=["Realtime Preview", "Strict Confirm"], tooltip="")
 bool panel_show_live    = panel_update_mode == "Realtime Preview"
-bool panel_show_legend  = input.bool(false, "Legend", inline="panel", tooltip="Shows a legend cell for CONF/REG/VOL in the panel.")
+bool panel_show_legend  = input.bool(false, "Legend", inline="panel", tooltip="• MTF Panel position: choose where the panel is shown (None disables it).\n• Update Mode controls whether values are live (○) or only confirmed (●).\
+                          n• Realtime Preview shows developing values; Strict Confirm shows only closed-bar values.\n• Shows a legend cell for CONF/REG/VOL in the panel.")
 
-auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="• CONF shows dominant trend as 0–100 (50 = neutral).\n• BULL/BEAR/NEUT = direction; H/M/L = quality.\n• Bias comes from FVG + structure + trend filter (first FVG holds bias).\n• Trendlines/Segments confirm briefly but cannot flip bias alone.\n• REG gates reliability (SQUEEZE dampens CONF).\n• Visuals: Green/Red = Bull/Bear; NEUT is transparent.\n• Auto tuning sets sensitivity: Conservative (slower), Balanced (standard), Aggressive (faster).")
+auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="• CONF shows dominant trend as 0–100 (50 = neutral).
+                      \n• BULL/BEAR/NEUT = direction; H/M/L = quality.\n• Bias comes from FVG + structure + trend filter (first FVG holds bias).\n• Trendlines/Segments confirm briefly but cannot flip bias alone.\n• REG gates reliability (SQUEEZE dampens CONF).
+                      \n• Visuals: Green/Red = Bull/Bear; NEUT is transparent.\n• Auto tuning sets sensitivity: Conservative (slower), Balanced (standard), Aggressive (faster).")
 
 // CONF Panel: Confirmed Bias (profile + optional scalp optimization)
 //string grp_conf_bias = "CONF Confirmed Bias"
@@ -1988,7 +1992,7 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
 
     // Legend (Row 0)
     string legend_txt = "CONF: BULL/BEAR/\nNEUT = bias\n• L/M/H/E = quality\n• A = aligned\n• X = misaligned\n\nREG: RANGE/TREND/\nSQUEEZE = regime\n\nVOL: \nRVOL \n L/M/H/E = quality\nVWP Z \n  N/S/T/E = quality
-                       \n• ○ = developing\n• ● = confirmed\n• C = current tf\n• L = low\n• M = medium\n• H = high\n• E = extreme\n• N = neutral\n• S = squeeze\n• T = trend\n"
+                       \n• ○ = developing\n• ● = confirmed\n• C = current tf\n• L = low\n• M = medium\n• H = high\n• E = extreme\n• N = neutral\n• S = squeeze\n• T = trend"
     table.merge_cells(info_panel, 0, f_panel_row(0), 2, f_panel_row(0))
     table.cell(table_id=info_panel, column=0, row=f_panel_row(0), text=panel_show_legend ? legend_txt : "", text_size=size.small, text_color=color.silver, text_halign=text.align_left)
 
