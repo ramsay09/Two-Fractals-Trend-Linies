@@ -287,10 +287,10 @@ key_extend          = input.bool(true, "Extend", inline="kl_3", group=grp_key, t
 grp_rvol            = "Relative Volume & High Volume Spikes"
 rvol_enabled        = input.bool(true, "RVOL Enabled", group=grp_rvol, tooltip="Relative Volume = Current Vol / Avg Vol. \nMeasures participation; confirms breakouts and reclaims. \n• Opening Auction / Expansion: RVOL > 2.0 signals expansion. \n• Reclaim: RVOL pickup confirms strength.")
 rvol_len            = input.int(20, "Length", minval=1, group=grp_rvol, inline="rv_1", tooltip="Average window; 20 is common.")
-rvol_display        = input.string("Marker", "⠀Display", options=["None", "Marker", "Label", "Both"], group=grp_rvol, inline="rv_1", tooltip="Visual style.")
+rvol_display        = input.string("Marker", "⠀⠀Display", options=["None", "Marker", "Label", "Both"], group=grp_rvol, inline="rv_1", tooltip="Visual style.")
 rvol_points_enabled = input.bool(true, "Points", group=grp_rvol, inline="rv_1", tooltip="H/E only markers to reduce noise. \nEnabled by default in Opening Auction / Expansion lenses.")
 rvol_th_1           = input.float(1.2, "Low⠀", step=0.1, group=grp_rvol, inline="rv_2", tooltip="1.2x: Slightly elevated.")
-rvol_th_2           = input.float(2.0, "⠀Med", step=0.1, group=grp_rvol, inline="rv_2", tooltip="2.0x: Event / Breakout fuel.")
+rvol_th_2           = input.float(2.0, "⠀⠀Med", step=0.1, group=grp_rvol, inline="rv_2", tooltip="2.0x: Event / Breakout fuel.")
 rvol_th_3           = input.float(3.0, "⠀High", step=0.1, group=grp_rvol, inline="rv_2", tooltip="3.0x: Strong trend / News.")
 
 show_vol            = input.bool(true, "High Volume Spikes⠀", group=grp_rvol, inline="vol_sp", tooltip="A small 'V' indicates whether institutions are active (e.g., double the average volume). High volume is often observed at local highs and lows.")
