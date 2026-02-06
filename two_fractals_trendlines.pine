@@ -1987,9 +1987,9 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
     info_panel := na(info_panel) ? table.new(position = pos_input, columns = PANEL_COLS, rows = PANEL_ROWS, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50)) : info_panel
 
     // Legend (Row 0)
-    string legend_txt = "• CONF: BULL/BEAR/NEUT\n• REG: RANGE/TREND/SQUEEZE\n• VOL: RVOL L/M/H/E\n• VWP: Z N/S/T/E\n• ○ = developing\n• ● = confirmed\n• Use with price action\n• Context matters\n \n "
+    string legend_txt = "• CONF: BULL/BEAR/NEUT\n• REG: RANGE/TREND/\n  SQUEEZE\n• VOL: RVOL L/M/H/E\n• VWP: Z N/S/T/E\n• ○ = developing\n• ● = confirmed\n• Use with price action\n• Context matters\n "
     table.merge_cells(info_panel, 0, f_panel_row(0), 2, f_panel_row(0))
-    table.cell(table_id=info_panel, column=0, row=f_panel_row(0), text=panel_show_legend ? legend_txt : "", text_size=size.small, text_color=color.silver)
+    table.cell(table_id=info_panel, column=0, row=f_panel_row(0), text=panel_show_legend ? legend_txt : "", text_size=size.small, text_color=color.silver, text_halign=text.align_left)
 
     // HEADER NAMES (Row 1)
     table.cell(table_id=info_panel, column=0, row=f_panel_row(1), text="TF", text_size= size.small, text_color=color.silver)
