@@ -35,8 +35,7 @@ panel_pos               = input.string(title='MTF Panel', inline="panel", defval
                           tooltip="")
 panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update", inline="panel", options=["Realtime Preview", "Strict Confirm"], tooltip="")
 bool panel_show_live    = panel_update_mode == "Realtime Preview"
-bool panel_show_legend  = input.bool(false, "Legend", inline="panel", tooltip="• MTF Panel position: choose where the panel is shown (None disables it).\n• Update Mode controls whether values are live (○) or only confirmed (●).\
-                          n• Realtime Preview shows developing values; Strict Confirm shows only closed-bar values.\n• Shows a legend cell for CONF/REG/VOL in the panel.")
+bool panel_show_legend  = input.bool(false, "Legend", inline="panel", tooltip="• MTF Panel position: choose where the panel is shown (None disables it).\n• Update Mode controls whether values are live (○) or only confirmed (●).\n• Realtime Preview shows developing values; Strict Confirm shows only closed-bar values.\n• Shows a legend cell for CONF/REG/RVOL/VWP in the panel.")
 
 auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="• CONF shows dominant trend as 0–100 (50 = neutral).
                       \n• BULL/BEAR/NEUT = direction; H/M/L = quality.\n• Bias comes from FVG + structure + trend filter (first FVG holds bias).\n• Trendlines/Segments confirm briefly but cannot flip bias alone.\n• REG gates reliability (SQUEEZE dampens CONF).
@@ -70,7 +69,7 @@ show_conf_bg        = input.bool(false, "Confluence Meter BG⠀", inline="conf_u
 show_confirmed_bias_bg  = input.bool(false, "Confirmed Bias BG", inline="conf_ui", group=grp_conf_reg, tooltip="• CONF toggles the confluence meter display.\n• Confluence Meter BG colors the chart by CONF score (green > 55, red < 45).\n• Confirmed Bias BG colors by confirmed bias (BULL/BEAR/NEUT) for comparison.")
 
 show_regime_panel   = input.bool(true, "REG⠀⠀⠀⠀", inline="REGIME_UI", group=grp_conf_reg, tooltip="")
-regime_bg_enabled   = input.bool(false, "Squeeze & Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="• REG toggles the regime panel (Squeeze/Trend/Range state).\n• Squeeze & Trend BG colors the chart (Gold=Squeeze, Blue=Trend).\n• Panel codes: RVOL L/M/H/E and VWAP Z N/S/T/E; ○=developing, ●=confirmed.")
+regime_bg_enabled   = input.bool(false, "Squeeze & Trend BG", inline="REGIME_UI", group=grp_conf_reg, tooltip="• REG toggles the regime panel (Squeeze/Trend/Range state).\n• Squeeze & Trend BG colors the chart (Gold=Squeeze, Blue=Trend).\n• Panel codes: RVOL L/M/H/E (quality) and VWP N/S/T/E (zone/state); ○=developing, ●=confirmed.")
 
 string M_FORM = "○"
 string M_CONF = "●"
@@ -1989,10 +1988,13 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
 
     string pos_input = panel_pos == "Top Right" ? position.top_right : panel_pos == "Bottom Right" ? position.bottom_right : position.bottom_left
     info_panel := na(info_panel) ? table.new(position = pos_input, columns = PANEL_COLS, rows = PANEL_ROWS, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50)) : info_panel
-
     // Legend (Row 0)
-    string legend_txt = "CONF: BULL/BEAR/\nNEUT = bias\n• L/M/H/E = quality\n• A = aligned\n• X = misaligned\n\nREG: RANGE/TREND/\nSQUEEZE = regime\n\nVOL: \nRVOL \n L/M/H/E = quality\nVWP Z \n  N/S/T/E = quality
-                       \n• ○ = developing\n• ● = confirmed\n• C = current tf\n• L = low\n• M = medium\n• H = high\n• E = extreme\n• N = neutral\n• S = squeeze\n• T = trend"
+    string legend_txt =
+        "CONF: BULL/BEAR/\nNEUT = bias\n• L/M/H/E = quality\n• A = aligned\n• X = misaligned\n\n" +
+        "REG: RANGE/TREND/\nSQUEEZE = regime\n\n" +
+        "RVOL:\n• L/M/H/E = quality\n\n" +
+        "VWP (Z):\n• N/S/T/E = zone/state\n  N=normal S=stretched\n  T=TP  E=extreme\n\n" +
+        "• ○ = developing\n• ● = confirmed\n• C = current tf"
     table.merge_cells(info_panel, 0, f_panel_row(0), 2, f_panel_row(0))
     table.cell(table_id=info_panel, column=0, row=f_panel_row(0), text=panel_show_legend ? legend_txt : "", text_size=size.small, text_color=color.silver, text_halign=text.align_left)
 
@@ -3383,7 +3385,7 @@ if eff_regime_panel and not na(info_panel) and barstate.islast
         color rvol_bg_disp = panel_show_live ? c_rv_p_live : rvol_bg_conf
         rvol_disp := f_with_marker(rvol_disp, m_reg)
         table.merge_cells(info_panel, 1, f_panel_row(14), 2, f_panel_row(14))
-        table.cell(info_panel, 0, f_panel_row(14), "VOL", text_size=marker_size_inline, text_color=color.silver)
+        table.cell(info_panel, 0, f_panel_row(14), "RVOL", text_size=marker_size_inline, text_color=color.silver)
         table.cell(info_panel, 1, f_panel_row(14), rvol_disp, text_size=marker_size_inline, text_color=color.silver, bgcolor=rvol_bg_disp)
 
     // Row 14: VWAP Z

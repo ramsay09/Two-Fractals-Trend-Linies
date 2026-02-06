@@ -117,10 +117,10 @@ A **Context Lens** applies focused defaults to reduce clutter and align the tool
 ## Panel Legend (Compact Pro Readout)
 The panel is intended to be readable at a glance (numbers + classification):
 
-- **RVOL**: `VOL 0.14x L`  
+- **RVOL**: `RVOL 0.14x L`  
   - `L/M/H/E` = low / moderate / high / extreme participation
 - **VWAP Z**: `VWP -4.1σ E`  
-  - `N/S/T/E` = normal / stretched / TP zone / extreme
+  - `N/S/T/E` = zone/state (normal / stretched / TP zone / extreme)
 - **CONF / REG**: regime + confluence bias/quality context (not a standalone entry)
 
 ---
