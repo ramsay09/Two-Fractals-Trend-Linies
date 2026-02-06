@@ -5,7 +5,7 @@ indicator('Market Context & Confluence Suite', overlay=true, shorttitle='MCCS', 
 general_info   = input.bool(title='General Description', defval=false, tooltip="• Explains how to read the confluence signals and market tension context.\n• Highlights that context matters and signals should be combined with price action.\n• Reminder: the chart itself is the most direct indicator—use tools selectively.")
 
 // Constants for Panel & Weights (Centralized)
-int PANEL_ROWS = 15
+int PANEL_ROWS = 16
 int PANEL_COLS = 3
 
 // Confluence Weights
@@ -34,6 +34,7 @@ panel_pos               = input.string(title='MTF Panel', inline="panel", defval
                           tooltip="")
 panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update Mode", inline="panel", options=["Realtime Preview", "Strict Confirm"], tooltip="• MTF Panel position: choose where the panel is shown (None disables it).\n• Update Mode controls whether values are live (○) or only confirmed (●).\n• Realtime Preview shows developing values; Strict Confirm shows only closed-bar values.")
 bool panel_show_live    = panel_update_mode == "Realtime Preview"
+bool panel_show_legend  = input.bool(false, "Legend", inline="panel", tooltip="Shows a legend cell for CONF/REG/VOL in the panel.")
 
 auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="• CONF shows dominant trend as 0–100 (50 = neutral).\n• BULL/BEAR/NEUT = direction; H/M/L = quality.\n• Bias comes from FVG + structure + trend filter (first FVG holds bias).\n• Trendlines/Segments confirm briefly but cannot flip bias alone.\n• REG gates reliability (SQUEEZE dampens CONF).\n• Visuals: Green/Red = Bull/Bear; NEUT is transparent.\n• Auto tuning sets sensitivity: Conservative (slower), Balanced (standard), Aggressive (faster).")
 
@@ -2024,18 +2025,23 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
     table.cell(table_id=info_panel, column=0, row=f_panel_row(7), text="5m", text_size= size.small, text_color=color.silver, bgcolor=is_5m ? col_tf_highlight : na)
     table.cell(table_id=info_panel, column=1, row=f_panel_row(7), text=m_fvg_5m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=Intra ? fvg_color_5m : na)
     table.cell(table_id=info_panel, column=2, row=f_panel_row(7), text=m_fr_5m, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=Intra ? fr_color_5m : na)
-    // ATR14 (Row 8)
+    // Legend (Row 8)
+    string legend_txt = "• CONF: Bias/Score\n• REG: Regime\n• VOL: RVOL\n \n \n \n \n \n \n "
     table.merge_cells(info_panel, 0, f_panel_row(8), 2, f_panel_row(8))
-    table.cell(table_id=info_panel, column=0, row=f_panel_row(8), text="ATR14 " + str.tostring(atr14_val, "#.#####"), text_size=size.small, text_color=color.silver)
+    table.cell(table_id=info_panel, column=0, row=f_panel_row(8), text=panel_show_legend ? legend_txt : "", text_size=size.small, text_color=color.silver)
 
-    // ADR% (Row 9) - Initial Placeholder (Filled later)
+    // ATR14 (Row 9)
     table.merge_cells(info_panel, 0, f_panel_row(9), 2, f_panel_row(9))
-    table.cell(table_id=info_panel, column=0, row=f_panel_row(9), text="ADR%", text_size=size.small, text_color=color.silver)
+    table.cell(table_id=info_panel, column=0, row=f_panel_row(9), text="ATR14 " + str.tostring(atr14_val, "#.#####"), text_size=size.small, text_color=color.silver)
 
-    // HEADER (Row 10: Current)
-    table.cell(table_id=info_panel, column=0, row=f_panel_row(10), text="C", text_size= size.small, text_color=color.silver, bgcolor=is_custom_tf ? col_tf_highlight : na)
-    table.cell(table_id=info_panel, column=1, row=f_panel_row(10), text=m_fvg_c, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(Intra_D_W_M) ? fvg_color_c : na)
-    table.cell(table_id=info_panel, column=2, row=f_panel_row(10), text=m_fr_c, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(Intra_D_W_M) ? fr_color_c : na)
+    // ADR% (Row 10) - Initial Placeholder (Filled later)
+    table.merge_cells(info_panel, 0, f_panel_row(10), 2, f_panel_row(10))
+    table.cell(table_id=info_panel, column=0, row=f_panel_row(10), text="ADR%", text_size=size.small, text_color=color.silver)
+
+    // HEADER (Row 11: Current)
+    table.cell(table_id=info_panel, column=0, row=f_panel_row(11), text="C", text_size= size.small, text_color=color.silver, bgcolor=is_custom_tf ? col_tf_highlight : na)
+    table.cell(table_id=info_panel, column=1, row=f_panel_row(11), text=m_fvg_c, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(Intra_D_W_M) ? fvg_color_c : na)
+    table.cell(table_id=info_panel, column=2, row=f_panel_row(11), text=m_fr_c, text_size=marker_size_grid, text_color=MARKER_COLOR, bgcolor=(Intra_D_W_M) ? fr_color_c : na)
 else
     if not na(info_panel)
         table.delete(info_panel)
@@ -3200,11 +3206,11 @@ plot(adr_pct, title="ADR %", color=color.new(color.white, 100), display=display.
 var label lbl_adr = na
 label.delete(lbl_adr)
 
-// Update Panel Row 9 (ADR%)
+// Update Panel Row 10 (ADR%)
 if not na(info_panel) and barstate.islast
     string adr_txt = "ADR% " + (not na(adr_pct) ? str.tostring(adr_pct, "#.#") + "%" : "n/a")
-    table.merge_cells(info_panel, 0, f_panel_row(9), 2, f_panel_row(9))
-    table.cell(table_id=info_panel, column=0, row=f_panel_row(9), text=adr_txt, text_size=size.small, text_color=color.silver, tooltip="• ADR% shows progress within the Average Daily Range.\n• Helps avoid entering near exhaustion levels.")
+    table.merge_cells(info_panel, 0, f_panel_row(10), 2, f_panel_row(10))
+    table.cell(table_id=info_panel, column=0, row=f_panel_row(10), text=adr_txt, text_size=size.small, text_color=color.silver, tooltip="• ADR% shows progress within the Average Daily Range.\n• Helps avoid entering near exhaustion levels.")
 
 
 // -------------------------------------------------------------------------
@@ -3350,9 +3356,9 @@ if eff_regime_panel and not na(info_panel) and barstate.islast
     color reg_bg_disp = panel_show_live ? c_reg_bg_live : reg_bg_conf
     reg_bg_disp := reg_disp == "SQUEEZE" ? color.new(reg_bg_disp, 50) : reg_bg_disp
     reg_disp := f_with_marker(reg_disp, m_reg)
-    table.merge_cells(info_panel, 1, f_panel_row(12), 2, f_panel_row(12))
-    table.cell(info_panel, 0, f_panel_row(12), "REG", text_size=marker_size_inline, text_color=color.silver)
-    table.cell(info_panel, 1, f_panel_row(12), reg_disp, text_size=marker_size_inline, text_color=color.silver, bgcolor=reg_bg_disp)
+    table.merge_cells(info_panel, 1, f_panel_row(13), 2, f_panel_row(13))
+    table.cell(info_panel, 0, f_panel_row(13), "REG", text_size=marker_size_inline, text_color=color.silver)
+    table.cell(info_panel, 1, f_panel_row(13), reg_disp, text_size=marker_size_inline, text_color=color.silver, bgcolor=reg_bg_disp)
 
     // Row 13: RVOL
     if eff_rvol_enabled
@@ -3370,9 +3376,9 @@ if eff_regime_panel and not na(info_panel) and barstate.islast
         string rvol_disp = panel_show_live ? rvol_txt_live : rvol_conf
         color rvol_bg_disp = panel_show_live ? c_rv_p_live : rvol_bg_conf
         rvol_disp := f_with_marker(rvol_disp, m_reg)
-        table.merge_cells(info_panel, 1, f_panel_row(13), 2, f_panel_row(13))
-        table.cell(info_panel, 0, f_panel_row(13), "VOL", text_size=marker_size_inline, text_color=color.silver)
-        table.cell(info_panel, 1, f_panel_row(13), rvol_disp, text_size=marker_size_inline, text_color=color.silver, bgcolor=rvol_bg_disp)
+        table.merge_cells(info_panel, 1, f_panel_row(14), 2, f_panel_row(14))
+        table.cell(info_panel, 0, f_panel_row(14), "VOL", text_size=marker_size_inline, text_color=color.silver)
+        table.cell(info_panel, 1, f_panel_row(14), rvol_disp, text_size=marker_size_inline, text_color=color.silver, bgcolor=rvol_bg_disp)
 
     // Row 14: VWAP Z
     if eff_vwap_enabled and eff_vwap_z and not na(z_val)
@@ -3392,9 +3398,9 @@ if eff_regime_panel and not na(info_panel) and barstate.islast
         string z_disp = panel_show_live ? z_txt_live : z_conf
         color z_bg_disp = panel_show_live ? c_z_p_live : z_bg_conf
         z_disp := f_with_marker(z_disp, m_reg)
-        table.merge_cells(info_panel, 1, f_panel_row(14), 2, f_panel_row(14))
-        table.cell(info_panel, 0, f_panel_row(14), "VWP", text_size=marker_size_inline, text_color=color.silver)
-        table.cell(info_panel, 1, f_panel_row(14), z_disp, text_size=marker_size_inline, text_color=color.silver, bgcolor=z_bg_disp)
+        table.merge_cells(info_panel, 1, f_panel_row(15), 2, f_panel_row(15))
+        table.cell(info_panel, 0, f_panel_row(15), "VWP", text_size=marker_size_inline, text_color=color.silver)
+        table.cell(info_panel, 1, f_panel_row(15), z_disp, text_size=marker_size_inline, text_color=color.silver, bgcolor=z_bg_disp)
 
 
 //------------------------------------------------------- Squeeze Box Module -------------------------------------------------------
@@ -3820,9 +3826,9 @@ if eff_calc_conf
         string m_conf = f_marker(panel_show_live and barstate.isrealtime, barstate.isconfirmed)
         conf_txt_disp := f_with_marker(conf_txt_disp, m_conf)
 
-        table.merge_cells(info_panel, 1, f_panel_row(11), 2, f_panel_row(11))
-        table.cell(info_panel, 0, f_panel_row(11), "CONF", text_size=marker_size_inline, text_color=color.silver)
-        table.cell(info_panel, 1, f_panel_row(11), conf_txt_disp, text_size=marker_size_inline, text_color=color.silver, bgcolor=conf_bg_disp)
+        table.merge_cells(info_panel, 1, f_panel_row(12), 2, f_panel_row(12))
+        table.cell(info_panel, 0, f_panel_row(12), "CONF", text_size=marker_size_inline, text_color=color.silver)
+        table.cell(info_panel, 1, f_panel_row(12), conf_txt_disp, text_size=marker_size_inline, text_color=color.silver, bgcolor=conf_bg_disp)
 
 // --- CENTRALIZED BACKGROUND ROUTING (Fix Bug #2) ---
 color bg_final = na
