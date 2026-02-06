@@ -3200,7 +3200,7 @@ label.delete(lbl_adr)
 if not na(info_panel) and barstate.islast
     string adr_txt = "ADR% " + (not na(adr_pct) ? str.tostring(adr_pct, "#.#") + "%" : "n/a")
     table.merge_cells(info_panel, 0, f_panel_row(9), 2, f_panel_row(9))
-table.cell(table_id=info_panel, column=0, row=f_panel_row(9), text=adr_txt, text_size=size.small, text_color=color.silver, tooltip="• ADR% shows progress within the Average Daily Range.\n• Helps avoid entering near exhaustion levels.")
+    table.cell(table_id=info_panel, column=0, row=f_panel_row(9), text=adr_txt, text_size=size.small, text_color=color.silver, tooltip="• ADR% shows progress within the Average Daily Range.\n• Helps avoid entering near exhaustion levels.")
 
 
 // -------------------------------------------------------------------------
