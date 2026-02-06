@@ -417,7 +417,7 @@ ma2_slope_c         = input.bool(false, title="Slope Color", inline="ma2", group
 // KAMA Inputs
 kama_enabled        = input.bool(false, title='KAMA⠀', inline="kama", group=grp_ma, tooltip="• KAMA toggles the Kaufman Adaptive Moving Average plot.\n• Uses the selected timeframe (MTF) for calculation.\n• Only computes when enabled to save resources.")
 kama_tf_sel         = input.timeframe("", title="TF", inline="kama", group=grp_ma, tooltip="• Timeframe for KAMA calculation.\n• Blank uses the chart timeframe.")
-kama_color_mode     = input.string("Slope", "⠀Color Mode", options=["Slope", "Break Close"], inline="kama", group=grp_ma, tooltip="• Slope: green when KAMA rises, red when it falls.\n• Break Close: green when HTF close > KAMA, red when HTF close < KAMA.")
+kama_slope_color    = input.bool(true, "⠀Slope", inline="kama", group=grp_ma, tooltip="• Slope: green when KAMA rises, red when it falls.\n• Disabled: KAMA is plotted in blue.")
 kama_len            = input.int(10, title='KAMA Length', minval=1, inline="kama_len", group=grp_ma)
 kama_fast           = input.int(2, title='Fast', minval=1, inline="kama_len", group=grp_ma)
 kama_slow           = input.int(30, title='Slow', minval=1, inline="kama_len", group=grp_ma, tooltip="• Length controls the efficiency ratio window.\n• Fast/Slow set the adaptive smoothing limits.")
@@ -1373,22 +1373,19 @@ if kama_enabled
         [kama_val, kama_close] = request.security(syminfo.tickerid, kama_tf, [f_kama(close, kama_len, kama_fast, kama_slow), close], lookahead=barmerge.lookahead_off)
         active_sec_calls += 1
 
-// KAMA Signals (Slope / Break Close Mode)
+// KAMA Signals (Slope Mode)
 bool kama_bull = false
 bool kama_bear = false
 if kama_enabled and not na(kama_val)
-    if kama_color_mode == "Slope"
+    if kama_slope_color
         kama_bull := kama_val > kama_val[1]
         kama_bear := kama_val < kama_val[1]
-    else
-        kama_bull := kama_close > kama_val
-        kama_bear := kama_close < kama_val
 
 if kama_enabled
     sig.kama_bull := kama_bull
     sig.kama_bear := kama_bear
 
-kama_col = kama_bull ? color.lime : kama_bear ? color.red : color.new(color.gray, 0)
+kama_col = kama_slope_color ? (kama_bull ? color.lime : kama_bear ? color.red : color.new(color.gray, 0)) : color.blue
 plot(kama_enabled ? kama_val : na, color=kama_col, linewidth=2, title="KAMA")
 
 
