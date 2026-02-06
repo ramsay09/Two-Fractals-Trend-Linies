@@ -286,14 +286,14 @@ vol_mult            = input.float(2.0, "Threshold (x Avg)", inline="vol_sp", gro
 
 // VWAP Inputs
 grp_vwap            = "VWAP / Value Zone"
-vwap_enabled        = input.bool(false, "VWAP Enabled", group=grp_vwap, tooltip="Volume-weighted fair value. \n• Trend: Above=Bull, Below=Bear. \n• Reversion: Far from VWAP = Stretched.")
+vwap_enabled        = input.bool(true, "VWAP Enabled", group=grp_vwap, tooltip="Volume-weighted fair value. \n• Trend: Above=Bull, Below=Bear. \n• Reversion: Far from VWAP = Stretched.")
 vwap_anchor         = input.string("Session (Daily Reset)", "Anchor", options=["Session (Daily Reset)", "Weekly"], group=grp_vwap, inline="vw_1", tooltip="")
 vwap_src_opt        = input.string("HLC3", "⠀Source", options=["HLC3", "HL2", "Close", "OHLC4"], group=grp_vwap, inline="vw_1", tooltip="• Anchor chooses Session (intraday) or Weekly VWAP.\n• Source picks the price input (HLC3 default, HL2 range focus, Close simplest).\n• Use a consistent source to avoid overfitting.")
-vwap_show_line      = input.bool(true, "Show Line⠀", group=grp_vwap, inline="vw_2")
+vwap_show_line      = input.bool(false, "Show Line⠀", group=grp_vwap, inline="vw_2")
 vwap_only_sess      = input.bool(false, "Calc Only in Sessions", group=grp_vwap, inline="vw_2", tooltip="• Show Line toggles the VWAP line visibility.\n• Calc Only in Sessions pauses VWAP outside selected sessions.\n• Use to align with market hours.")
 
 vwap_display_mode   = input.string("Value Zone (±1σ)", "Display", options=["Line only", "Value Zone (±1σ)", "Full Bands (B1–B3)"], group=grp_vwap, inline="vw_3", tooltip="")
-vwap_bands_enabled  = input.bool(true, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="• Display chooses line-only, ±1σ zone, or full B1–B3 bands.\n• Bands Enabled toggles the deviation bands.\n• Bands define “don’t chase” and take-profit zones.")
+vwap_bands_enabled  = input.bool(false, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="• Display chooses line-only, ±1σ zone, or full B1–B3 bands.\n• Bands Enabled toggles the deviation bands.\n• Bands define “don’t chase” and take-profit zones.")
 vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_4", tooltip="")
 vwap_stdev_len      = input.int(100, "⠀Len", minval=2, group=grp_vwap, inline="vw_4", tooltip="• Sigma Mode chooses Rolling or Session (Welford) deviation.\n• Len sets the rolling window for stdev.\n• Longer windows smooth band movement.")
 band_k1             = input.float(1.0, "K1", step=0.5, group=grp_vwap, inline="vw_6", tooltip="")
@@ -1989,11 +1989,8 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
     string pos_input = panel_pos == "Top Right" ? position.top_right : panel_pos == "Bottom Right" ? position.bottom_right : position.bottom_left
     info_panel := na(info_panel) ? table.new(position = pos_input, columns = PANEL_COLS, rows = PANEL_ROWS, bgcolor=color.new(color.blue, 95), frame_width=1, border_width=1, frame_color=color.new(color.black, 50), border_color=color.new(color.black, 50)) : info_panel
     // Legend (Row 0)
-    string legend_txt = "CONF: BULL/BEAR/\nNEUT = bias\n• L/M/H/E = quality\n• A = aligned\n• X = misaligned\n\n"
-    legend_txt += "REG: RANGE/TREND/\nSQUEEZE = regime\n\n"
-    legend_txt += "RVOL → quality (L/M/H/E)\n\n"
-    legend_txt += "VWP → zone/state (N/S/T/E)\n  N=normal  S=stretched\n  T=TP      E=extreme\n\n"
-    legend_txt += "• ○ = developing\n• ● = confirmed\n• C = current tf"
+    string legend_txt = "CONF: BULL/BEAR/\nNEUT = bias\n• L/M/H/E = quality\n• A = aligned\n• X = misaligned\n\nREG: RANGE/TREND/\nSQUEEZE = regime\n\nRVOL: \nL/M/H/E = quality\nVWP: \nN/S/T/E = zone/state
+                       \n\n• ○ = developing\n• ● = confirmed\n• C = current tf\n• L = low\n• M = medium\n• H = high\n• E = extreme\n• N = normal\n• S = streched\n• T = tp"
     table.merge_cells(info_panel, 0, f_panel_row(0), 2, f_panel_row(0))
     table.cell(table_id=info_panel, column=0, row=f_panel_row(0), text=panel_show_legend ? legend_txt : "", text_size=size.small, text_color=color.silver, text_halign=text.align_left)
 
