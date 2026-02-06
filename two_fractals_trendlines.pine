@@ -416,7 +416,7 @@ ma2_slope_c         = input.bool(false, title="Slope Color", inline="ma2", group
 
 // KAMA Inputs
 kama_enabled        = input.bool(false, title='KAMA⠀', inline="kama", group=grp_ma, tooltip="• KAMA toggles the Kaufman Adaptive Moving Average plot.\n• Uses the selected timeframe (MTF) for calculation.\n• Only computes when enabled to save resources.")
-kama_tf_sel         = input.string("1h", "", options=["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "1w", "1M", "3M"], inline="kama", group=grp_ma, tooltip="• Timeframe for KAMA calculation.\n• Uses the standard MTF combo options.")
+kama_tf_sel         = input.timeframe("", title="TF", inline="kama", group=grp_ma, tooltip="• Timeframe for KAMA calculation.\n• Blank uses the chart timeframe.")
 kama_color_mode     = input.string("Slope", "⠀Color Mode", options=["Slope", "Break Close"], inline="kama", group=grp_ma, tooltip="• Slope: green when KAMA rises, red when it falls.\n• Break Close: green when HTF close > KAMA, red when HTF close < KAMA.")
 kama_len            = input.int(10, title='KAMA Length', minval=1, inline="kama_len", group=grp_ma)
 kama_fast           = input.int(2, title='Fast', minval=1, inline="kama_len", group=grp_ma)
@@ -1360,21 +1360,7 @@ f_kama(_src, _len, _fast, _slow) =>
     _kama := na(_kama[1]) ? _src : _kama[1] + _sc * (_src - _kama[1])
     _kama
 
-string kama_tf = switch kama_tf_sel
-    "5m" => "5"
-    "15m" => "15"
-    "30m" => "30"
-    "1h" => "60"
-    "2h" => "120"
-    "4h" => "240"
-    "6h" => "360"
-    "12h" => "720"
-    "1d" => "D"
-    "1w" => "W"
-    "1M" => "M"
-    "3M" => "3M"
-    => "240"
-
+string kama_tf = kama_tf_sel == "" ? timeframe.period : kama_tf_sel
 bool kama_is_current_tf = timeframe.in_seconds(kama_tf) == timeframe.in_seconds(timeframe.period)
 float kama_val = na
 float kama_close = na
