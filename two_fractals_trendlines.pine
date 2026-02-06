@@ -1385,7 +1385,7 @@ if kama_enabled
     sig.kama_bull := kama_bull
     sig.kama_bear := kama_bear
 
-kama_col = kama_slope_color ? (kama_bull ? color.lime : kama_bear ? color.red : color.new(color.gray, 0)) : color.blue
+kama_col = kama_slope_color ? (kama_bull ? color.new(color.lime, 70) : kama_bear ? color.new(color.red, 70) : color.new(color.gray, 70)) : color.new(color.blue, 70)
 plot(kama_enabled ? kama_val : na, color=kama_col, linewidth=2, title="KAMA")
 
 
