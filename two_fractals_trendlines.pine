@@ -1991,8 +1991,8 @@ if panel_pos != "None" and barstate.islast // Stage 5: Last-Bar Gating for Secur
     // Legend (Row 0)
     string legend_txt = "CONF: BULL/BEAR/\nNEUT = bias\n• L/M/H/E = quality\n• A = aligned\n• X = misaligned\n\n"
     legend_txt += "REG: RANGE/TREND/\nSQUEEZE = regime\n\n"
-    legend_txt += "RVOL:\n• L/M/H/E = quality\n\n"
-    legend_txt += "VWP (Z):\n• N/S/T/E = zone/state\n  N=normal S=stretched\n  T=TP  E=extreme\n\n"
+    legend_txt += "RVOL → quality (L/M/H/E)\n\n"
+    legend_txt += "VWP → zone/state (N/S/T/E)\n  N=normal  S=stretched\n  T=TP      E=extreme\n\n"
     legend_txt += "• ○ = developing\n• ● = confirmed\n• C = current tf"
     table.merge_cells(info_panel, 0, f_panel_row(0), 2, f_panel_row(0))
     table.cell(table_id=info_panel, column=0, row=f_panel_row(0), text=panel_show_legend ? legend_txt : "", text_size=size.small, text_color=color.silver, text_halign=text.align_left)
