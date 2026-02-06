@@ -320,7 +320,6 @@ or_lock             = input.bool(true, "Lock after Window", group=grp_or, inline
 use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", inline="sess_1st", group=grp_or, tooltip="")
 sess_1st_tf     = input.timeframe("5", "", inline="sess_1st", group=grp_or, tooltip="• 1st Session Candle draws the first bar high/low as reference.\n• Timeframe selects the bar used for that first candle.\n• Useful for early session range framing.")
 
-
 // Squeeze Box
 grp_sq              = "Squeeze Box"
 sq_box_enabled      = input.bool(false, "Squeeze Box⠀", inline="sq_b", group=grp_sq, tooltip="")
@@ -415,10 +414,11 @@ ma2_len             = input.int(200, title="", minval=1, inline="ma2", group=grp
 ma2_slope_c         = input.bool(false, title="Slope Color", inline="ma2", group=grp_ma, tooltip="• MA 2 selects the moving average type.\n• Length sets the MA period.\n• Slope Color colors the MA by slope direction.")
 
 // KAMA Inputs
-kama_enabled        = input.bool(false, title='KAMA⠀', inline="kama", group=grp_ma, tooltip="• KAMA toggles the Kaufman Adaptive Moving Average plot.\n• Uses the selected timeframe (MTF) for calculation.\n• Only computes when enabled to save resources.")
-kama_tf_sel         = input.timeframe("", title="TF", inline="kama", group=grp_ma, tooltip="• Timeframe for KAMA calculation.\n• Blank uses the chart timeframe.")
-kama_slope_color    = input.bool(true, "⠀Slope", inline="kama", group=grp_ma, tooltip="• Slope: green when KAMA rises, red when it falls.\n• Disabled: KAMA is plotted in blue.")
-kama_len            = input.int(10, title='KAMA Length', minval=1, inline="kama_len", group=grp_ma)
+kama_enabled        = input.bool(false, title='KAMA⠀', inline="kama", group=grp_ma, tooltip="")
+kama_tf_sel         = input.timeframe("", title="TF", inline="kama", group=grp_ma, tooltip="")
+kama_slope_color    = input.bool(false, "Slope Color", inline="kama", group=grp_ma, tooltip="• KAMA toggles the Kaufman Adaptive Moving Average plot.\n• Uses the selected timeframe (MTF) for calculation.\n• Only computes when enabled to save resources.
+                      \n• Timeframe for KAMA calculation.\n• Blank uses the chart timeframe. \n• Slope: green when KAMA rises, red when it falls.\n• Disabled: KAMA is plotted in blue.")
+kama_len            = input.int(10, title='Length', minval=1, inline="kama_len", group=grp_ma)
 kama_fast           = input.int(2, title='Fast', minval=1, inline="kama_len", group=grp_ma)
 kama_slow           = input.int(30, title='Slow', minval=1, inline="kama_len", group=grp_ma, tooltip="• Length controls the efficiency ratio window.\n• Fast/Slow set the adaptive smoothing limits.")
 
@@ -428,7 +428,6 @@ plot_trendline      = input.bool(false, title='Fractal Trend Lines⠀', inline="
 fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group=grp_fr, tooltip="• Fractal Trend Lines connect Bill Williams fractals for breakout cues.\n• Bars Per Side sets fractal width (2 = 5-bar fractal).\n• Min=0 uses anchored linear regression to follow highs/lows.\n• Max=10 uses 21 bars; more bars filter noise but reduce signals.")
 show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fr, inline="l_rf", tooltip="")
 last_frac_tf    = input.timeframe("240", "", group=grp_fr, inline="l_rf", tooltip="• Last Fractal S/R draws the most recent confirmed fractal levels.\n• Timeframe selects which fractals to reference.\n• Useful for break-of-structure cues.")
-
 
 // divergence signal inputs
 grp_div             = 'Divergences'
@@ -1385,7 +1384,7 @@ if kama_enabled
     sig.kama_bull := kama_bull
     sig.kama_bear := kama_bear
 
-kama_col = kama_slope_color ? (kama_bull ? color.new(color.lime, 70) : kama_bear ? color.new(color.red, 70) : color.new(color.gray, 70)) : color.new(color.blue, 70)
+kama_col = kama_slope_color ? (kama_bull ? color.new(color.lime, 50) : kama_bear ? color.new(color.red, 50) : color.new(color.gray, 50)) : color.new(color.blue, 50)
 plot(kama_enabled ? kama_val : na, color=kama_col, linewidth=2, title="KAMA")
 
 
