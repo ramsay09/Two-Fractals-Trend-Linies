@@ -416,8 +416,7 @@ kama_slow           = 30
 // two fractal trendlines inputs
 grp_fr              = 'Fractal Trend lines'
 plot_trendline      = input.bool(false, title='Fractal Trend Lines⠀', inline="fr_tr", group=grp_fr, tooltip="")
-fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group=grp_fr, tooltip="• Fractal Trend Lines connect Bill Williams fractals for breakout cues.\n• Bars Per Side sets fractal width (2 = 5-bar fractal).\n• More bars filter noise but reduce signals.")
-                     Min=0 (Fractal(2) using anchored linear regression, follow the highs/lows of the subsequent candles to align with the current trend), Max=10 (21 bars).")
+fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group=grp_fr, tooltip="• Fractal Trend Lines connect Bill Williams fractals for breakout cues.\n• Bars Per Side sets fractal width (2 = 5-bar fractal).\n• Min=0 uses anchored linear regression to follow highs/lows.\n• Max=10 uses 21 bars; more bars filter noise but reduce signals.")
 show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fr, inline="l_rf", tooltip="")
 last_frac_tf    = input.timeframe("240", "", group=grp_fr, inline="l_rf", tooltip="• Last Fractal S/R draws the most recent confirmed fractal levels.\n• Timeframe selects which fractals to reference.\n• Useful for break-of-structure cues.")
 
