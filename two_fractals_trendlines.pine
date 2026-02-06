@@ -30,13 +30,12 @@ int W_O     = 1
 trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Market Map", "Opening Auction", "Value Reversion", "Compression -> Expansion", "Trend Continuation", "Range Rotation"], tooltip="Applies focused defaults for a trading lens. Custom = manual.\n• Market Map: Sessions + key levels.\n• Opening Auction: OR/IB + RVOL.\n• Value Reversion: VWAP bands + BB touch.\n• Compression -> Expansion: Squeeze + RVOL.\n• Trend Continuation: Trend tools + weekly VWAP.\n• Range Rotation: VWAP zone + BB touch.")
 
 
-panel_pos               = input.string(title='MTF Panel', inline="panel", defval='Bottom Right', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
-                          tooltip="")
-panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update Mode", inline="panel", options=["Realtime Preview", "Strict Confirm"], tooltip="• MTF Panel position: choose where the panel is shown (None disables it).\n• Update Mode controls whether values are live (○) or only confirmed (●).\n• Realtime Preview shows developing values; Strict Confirm shows only closed-bar values.")
+panel_pos               = input.string(title='MTF Panel', inline="panel", defval='Bottom Right', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'], tooltip="")
+panel_update_mode       = input.string("Realtime Preview", "⠀Panel Update", inline="panel", options=["Realtime Preview", "Strict Confirm"], tooltip="• MTF Panel position: choose where the panel is shown (None disables it).\n• Update Mode controls whether values are live (○) or only confirmed (●).\n• Realtime Preview shows developing values; Strict Confirm shows only closed-bar values.")
 bool panel_show_live    = panel_update_mode == "Realtime Preview"
-bool panel_show_legend  = input.bool(false, "Legend", inline="panel", tooltip="Shows a legend cell for CONF/REG/VOL in the panel.")
+bool panel_show_legend  = input.bool(false, "Legend", inline="panel", tooltip="Shows a legend cell in the panel.")
 
-auto_tuning         = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="• CONF shows dominant trend as 0–100 (50 = neutral).\n• BULL/BEAR/NEUT = direction; H/M/L = quality.\n• Bias comes from FVG + structure + trend filter (first FVG holds bias).\n• Trendlines/Segments confirm briefly but cannot flip bias alone.\n• REG gates reliability (SQUEEZE dampens CONF).\n• Visuals: Green/Red = Bull/Bear; NEUT is transparent.\n• Auto tuning sets sensitivity: Conservative (slower), Balanced (standard), Aggressive (faster).")
+auto_tuning             = input.string("Balanced", "CONF/REG Auto Tuning", options=["Conservative", "Balanced", "Aggressive"], tooltip="• CONF shows dominant trend as 0–100 (50 = neutral).\n• BULL/BEAR/NEUT = direction; H/M/L = quality.\n• Bias comes from FVG + structure + trend filter (first FVG holds bias).\n• Trendlines/Segments confirm briefly but cannot flip bias alone.\n• REG gates reliability (SQUEEZE dampens CONF).\n• Visuals: Green/Red = Bull/Bear; NEUT is transparent.\n• Auto tuning sets sensitivity: Conservative (slower), Balanced (standard), Aggressive (faster).")
 
 // CONF Panel: Confirmed Bias (profile + optional scalp optimization)
 //string grp_conf_bias = "CONF Confirmed Bias"
