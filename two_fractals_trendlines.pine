@@ -27,8 +27,8 @@ int W_O     = 1
 
 // --- TOP LEVEL UI ---
 // adx, hma and ema1 x ema2 mtf trend info panel
-trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Market Map", "Opening Auction", "Value Reversion", "Compression -> Expansion", "Trend Continuation", "Range Rotation"],
-                          tooltip="Applies focused defaults for a trading lens. Custom = manual.\n• Market Map: Sessions + key levels.\n• Opening Auction: OR/IB + RVOL.\n• Value Reversion: VWAP bands + BB touch.\n• Compression -> Expansion: Squeeze + RVOL.\n• Trend Continuation: Trend tools + weekly VWAP.\n• Range Rotation: VWAP zone + BB touch.")
+trading_approach        = input.string("Custom", "Context", options=["Custom", "Opening Auction", "Compression -> Expansion", "Trend Continuation", "Range Rotation"],
+                          tooltip="Applies focused defaults for a trading context. Custom = manual.\n• Opening Auction: OR/IB + RVOL.\n• Compression -> Expansion: Squeeze + RVOL.\n• Trend Continuation: Trend tools + weekly VWAP.\n• Range Rotation: VWAP zone + BB touch.")
 
 
 panel_pos               = input.string(title='MTF Panel', inline="panel", defval='Bottom Right', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
@@ -524,14 +524,14 @@ transp_bg           = input.int(85, 'Background Color Transparency', minval=1, m
 // Stage 0: Centralized Gating Flags as aliases for inputs
 
 // Preset Helper
-int approach_id = trading_approach == "Market Map" ? 1 : trading_approach == "Opening Auction" ? 2 : trading_approach == "Value Reversion" ? 3 : trading_approach == "Compression -> Expansion" ? 4 : trading_approach == "Trend Continuation" ? 5 : trading_approach == "Range Rotation" ? 6 : 0
+int approach_id = trading_approach == "Opening Auction" ? 1 : trading_approach == "Compression -> Expansion" ? 2 : trading_approach == "Trend Continuation" ? 3 : trading_approach == "Range Rotation" ? 4 : 0
 
-f_approach_bool(_custom, _map, _auction, _reversion, _compExp, _trend, _range) =>
-    approach_id == 1 ? _map : approach_id == 2 ? _auction : approach_id == 3 ? _reversion : approach_id == 4 ? _compExp : approach_id == 5 ? _trend : approach_id == 6 ? _range : _custom
+f_approach_bool(_custom, _auction, _compExp, _trend, _range) =>
+    approach_id == 1 ? _auction : approach_id == 2 ? _compExp : approach_id == 3 ? _trend : approach_id == 4 ? _range : _custom
 
 // Preset Helper for Strings
-f_approach_str(_custom, _map, _auction, _reversion, _compExp, _trend, _range) =>
-    approach_id == 1 ? _map : approach_id == 2 ? _auction : approach_id == 3 ? _reversion : approach_id == 4 ? _compExp : approach_id == 5 ? _trend : approach_id == 6 ? _range : _custom
+f_approach_str(_custom, _auction, _compExp, _trend, _range) =>
+    approach_id == 1 ? _auction : approach_id == 2 ? _compExp : approach_id == 3 ? _trend : approach_id == 4 ? _range : _custom
 
 var int prev_approach_id = na
 bool lens_changed = not na(prev_approach_id) and prev_approach_id != approach_id
@@ -542,30 +542,30 @@ int fvg2_limit_eff = dbg_stress ? math.min(fvg2_limit, 120) : fvg2_limit
 int sess_line_limit_eff = dbg_stress ? math.min(sess_line_limit, 120) : sess_line_limit
 
 f_resolve_effective_flags() =>
-    //                                          Cust           Map     Auction   Reversion   Comp->Exp   Trend   Range
-    bool eff_fractals_plot = f_approach_bool(fractals_plot,      true,    true,     true,      true,       true,   true)
-    bool eff_sub_fractals = f_approach_bool(sub_fractals,       false,   false,    false,     false,      false,  false)
-    bool eff_plot_trendline = f_approach_bool(plot_trendline,    false,   false,    false,     true,       true,   false)
-    bool eff_show_mtf_candles = f_approach_bool(show_mtf_candles,  false,   false,    false,     false,      true,   false)
-    bool eff_use_sess_1st = f_approach_bool(use_sess_1st,       false,   true,     false,     false,      false,  false)
-    bool eff_show_last_frac = f_approach_bool(show_last_frac,     false,   false,    false,     false,      false,  true)
-    bool eff_show_vol = f_approach_bool(show_vol,           true,    false,    false,     false,      false,  false)
-    bool eff_plot_fvg1 = f_approach_bool(plot_fvg1,          false,   false,    false,     false,      true,   false)
-    bool eff_plot_fvg2 = f_approach_bool(plot_fvg2,          false,   false,    false,     false,      false,  false)
-    string eff_ps_mode = f_approach_str(ps_mode,             "None",  "None",   "None",    "None",     "None", "None")
-    bool eff_BB_plot = f_approach_bool(BB_plot,            true,    false,    true,      false,      false,  true)
-    bool eff_en_cloud = f_approach_bool(en_cloud,           false,   false,    false,     false,      true,   false)
-    bool eff_sig_plot = f_approach_bool(sig_plot,           sig_plot, false,    false,     false,      true,   false)
-    string eff_ma1_type = f_approach_str(ma1_type,            ma1_type, "None","None","None","None", ma1_type)
-    string eff_ma2_type = f_approach_str(ma2_type,            ma2_type, "None","None","None","None", ma2_type)
-    bool eff_plot_div = f_approach_bool(plot_div,           false,   false,    true,      false,      false,  false)
-    bool eff_plot_l12_bar = f_approach_bool(plot_l12_bar,       false,   false,    false,     false,      false,  false)
-    bool eff_plot_nr_bar = f_approach_bool(plot_nr_bar,        false,   false,    false,     true,       false,  false)
-    bool eff_plot_i_bar = f_approach_bool(plot_i_bar,         false,   false,    false,     false,      false,  true)
-    bool eff_plot_o_bar = f_approach_bool(plot_o_bar,         false,   false,    false,     false,      false,  false)
-    bool eff_plot_s_bar = f_approach_bool(plot_s_bar,         false,   false,    false,     false,      false,  false)
-    bool eff_plot_f_bar = f_approach_bool(plot_f_bar,         false,   false,    false,     false,      false,  false)
-    bool eff_plot_segments = f_approach_bool(plot_segments,      false,   false,    false,     false,      false,  false)
+    //                                          Cust           Auction   Comp->Exp   Trend   Range
+    bool eff_fractals_plot = f_approach_bool(fractals_plot,      true,      true,       true,   true)
+    bool eff_sub_fractals = f_approach_bool(sub_fractals,       false,     false,      false,  false)
+    bool eff_plot_trendline = f_approach_bool(plot_trendline,    false,     true,       true,   false)
+    bool eff_show_mtf_candles = f_approach_bool(show_mtf_candles,  false,     false,      true,   false)
+    bool eff_use_sess_1st = f_approach_bool(use_sess_1st,       true,      false,      false,  false)
+    bool eff_show_last_frac = f_approach_bool(show_last_frac,     false,     false,      false,  true)
+    bool eff_show_vol = f_approach_bool(show_vol,           false,     false,      false,  false)
+    bool eff_plot_fvg1 = f_approach_bool(plot_fvg1,          false,     false,      true,   false)
+    bool eff_plot_fvg2 = f_approach_bool(plot_fvg2,          false,     false,      false,  false)
+    string eff_ps_mode = f_approach_str(ps_mode,             "None",   "None",     "None", "None")
+    bool eff_BB_plot = f_approach_bool(BB_plot,            false,     false,      false,  true)
+    bool eff_en_cloud = f_approach_bool(en_cloud,           false,     false,      true,   false)
+    bool eff_sig_plot = f_approach_bool(sig_plot,           false,     false,      true,   false)
+    string eff_ma1_type = f_approach_str(ma1_type,            "None",  "None",     "None", ma1_type)
+    string eff_ma2_type = f_approach_str(ma2_type,            "None",  "None",     "None", ma2_type)
+    bool eff_plot_div = f_approach_bool(plot_div,           false,     false,      false,  false)
+    bool eff_plot_l12_bar = f_approach_bool(plot_l12_bar,       false,     false,      false,  false)
+    bool eff_plot_nr_bar = f_approach_bool(plot_nr_bar,        false,     true,       false,  false)
+    bool eff_plot_i_bar = f_approach_bool(plot_i_bar,         false,     false,      false,  true)
+    bool eff_plot_o_bar = f_approach_bool(plot_o_bar,         false,     false,      false,  false)
+    bool eff_plot_s_bar = f_approach_bool(plot_s_bar,         false,     false,      false,  false)
+    bool eff_plot_f_bar = f_approach_bool(plot_f_bar,         false,     false,      false,  false)
+    bool eff_plot_segments = f_approach_bool(plot_segments,      false,     false,      false,  false)
     bool eff_plot_pivots_h1 = plot_pivots_h1
     bool eff_plot_pivots_h4 = plot_pivots_h4
     bool eff_plot_pivots_d = plot_pivots_d
@@ -573,29 +573,29 @@ f_resolve_effective_flags() =>
     bool eff_plot_pivots_m = plot_pivots_m
     bool eff_plot_pivots_3m = plot_pivots_3m
     bool eff_plot_pivots_12m = plot_pivots_12m
-    bool eff_london_show = f_approach_bool(london_show,        true,    true,     false,     false,      false,  false)
-    bool eff_ny_show = f_approach_bool(ny_show,            true,    true,     false,     false,      false,  false)
-    bool eff_tokyo_show = f_approach_bool(tokyo_show,         true,    true,     false,     false,      false,  false)
-    bool eff_sydney_show = f_approach_bool(sydney_show,        true,    true,     false,     false,      false,  false)
-    bool eff_sess_bg_enable = f_approach_bool(true,               true,    true,     false,     false,      false,  false)
+    bool eff_london_show = f_approach_bool(london_show,        true,     false,      false,  false)
+    bool eff_ny_show = f_approach_bool(ny_show,            true,     false,      false,  false)
+    bool eff_tokyo_show = f_approach_bool(tokyo_show,         true,     false,      false,  false)
+    bool eff_sydney_show = f_approach_bool(sydney_show,        true,     false,      false,  false)
+    bool eff_sess_bg_enable = f_approach_bool(true,               true,     false,      false,  false)
     bool eff_key_levels_enabled = key_levels_enabled
     bool eff_show_pdh = show_pdh
     bool eff_show_pdl = show_pdl
-    bool eff_show_pdc = f_approach_bool(show_pdc, true,    true,     true,      false,      false,  true)
+    bool eff_show_pdc = f_approach_bool(show_pdc, true,     false,      false,  true)
     bool eff_show_wopen = show_wopen
-    bool eff_show_mopen = f_approach_bool(show_mopen, true,    false,    false,     false,      true,   false)
-    bool eff_rvol_enabled = f_approach_bool(rvol_enabled, false,   true,     false,     true,       true,   false)
-    bool eff_rvol_points_enabled = f_approach_bool(rvol_points_enabled, false,   true,     false,     true,       true,   false)
-    bool eff_vwap_enabled = f_approach_bool(vwap_enabled, true,    false,    true,      false,      true,   true)
-    string eff_vwap_anchor = f_approach_str(vwap_anchor, "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Weekly", "Session (Daily Reset)")
-    string eff_vwap_display_raw = f_approach_str(vwap_display_mode, "Value Zone (±1σ)", "Line only", "Full Bands (B1–B3)", "Line only", "Line only", "Value Zone (±1σ)")
+    bool eff_show_mopen = f_approach_bool(show_mopen, false,     false,      true,   false)
+    bool eff_rvol_enabled = f_approach_bool(rvol_enabled, true,     true,       true,   false)
+    bool eff_rvol_points_enabled = f_approach_bool(rvol_points_enabled, true,     true,       true,   false)
+    bool eff_vwap_enabled = f_approach_bool(vwap_enabled, false,     false,      true,   true)
+    string eff_vwap_anchor = f_approach_str(vwap_anchor, "Session (Daily Reset)", "Session (Daily Reset)", "Weekly", "Session (Daily Reset)")
+    string eff_vwap_display_raw = f_approach_str(vwap_display_mode, "Line only", "Line only", "Line only", "Value Zone (±1σ)")
     string eff_vwap_display_mode = vwap_bands_enabled ? eff_vwap_display_raw : "Line only"
     bool eff_vwap_line_only = eff_vwap_display_mode == "Line only"
     bool eff_vwap_zone = eff_vwap_display_mode == "Value Zone (±1σ)"
     bool eff_vwap_fullbands = eff_vwap_display_mode == "Full Bands (B1–B3)"
-    bool eff_vwap_z = f_approach_bool(vwap_z_enabled, false,   false,    true,      false,      false,  true)
-    bool eff_or_enabled = f_approach_bool(or_enabled, false,   true,     false,     false,      false,  false)
-    bool eff_sq_box_enabled = f_approach_bool(sq_box_enabled, false,   false,    false,     true,       false,  false)
+    bool eff_vwap_z = f_approach_bool(vwap_z_enabled, false,     false,      false,  true)
+    bool eff_or_enabled = f_approach_bool(or_enabled, true,     false,      false,  false)
+    bool eff_sq_box_enabled = f_approach_bool(sq_box_enabled, false,     true,       false,  false)
     [eff_fractals_plot, eff_sub_fractals, eff_plot_trendline,
      eff_show_mtf_candles, eff_use_sess_1st, eff_show_last_frac, eff_show_vol, eff_plot_fvg1,
      eff_plot_fvg2, eff_ps_mode, eff_BB_plot, eff_en_cloud, eff_sig_plot,
