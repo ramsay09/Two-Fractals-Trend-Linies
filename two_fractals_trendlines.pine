@@ -27,8 +27,8 @@ int W_O     = 1
 
 // --- TOP LEVEL UI ---
 // adx, hma and ema1 x ema2 mtf trend info panel
-trading_approach        = input.string("Custom", "Context Lenses", options=["Custom", "Market Map", "Opening Auction", "Value Reversion", "Compression -> Expansion", "Trend Continuation", "Range Rotation"],
-                          tooltip="Applies focused defaults for a trading lens. Custom = manual.\n• Market Map: Sessions + key levels.\n• Opening Auction: OR/IB + RVOL.\n• Value Reversion: VWAP bands + BB touch.\n• Compression -> Expansion: Squeeze + RVOL.\n• Trend Continuation: Trend tools + weekly VWAP.\n• Range Rotation: VWAP zone + BB touch.")
+trading_approach        = input.string("Custom", "Context", options=["Custom", "Opening Auction", "Compression -> Expansion", "Trend Continuation", "Range Rotation"],
+                          tooltip="Applies focused defaults for a trading context. Custom = manual.\n• Opening Auction: OR/IB + RVOL.\n• Compression -> Expansion: Squeeze + RVOL.\n• Trend Continuation: Trend tools + weekly VWAP.\n• Range Rotation: VWAP zone + BB touch.")
 
 
 panel_pos               = input.string(title='MTF Panel', inline="panel", defval='Bottom Right', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
@@ -292,8 +292,8 @@ vwap_src_opt        = input.string("HLC3", "⠀Source", options=["HLC3", "HL2", 
 vwap_show_line      = input.bool(false, "Show Line⠀", group=grp_vwap, inline="vw_2")
 vwap_only_sess      = input.bool(false, "Calc Only in Sessions", group=grp_vwap, inline="vw_2", tooltip="• Show Line toggles the VWAP line visibility.\n• Calc Only in Sessions pauses VWAP outside selected sessions.\n• Use to align with market hours.")
 
-vwap_display_mode   = input.string("Value Zone (±1σ)", "Display", options=["Line only", "Value Zone (±1σ)", "Full Bands (B1–B3)"], group=grp_vwap, inline="vw_3", tooltip="")
-vwap_bands_enabled  = input.bool(false, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="• Display chooses line-only, ±1σ zone, or full B1–B3 bands.\n• Bands Enabled toggles the deviation bands.\n• Bands define “don’t chase” and take-profit zones.")
+vwap_bands_enabled  = input.bool(false, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="")
+vwap_display_mode   = input.string("Value Zone (±1σ)", "", options=["Line only", "Value Zone (±1σ)", "Full Bands (B1–B3)"], group=grp_vwap, inline="vw_3", tooltip="• Display chooses line-only, ±1σ zone, or full B1–B3 bands.\n• Bands Enabled toggles the deviation bands.\n• Bands define “don’t chase” and take-profit zones.")
 vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_4", tooltip="")
 vwap_stdev_len      = input.int(100, "⠀Len", minval=2, group=grp_vwap, inline="vw_4", tooltip="• Sigma Mode chooses Rolling or Session (Welford) deviation.\n• Len sets the rolling window for stdev.\n• Longer windows smooth band movement.")
 band_k1             = input.float(1.0, "K1⠀⠀⠀⠀", step=0.5, group=grp_vwap, inline="vw_6", tooltip="")
@@ -301,7 +301,7 @@ band_k2             = input.float(2.0, "K2⠀⠀", step=0.5, group=grp_vwap, inl
 band_k3             = input.float(3.0, "K3⠀⠀⠀", step=0.5, group=grp_vwap, inline="vw_6", tooltip="• K1/K2/K3 set the 1σ, 2σ, 3σ band multipliers.\n• Higher multipliers widen bands and reduce signals.\n• Keep consistent across sessions for comparability.")
 
 vwap_z_enabled      = input.bool(true, "Z-Score Enabled⠀", group=grp_vwap, inline="vw_5", tooltip="")
-vwap_z_show_label   = input.bool(true, "Show Z Label", group=grp_vwap, inline="vw_5", tooltip="• Z-Score Enabled toggles stretch signals (distance to VWAP in σ).\n• Show Z Label toggles the chart label for the current Z-Score.\n• Entry Th avoids entries when too stretched.\n• TP Th marks typical scale-out levels.\n• Ext Th flags extreme reversals.")
+vwap_z_show_label   = input.bool(false, "Show Z Label", group=grp_vwap, inline="vw_5", tooltip="• Z-Score Enabled toggles stretch signals (distance to VWAP in σ).\n• Show Z Label toggles the chart label for the current Z-Score.\n• Entry Th avoids entries when too stretched.\n• TP Th marks typical scale-out levels.\n• Ext Th flags extreme reversals.")
 z_th_entry          = input.float(2.0, "Entry Th", step=0.1, group=grp_vwap, inline="vw_6", tooltip="")
 z_th_tp             = input.float(2.5, "TP Th", step=0.1, group=grp_vwap, inline="vw_6", tooltip="")
 z_th_ext            = input.float(3.0, "Ext Th", step=0.1, group=grp_vwap, inline="vw_6", tooltip="")
@@ -319,7 +319,6 @@ or_lock             = input.bool(true, "Lock after Window", group=grp_or, inline
 
 use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", inline="sess_1st", group=grp_or, tooltip="")
 sess_1st_tf     = input.timeframe("5", "", inline="sess_1st", group=grp_or, tooltip="• 1st Session Candle draws the first bar high/low as reference.\n• Timeframe selects the bar used for that first candle.\n• Useful for early session range framing.")
-
 
 // Squeeze Box
 grp_sq              = "Squeeze Box"
@@ -397,7 +396,7 @@ BB_sdev_3           = 4
 BB_sdev_4           = 5
 
 // ema cloud and ma inputs
-grp_ma              = 'EMA cloud and MA'
+grp_ma              = 'EMA Cloud & MA & KAMA'
 en_cloud            = input.bool(false, title='EMA Cloud⠀', inline="ema_c", group=grp_ma, tooltip="")
 sig_plot            = input.bool(true, title='Cloud Color Signal', inline="ema_c", group=grp_ma, tooltip="• EMA Cloud toggles the EMA1/EMA2 cloud.\n• Cloud Color Signal colors the cloud on EMA cross.\n• Use as a quick trend visualization.\n• Cloud can act as dynamic S/R and trend indication.\n• Wide cloud = higher volatility; narrow cloud = compression.\n• Common pairs: 8/21, 40/97.")
 
@@ -415,9 +414,13 @@ ma2_len             = input.int(200, title="", minval=1, inline="ma2", group=grp
 ma2_slope_c         = input.bool(false, title="Slope Color", inline="ma2", group=grp_ma, tooltip="• MA 2 selects the moving average type.\n• Length sets the MA period.\n• Slope Color colors the MA by slope direction.")
 
 // KAMA Inputs
-kama_len            = 10
-kama_fast           = 2
-kama_slow           = 30
+kama_enabled        = input.bool(false, title='KAMA⠀', inline="kama", group=grp_ma, tooltip="")
+kama_tf_sel         = input.timeframe("", title="TF", inline="kama", group=grp_ma, tooltip="")
+kama_slope_color    = input.bool(false, "Slope Color", inline="kama", group=grp_ma, tooltip="• KAMA toggles the Kaufman Adaptive Moving Average plot.\n• Uses the selected timeframe (MTF) for calculation.\n• Only computes when enabled to save resources.
+                      \n• Timeframe for KAMA calculation.\n• Blank uses the chart timeframe. \n• Slope: green when KAMA rises, red when it falls.\n• Disabled: KAMA is plotted in blue.")
+kama_len            = input.int(10, title='Length', minval=1, inline="kama_len", group=grp_ma)
+kama_fast           = input.int(2, title='Fast', minval=1, inline="kama_len", group=grp_ma)
+kama_slow           = input.int(30, title='Slow', minval=1, inline="kama_len", group=grp_ma, tooltip="• Length controls the efficiency ratio window.\n• Fast/Slow set the adaptive smoothing limits.")
 
 // two fractal trendlines inputs
 grp_fr              = 'Fractal Trend lines'
@@ -425,7 +428,6 @@ plot_trendline      = input.bool(false, title='Fractal Trend Lines⠀', inline="
 fractalBarsPerSide  = input.int(2, title="Bars Per Side", minval=0, maxval=10, inline="fr_tr", group=grp_fr, tooltip="• Fractal Trend Lines connect Bill Williams fractals for breakout cues.\n• Bars Per Side sets fractal width (2 = 5-bar fractal).\n• Min=0 uses anchored linear regression to follow highs/lows.\n• Max=10 uses 21 bars; more bars filter noise but reduce signals.")
 show_last_frac  = input.bool(false, "Last Fractal S/R ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀", group=grp_fr, inline="l_rf", tooltip="")
 last_frac_tf    = input.timeframe("240", "", group=grp_fr, inline="l_rf", tooltip="• Last Fractal S/R draws the most recent confirmed fractal levels.\n• Timeframe selects which fractals to reference.\n• Useful for break-of-structure cues.")
-
 
 // divergence signal inputs
 grp_div             = 'Divergences'
@@ -524,14 +526,14 @@ transp_bg           = input.int(85, 'Background Color Transparency', minval=1, m
 // Stage 0: Centralized Gating Flags as aliases for inputs
 
 // Preset Helper
-int approach_id = trading_approach == "Market Map" ? 1 : trading_approach == "Opening Auction" ? 2 : trading_approach == "Value Reversion" ? 3 : trading_approach == "Compression -> Expansion" ? 4 : trading_approach == "Trend Continuation" ? 5 : trading_approach == "Range Rotation" ? 6 : 0
+int approach_id = trading_approach == "Opening Auction" ? 1 : trading_approach == "Compression -> Expansion" ? 2 : trading_approach == "Trend Continuation" ? 3 : trading_approach == "Range Rotation" ? 4 : 0
 
-f_approach_bool(_custom, _map, _auction, _reversion, _compExp, _trend, _range) =>
-    approach_id == 1 ? _map : approach_id == 2 ? _auction : approach_id == 3 ? _reversion : approach_id == 4 ? _compExp : approach_id == 5 ? _trend : approach_id == 6 ? _range : _custom
+f_approach_bool(_custom, _auction, _compExp, _trend, _range) =>
+    approach_id == 1 ? _auction : approach_id == 2 ? _compExp : approach_id == 3 ? _trend : approach_id == 4 ? _range : _custom
 
 // Preset Helper for Strings
-f_approach_str(_custom, _map, _auction, _reversion, _compExp, _trend, _range) =>
-    approach_id == 1 ? _map : approach_id == 2 ? _auction : approach_id == 3 ? _reversion : approach_id == 4 ? _compExp : approach_id == 5 ? _trend : approach_id == 6 ? _range : _custom
+f_approach_str(_custom, _auction, _compExp, _trend, _range) =>
+    approach_id == 1 ? _auction : approach_id == 2 ? _compExp : approach_id == 3 ? _trend : approach_id == 4 ? _range : _custom
 
 var int prev_approach_id = na
 bool lens_changed = not na(prev_approach_id) and prev_approach_id != approach_id
@@ -542,30 +544,30 @@ int fvg2_limit_eff = dbg_stress ? math.min(fvg2_limit, 120) : fvg2_limit
 int sess_line_limit_eff = dbg_stress ? math.min(sess_line_limit, 120) : sess_line_limit
 
 f_resolve_effective_flags() =>
-    //                                          Cust           Map     Auction   Reversion   Comp->Exp   Trend   Range
-    bool eff_fractals_plot = f_approach_bool(fractals_plot,      true,    true,     true,      true,       true,   true)
-    bool eff_sub_fractals = f_approach_bool(sub_fractals,       false,   false,    false,     false,      false,  false)
-    bool eff_plot_trendline = f_approach_bool(plot_trendline,    false,   false,    false,     true,       true,   false)
-    bool eff_show_mtf_candles = f_approach_bool(show_mtf_candles,  false,   false,    false,     false,      true,   false)
-    bool eff_use_sess_1st = f_approach_bool(use_sess_1st,       false,   true,     false,     false,      false,  false)
-    bool eff_show_last_frac = f_approach_bool(show_last_frac,     false,   false,    false,     false,      false,  true)
-    bool eff_show_vol = f_approach_bool(show_vol,           true,    false,    false,     false,      false,  false)
-    bool eff_plot_fvg1 = f_approach_bool(plot_fvg1,          false,   false,    false,     false,      true,   false)
-    bool eff_plot_fvg2 = f_approach_bool(plot_fvg2,          false,   false,    false,     false,      false,  false)
-    string eff_ps_mode = f_approach_str(ps_mode,             "None",  "None",   "None",    "None",     "None", "None")
-    bool eff_BB_plot = f_approach_bool(BB_plot,            true,    false,    true,      false,      false,  true)
-    bool eff_en_cloud = f_approach_bool(en_cloud,           false,   false,    false,     false,      true,   false)
-    bool eff_sig_plot = f_approach_bool(sig_plot,           sig_plot, false,    false,     false,      true,   false)
-    string eff_ma1_type = f_approach_str(ma1_type,            ma1_type, "None","None","None","None", ma1_type)
-    string eff_ma2_type = f_approach_str(ma2_type,            ma2_type, "None","None","None","None", ma2_type)
-    bool eff_plot_div = f_approach_bool(plot_div,           false,   false,    true,      false,      false,  false)
-    bool eff_plot_l12_bar = f_approach_bool(plot_l12_bar,       false,   false,    false,     false,      false,  false)
-    bool eff_plot_nr_bar = f_approach_bool(plot_nr_bar,        false,   false,    false,     true,       false,  false)
-    bool eff_plot_i_bar = f_approach_bool(plot_i_bar,         false,   false,    false,     false,      false,  true)
-    bool eff_plot_o_bar = f_approach_bool(plot_o_bar,         false,   false,    false,     false,      false,  false)
-    bool eff_plot_s_bar = f_approach_bool(plot_s_bar,         false,   false,    false,     false,      false,  false)
-    bool eff_plot_f_bar = f_approach_bool(plot_f_bar,         false,   false,    false,     false,      false,  false)
-    bool eff_plot_segments = f_approach_bool(plot_segments,      false,   false,    false,     false,      false,  false)
+    //                                          Cust           Auction   Comp->Exp   Trend   Range
+    bool eff_fractals_plot = f_approach_bool(fractals_plot,      true,      true,       true,   true)
+    bool eff_sub_fractals = f_approach_bool(sub_fractals,       false,     false,      false,  false)
+    bool eff_plot_trendline = f_approach_bool(plot_trendline,    false,     true,       true,   false)
+    bool eff_show_mtf_candles = f_approach_bool(show_mtf_candles,  false,     false,      true,   false)
+    bool eff_use_sess_1st = f_approach_bool(use_sess_1st,       true,      false,      false,  false)
+    bool eff_show_last_frac = f_approach_bool(show_last_frac,     false,     false,      false,  true)
+    bool eff_show_vol = f_approach_bool(show_vol,           false,     false,      false,  false)
+    bool eff_plot_fvg1 = f_approach_bool(plot_fvg1,          false,     false,      true,   false)
+    bool eff_plot_fvg2 = f_approach_bool(plot_fvg2,          false,     false,      false,  false)
+    string eff_ps_mode = f_approach_str(ps_mode,             "None",   "None",     "None", "None")
+    bool eff_BB_plot = f_approach_bool(BB_plot,            false,     false,      false,  true)
+    bool eff_en_cloud = f_approach_bool(en_cloud,           false,     false,      true,   false)
+    bool eff_sig_plot = f_approach_bool(sig_plot,           false,     false,      true,   false)
+    string eff_ma1_type = f_approach_str(ma1_type,            "None",  "None",     "None", ma1_type)
+    string eff_ma2_type = f_approach_str(ma2_type,            "None",  "None",     "None", ma2_type)
+    bool eff_plot_div = f_approach_bool(plot_div,           false,     false,      false,  false)
+    bool eff_plot_l12_bar = f_approach_bool(plot_l12_bar,       false,     false,      false,  false)
+    bool eff_plot_nr_bar = f_approach_bool(plot_nr_bar,        false,     true,       false,  false)
+    bool eff_plot_i_bar = f_approach_bool(plot_i_bar,         false,     false,      false,  true)
+    bool eff_plot_o_bar = f_approach_bool(plot_o_bar,         false,     false,      false,  false)
+    bool eff_plot_s_bar = f_approach_bool(plot_s_bar,         false,     false,      false,  false)
+    bool eff_plot_f_bar = f_approach_bool(plot_f_bar,         false,     false,      false,  false)
+    bool eff_plot_segments = f_approach_bool(plot_segments,      false,     false,      false,  false)
     bool eff_plot_pivots_h1 = plot_pivots_h1
     bool eff_plot_pivots_h4 = plot_pivots_h4
     bool eff_plot_pivots_d = plot_pivots_d
@@ -573,29 +575,29 @@ f_resolve_effective_flags() =>
     bool eff_plot_pivots_m = plot_pivots_m
     bool eff_plot_pivots_3m = plot_pivots_3m
     bool eff_plot_pivots_12m = plot_pivots_12m
-    bool eff_london_show = f_approach_bool(london_show,        true,    true,     false,     false,      false,  false)
-    bool eff_ny_show = f_approach_bool(ny_show,            true,    true,     false,     false,      false,  false)
-    bool eff_tokyo_show = f_approach_bool(tokyo_show,         true,    true,     false,     false,      false,  false)
-    bool eff_sydney_show = f_approach_bool(sydney_show,        true,    true,     false,     false,      false,  false)
-    bool eff_sess_bg_enable = f_approach_bool(true,               true,    true,     false,     false,      false,  false)
+    bool eff_london_show = f_approach_bool(london_show,        true,     false,      false,  false)
+    bool eff_ny_show = f_approach_bool(ny_show,            true,     false,      false,  false)
+    bool eff_tokyo_show = f_approach_bool(tokyo_show,         true,     false,      false,  false)
+    bool eff_sydney_show = f_approach_bool(sydney_show,        true,     false,      false,  false)
+    bool eff_sess_bg_enable = f_approach_bool(true,               true,     false,      false,  false)
     bool eff_key_levels_enabled = key_levels_enabled
     bool eff_show_pdh = show_pdh
     bool eff_show_pdl = show_pdl
-    bool eff_show_pdc = f_approach_bool(show_pdc, true,    true,     true,      false,      false,  true)
+    bool eff_show_pdc = f_approach_bool(show_pdc, true,     false,      false,  true)
     bool eff_show_wopen = show_wopen
-    bool eff_show_mopen = f_approach_bool(show_mopen, true,    false,    false,     false,      true,   false)
-    bool eff_rvol_enabled = f_approach_bool(rvol_enabled, false,   true,     false,     true,       true,   false)
-    bool eff_rvol_points_enabled = f_approach_bool(rvol_points_enabled, false,   true,     false,     true,       true,   false)
-    bool eff_vwap_enabled = f_approach_bool(vwap_enabled, true,    false,    true,      false,      true,   true)
-    string eff_vwap_anchor = f_approach_str(vwap_anchor, "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Session (Daily Reset)", "Weekly", "Session (Daily Reset)")
-    string eff_vwap_display_raw = f_approach_str(vwap_display_mode, "Value Zone (±1σ)", "Line only", "Full Bands (B1–B3)", "Line only", "Line only", "Value Zone (±1σ)")
+    bool eff_show_mopen = f_approach_bool(show_mopen, false,     false,      true,   false)
+    bool eff_rvol_enabled = f_approach_bool(rvol_enabled, true,     true,       true,   false)
+    bool eff_rvol_points_enabled = f_approach_bool(rvol_points_enabled, true,     true,       true,   false)
+    bool eff_vwap_enabled = f_approach_bool(vwap_enabled, false,     false,      true,   true)
+    string eff_vwap_anchor = f_approach_str(vwap_anchor, "Session (Daily Reset)", "Session (Daily Reset)", "Weekly", "Session (Daily Reset)")
+    string eff_vwap_display_raw = f_approach_str(vwap_display_mode, "Line only", "Line only", "Line only", "Value Zone (±1σ)")
     string eff_vwap_display_mode = vwap_bands_enabled ? eff_vwap_display_raw : "Line only"
     bool eff_vwap_line_only = eff_vwap_display_mode == "Line only"
     bool eff_vwap_zone = eff_vwap_display_mode == "Value Zone (±1σ)"
     bool eff_vwap_fullbands = eff_vwap_display_mode == "Full Bands (B1–B3)"
-    bool eff_vwap_z = f_approach_bool(vwap_z_enabled, false,   false,    true,      false,      false,  true)
-    bool eff_or_enabled = f_approach_bool(or_enabled, false,   true,     false,     false,      false,  false)
-    bool eff_sq_box_enabled = f_approach_bool(sq_box_enabled, false,   false,    false,     true,       false,  false)
+    bool eff_vwap_z = f_approach_bool(vwap_z_enabled, false,     false,      false,  true)
+    bool eff_or_enabled = f_approach_bool(or_enabled, true,     false,      false,  false)
+    bool eff_sq_box_enabled = f_approach_bool(sq_box_enabled, false,     true,       false,  false)
     [eff_fractals_plot, eff_sub_fractals, eff_plot_trendline,
      eff_show_mtf_candles, eff_use_sess_1st, eff_show_last_frac, eff_show_vol, eff_plot_fvg1,
      eff_plot_fvg2, eff_ps_mode, eff_BB_plot, eff_en_cloud, eff_sig_plot,
@@ -1357,15 +1359,33 @@ f_kama(_src, _len, _fast, _slow) =>
     _kama := na(_kama[1]) ? _src : _kama[1] + _sc * (_src - _kama[1])
     _kama
 
-kama_val = f_kama(close, kama_len, kama_fast, kama_slow)
+string kama_tf = kama_tf_sel == "" ? timeframe.period : kama_tf_sel
+bool kama_is_current_tf = timeframe.in_seconds(kama_tf) == timeframe.in_seconds(timeframe.period)
+float kama_val = na
+float kama_close = na
+
+if kama_enabled
+    if kama_is_current_tf
+        kama_val := f_kama(close, kama_len, kama_fast, kama_slow)
+        kama_close := close
+    else
+        [kama_val, kama_close] = request.security(syminfo.tickerid, kama_tf, [f_kama(close, kama_len, kama_fast, kama_slow), close], lookahead=barmerge.lookahead_off)
+        active_sec_calls += 1
 
 // KAMA Signals (Slope Mode)
-// Rising = Bullish, Falling = Bearish
-bool kama_bull = kama_val > kama_val[1]
-bool kama_bear = kama_val < kama_val[1]
+bool kama_bull = false
+bool kama_bear = false
+if kama_enabled and not na(kama_val)
+    if kama_slope_color
+        kama_bull := kama_val > kama_val[1]
+        kama_bear := kama_val < kama_val[1]
 
-sig.kama_bull := kama_bull
-sig.kama_bear := kama_bear
+if kama_enabled
+    sig.kama_bull := kama_bull
+    sig.kama_bear := kama_bear
+
+kama_col = kama_slope_color ? (kama_bull ? color.new(color.lime, 40) : kama_bear ? color.new(color.red, 40) : color.new(color.gray, 40)) : color.new(color.blue, 40)
+plot(kama_enabled ? kama_val : na, color=kama_col, linewidth=2, title="KAMA")
 
 
 //------------------------------------------------------------ trend lines (Visuals for Chart) ----------------------------------------------------------------
