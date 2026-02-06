@@ -296,22 +296,19 @@ vwap_display_mode   = input.string("Value Zone (±1σ)", "Display", options=["Li
 vwap_bands_enabled  = input.bool(false, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="• Display chooses line-only, ±1σ zone, or full B1–B3 bands.\n• Bands Enabled toggles the deviation bands.\n• Bands define “don’t chase” and take-profit zones.")
 vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_4", tooltip="")
 vwap_stdev_len      = input.int(100, "⠀Len", minval=2, group=grp_vwap, inline="vw_4", tooltip="• Sigma Mode chooses Rolling or Session (Welford) deviation.\n• Len sets the rolling window for stdev.\n• Longer windows smooth band movement.")
-band_k1             = input.float(1.0, "K1", step=0.5, group=grp_vwap, inline="vw_6", tooltip="")
-band_k2             = input.float(2.0, "⠀K2", step=0.5, group=grp_vwap, inline="vw_6", tooltip="")
-band_k3             = input.float(3.0, "⠀K3", step=0.5, group=grp_vwap, inline="vw_6", tooltip="• K1/K2/K3 set the 1σ, 2σ, 3σ band multipliers.\n• Higher multipliers widen bands and reduce signals.\n• Keep consistent across sessions for comparability.")
+band_k1             = input.float(1.0, "K1⠀⠀⠀⠀", step=0.5, group=grp_vwap, inline="vw_6", tooltip="")
+band_k2             = input.float(2.0, "K2⠀⠀", step=0.5, group=grp_vwap, inline="vw_6", tooltip="")
+band_k3             = input.float(3.0, "K3⠀⠀⠀", step=0.5, group=grp_vwap, inline="vw_6", tooltip="• K1/K2/K3 set the 1σ, 2σ, 3σ band multipliers.\n• Higher multipliers widen bands and reduce signals.\n• Keep consistent across sessions for comparability.")
 
-vwap_z_enabled      = input.bool(true, "Z-Score Enabled", group=grp_vwap, inline="vw_5", tooltip="")
-vwap_z_show_label   = input.bool(true, "⠀Show Z Label", group=grp_vwap, inline="vw_5", tooltip="")
-z_th_entry          = input.float(2.0, "⠀Entry Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="")
-z_th_tp             = input.float(2.5, "⠀TP Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="")
-z_th_ext            = input.float(3.0, "Ext Th", step=0.1, group=grp_vwap, inline="vw_5", tooltip="• Z-Score Enabled toggles stretch signals (distance to VWAP in σ).\n• Show Z Label toggles the chart label for the current Z-Score.\n• Entry Th avoids entries when too stretched.\n• TP Th marks typical scale-out levels.\n• Ext Th flags extreme reversals.")
+vwap_z_enabled      = input.bool(true, "Z-Score Enabled⠀", group=grp_vwap, inline="vw_5", tooltip="")
+vwap_z_show_label   = input.bool(true, "Show Z Label", group=grp_vwap, inline="vw_5", tooltip="• Z-Score Enabled toggles stretch signals (distance to VWAP in σ).\n• Show Z Label toggles the chart label for the current Z-Score.\n• Entry Th avoids entries when too stretched.\n• TP Th marks typical scale-out levels.\n• Ext Th flags extreme reversals.")
+z_th_entry          = input.float(2.0, "Entry Th", step=0.1, group=grp_vwap, inline="vw_6", tooltip="")
+z_th_tp             = input.float(2.5, "TP Th", step=0.1, group=grp_vwap, inline="vw_6", tooltip="")
+z_th_ext            = input.float(3.0, "Ext Th", step=0.1, group=grp_vwap, inline="vw_6", tooltip="")
 
 // OR/IB Inputs
 grp_or              = "Opening Range / Initial Balance"
 or_enabled          = input.bool(false, "OR/IB Enabled", group=grp_or, tooltip="• Enables Opening Range / Initial Balance levels.\n• Defines the first battle zone of the session.\n• Key for distinguishing trend vs range days.")
-
-use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", inline="sess_1st", group=grp_or, tooltip="")
-sess_1st_tf     = input.timeframe("5", "", inline="sess_1st", group=grp_or, tooltip="• 1st Session Candle draws the first bar high/low as reference.\n• Timeframe selects the bar used for that first candle.\n• Useful for early session range framing.")
 
 or_type             = input.string("Opening Range", "Type", options=["Opening Range", "Initial Balance"], group=grp_or, inline="or_1", tooltip="")
 or_sess             = input.string("New York", "⠀Session", options=["London", "New York", "Custom"], group=grp_or, inline="or_1", tooltip="• Type: Opening Range (custom minutes) or Initial Balance (first 60m).\n• Session selects the market open context (London/NY/Custom).\n• Choose Custom to use a manual session window.")
@@ -319,6 +316,10 @@ or_cust             = input.session("0930-1600", "Custom Sess", group=grp_or, in
 or_min              = input.int(15, "Duration", inline="or_2", minval=1, group=grp_or, inline="or_2", tooltip="• Custom Sess sets the manual trading window.\n• Duration sets OR minutes (only for Opening Range).\n• Longer windows capture more volatility, shorter windows are tighter.")
 or_display          = input.string("Box+Lines", "Display", options=["Box+Lines", "Box", "Lines"], group=grp_or, inline="or_3", tooltip="")
 or_lock             = input.bool(true, "Lock after Window", group=grp_or, inline="or_3", tooltip="• Display controls whether OR/IB is shown as box, lines, or both.\n• Lock after Window freezes levels once the window ends.\n• Locking is required for clean breakout levels.")
+
+use_sess_1st    = input.bool(false, "1st Session Candle ⠀⠀⠀⠀⠀", inline="sess_1st", group=grp_or, tooltip="")
+sess_1st_tf     = input.timeframe("5", "", inline="sess_1st", group=grp_or, tooltip="• 1st Session Candle draws the first bar high/low as reference.\n• Timeframe selects the bar used for that first candle.\n• Useful for early session range framing.")
+
 
 // Squeeze Box
 grp_sq              = "Squeeze Box"
