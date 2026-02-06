@@ -292,8 +292,8 @@ vwap_src_opt        = input.string("HLC3", "⠀Source", options=["HLC3", "HL2", 
 vwap_show_line      = input.bool(false, "Show Line⠀", group=grp_vwap, inline="vw_2")
 vwap_only_sess      = input.bool(false, "Calc Only in Sessions", group=grp_vwap, inline="vw_2", tooltip="• Show Line toggles the VWAP line visibility.\n• Calc Only in Sessions pauses VWAP outside selected sessions.\n• Use to align with market hours.")
 
-vwap_display_mode   = input.string("Value Zone (±1σ)", "Display", options=["Line only", "Value Zone (±1σ)", "Full Bands (B1–B3)"], group=grp_vwap, inline="vw_3", tooltip="")
-vwap_bands_enabled  = input.bool(false, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="• Display chooses line-only, ±1σ zone, or full B1–B3 bands.\n• Bands Enabled toggles the deviation bands.\n• Bands define “don’t chase” and take-profit zones.")
+vwap_bands_enabled  = input.bool(false, "Bands Enabled", group=grp_vwap, inline="vw_3", tooltip="")
+vwap_display_mode   = input.string("Value Zone (±1σ)", "", options=["Line only", "Value Zone (±1σ)", "Full Bands (B1–B3)"], group=grp_vwap, inline="vw_3", tooltip="• Display chooses line-only, ±1σ zone, or full B1–B3 bands.\n• Bands Enabled toggles the deviation bands.\n• Bands define “don’t chase” and take-profit zones.")
 vwap_sigma_mode     = input.string("Rolling (ta.stdev)", "Sigma Mode", options=["Rolling (ta.stdev)", "Session (Welford)"], group=grp_vwap, inline="vw_4", tooltip="")
 vwap_stdev_len      = input.int(100, "⠀Len", minval=2, group=grp_vwap, inline="vw_4", tooltip="• Sigma Mode chooses Rolling or Session (Welford) deviation.\n• Len sets the rolling window for stdev.\n• Longer windows smooth band movement.")
 band_k1             = input.float(1.0, "K1⠀⠀⠀⠀", step=0.5, group=grp_vwap, inline="vw_6", tooltip="")
@@ -301,7 +301,7 @@ band_k2             = input.float(2.0, "K2⠀⠀", step=0.5, group=grp_vwap, inl
 band_k3             = input.float(3.0, "K3⠀⠀⠀", step=0.5, group=grp_vwap, inline="vw_6", tooltip="• K1/K2/K3 set the 1σ, 2σ, 3σ band multipliers.\n• Higher multipliers widen bands and reduce signals.\n• Keep consistent across sessions for comparability.")
 
 vwap_z_enabled      = input.bool(true, "Z-Score Enabled⠀", group=grp_vwap, inline="vw_5", tooltip="")
-vwap_z_show_label   = input.bool(true, "Show Z Label", group=grp_vwap, inline="vw_5", tooltip="• Z-Score Enabled toggles stretch signals (distance to VWAP in σ).\n• Show Z Label toggles the chart label for the current Z-Score.\n• Entry Th avoids entries when too stretched.\n• TP Th marks typical scale-out levels.\n• Ext Th flags extreme reversals.")
+vwap_z_show_label   = input.bool(false, "Show Z Label", group=grp_vwap, inline="vw_5", tooltip="• Z-Score Enabled toggles stretch signals (distance to VWAP in σ).\n• Show Z Label toggles the chart label for the current Z-Score.\n• Entry Th avoids entries when too stretched.\n• TP Th marks typical scale-out levels.\n• Ext Th flags extreme reversals.")
 z_th_entry          = input.float(2.0, "Entry Th", step=0.1, group=grp_vwap, inline="vw_6", tooltip="")
 z_th_tp             = input.float(2.5, "TP Th", step=0.1, group=grp_vwap, inline="vw_6", tooltip="")
 z_th_ext            = input.float(3.0, "Ext Th", step=0.1, group=grp_vwap, inline="vw_6", tooltip="")
