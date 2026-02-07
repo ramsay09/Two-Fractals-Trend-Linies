@@ -586,8 +586,9 @@ f_resolve_effective_flags() =>
     bool eff_rvol_points_enabled = f_approach_bool(rvol_points_enabled, true,     true,       true,   false)
     bool eff_vwap_enabled = f_approach_bool(vwap_enabled, false,     false,      true,   true)
     string eff_vwap_anchor = f_approach_str(vwap_anchor, "Session (Daily Reset)", "Session (Daily Reset)", "Weekly", "Session (Daily Reset)")
-    string eff_vwap_display_raw = f_approach_str(vwap_display_mode, "Line only", "Line only", "Line only", "Value Zone (±1σ)")
-    string eff_vwap_display_mode = vwap_bands_enabled ? eff_vwap_display_raw : "Line only"
+    string eff_vwap_display_raw = f_approach_str(vwap_display_mode, "Line only", "Line only", "Line only", "Full Bands (B1–B3)")
+    bool eff_vwap_bands_gate = (approach_id == 4) or vwap_bands_enabled
+    string eff_vwap_display_mode = eff_vwap_bands_gate ? eff_vwap_display_raw : "Line only"
     bool eff_vwap_line_only = eff_vwap_display_mode == "Line only"
     bool eff_vwap_zone = eff_vwap_display_mode == "Value Zone (±1σ)"
     bool eff_vwap_fullbands = eff_vwap_display_mode == "Full Bands (B1–B3)"
@@ -1388,8 +1389,10 @@ use_special_trend = fractalBarsPerSide == 0
 n_tl = use_special_trend ? 2 : fractalBarsPerSide
 
 // --- Detection using Pivot Functions ---
-ph_val = ta.pivothigh(high, n_tl, n_tl)
-pl_val = ta.pivotlow(low, n_tl, n_tl)
+// Closed-candle only (no intrabar repaint/flicker on realtime bar)
+bool tl_closed = (not barstate.isrealtime) or barstate.isconfirmed
+ph_val = tl_closed ? ta.pivothigh(high, n_tl, n_tl) : na
+pl_val = tl_closed ? ta.pivotlow(low, n_tl, n_tl) : na
 
 // --- State Variables (Pivot 0 = Newest, Pivot 1 = Old) ---
 var float y0_up = na
@@ -1434,7 +1437,7 @@ var line lower_line = na
 
 // STAGE 1: HYBRID HARD GATING
 // We only run the heavy regression and drawing logic if enabled.
-if eff_plot_trendline
+if eff_plot_trendline and tl_closed
     // LOGIC for Up-Trend Regression
     if use_special_trend
         // Check if new pivot detected (x0_up changed)
@@ -1588,7 +1591,7 @@ if eff_plot_trendline
     if not na(cur_y_dn) and close < cur_y_dn
         sig.tl_bear := true
 
-else
+else if not eff_plot_trendline
     // Cleanup & State Reset (Crucial for Resuming)
     if not na(last_x0_up)
         last_x0_up := na
