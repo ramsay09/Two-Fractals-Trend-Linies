@@ -415,9 +415,7 @@ ma2_slope_c         = input.bool(false, title="Slope Color", inline="ma2", group
 
 // KAMA Inputs
 kama_enabled        = input.bool(false, title='KAMA⠀', inline="kama", group=grp_ma, tooltip="")
-kama_tf_sel         = input.timeframe("", title="TF", inline="kama", group=grp_ma, tooltip="")
-kama_slope_color    = input.bool(false, "Slope Color", inline="kama", group=grp_ma, tooltip="• KAMA toggles the Kaufman Adaptive Moving Average plot.\n• Uses the selected timeframe (MTF) for calculation.\n• Only computes when enabled to save resources.
-                      \n• Timeframe for KAMA calculation.\n• Blank uses the chart timeframe. \n• Slope: green when KAMA rises, red when it falls.\n• Disabled: KAMA is plotted in blue.")
+kama_slope_color    = input.bool(false, "Slope Color", inline="kama", group=grp_ma, tooltip="• KAMA toggles the Kaufman Adaptive Moving Average plot.\n• Uses the chart timeframe for calculation.\n• Only computes when enabled to save resources.\n• Slope: green when KAMA rises, red when it falls.\n• Disabled: KAMA is plotted in blue.")
 kama_len            = input.int(10, title='Length', minval=1, inline="kama_len", group=grp_ma)
 kama_fast           = input.int(2, title='Fast', minval=1, inline="kama_len", group=grp_ma)
 kama_slow           = input.int(30, title='Slow', minval=1, inline="kama_len", group=grp_ma, tooltip="• Length controls the efficiency ratio window.\n• Fast/Slow set the adaptive smoothing limits.")
@@ -1359,18 +1357,10 @@ f_kama(_src, _len, _fast, _slow) =>
     _kama := na(_kama[1]) ? _src : _kama[1] + _sc * (_src - _kama[1])
     _kama
 
-string kama_tf = kama_tf_sel == "" ? timeframe.period : kama_tf_sel
-bool kama_is_current_tf = timeframe.in_seconds(kama_tf) == timeframe.in_seconds(timeframe.period)
 float kama_val = na
-float kama_close = na
 
 if kama_enabled
-    if kama_is_current_tf
-        kama_val := f_kama(close, kama_len, kama_fast, kama_slow)
-        kama_close := close
-    else
-        [kama_val, kama_close] = request.security(syminfo.tickerid, kama_tf, [f_kama(close, kama_len, kama_fast, kama_slow), close], lookahead=barmerge.lookahead_off)
-        active_sec_calls += 1
+    kama_val := f_kama(close, kama_len, kama_fast, kama_slow)
 
 // KAMA Signals (Slope Mode)
 bool kama_bull = false
