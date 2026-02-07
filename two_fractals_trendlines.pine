@@ -1519,9 +1519,9 @@ if eff_plot_trendline and tl_closed
     y1_u = use_special_trend ? y0_up : y1_up
 
     // End anchor:
-    //  • Classic mode (Bars Per Side > 0): project between confirmed fractals (old -> newest) and stop at the current bar.
+    //  • Classic mode (Bars Per Side > 0): project between confirmed fractals (old -> newest) and stop two bars ahead.
     //  • Special mode (Bars Per Side = 0): anchored regression from a confirmed 5-bar fractal (n_tl=2), updated using closed bars only.
-    x2_u = bar_index
+    x2_u = bar_index + 2
     // Calculate Y2:
     float y2_u = na
     if use_special_trend
@@ -1549,7 +1549,7 @@ if eff_plot_trendline and tl_closed
     x1_d = use_special_trend ? x0_dn : x1_dn
     y1_d = use_special_trend ? y0_dn : y1_dn
 
-    x2_d = bar_index
+    x2_d = bar_index + 2
     float y2_d = na
     if use_special_trend
         if not na(slope_dn) and not na(x0_dn)
