@@ -1,6 +1,6 @@
 //@version=5
 
-indicator('Market Context & Confluence Suite', overlay=true, shorttitle='MCCS', max_bars_back=3000, max_lines_count=500, max_boxes_count=500, max_labels_count=500, dynamic_requests=true)
+indicator('Apex Context - Market Context & Confluence Suite', overlay=true, shorttitle='MCCS', max_bars_back=3000, max_lines_count=500, max_boxes_count=500, max_labels_count=500, dynamic_requests=true)
 
 general_info   = input.bool(title='General Description', defval=false, tooltip="• Explains how to read the confluence signals and market tension context.\n• Highlights that context matters and signals should be combined with price action.\n• Reminder: the chart itself is the most direct indicator—use tools selectively.")
 
