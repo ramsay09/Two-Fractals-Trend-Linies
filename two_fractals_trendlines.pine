@@ -554,8 +554,8 @@ f_resolve_effective_flags() =>
     bool eff_BB_plot = f_approach_bool(BB_plot,            false,     false,      true,   true)
     bool eff_en_cloud = f_approach_bool(en_cloud,           false,     false,      true,   false)
     bool eff_sig_plot = f_approach_bool(sig_plot,           false,     false,      true,   false)
-    string eff_ma1_type = f_approach_str(ma1_type,            "None",  "None",     "None", ma1_type)
-    string eff_ma2_type = f_approach_str(ma2_type,            "None",  "None",     "None", ma2_type)
+    string eff_ma1_type = f_approach_str(ma1_type,            "None",  "None",     ma1_type, ma1_type)
+    string eff_ma2_type = f_approach_str(ma2_type,            "None",  "None",     ma2_type, ma2_type)
     bool eff_plot_div = f_approach_bool(plot_div,           false,     false,      true,   true)
     bool eff_plot_l12_bar = f_approach_bool(plot_l12_bar,       false,     false,      false,  false)
     bool eff_plot_nr_bar = f_approach_bool(plot_nr_bar,        false,     true,       false,  false)
@@ -1511,50 +1511,53 @@ if eff_plot_trendline
     x1_u = use_special_trend ? x0_up : x1_up
     y1_u = use_special_trend ? y0_up : y1_up
 
-    x2_u = bar_index + 1
-    // Calculate Y2 based on Slope for Mode 0, or projected value for Mode >0
+    // End anchor:
+    //  • Classic mode (Bars Per Side > 0): connect confirmed fractals only (old -> newest) and extend right.
+    //  • Special mode (Bars Per Side = 0): anchored regression from a confirmed 5-bar fractal (n_tl=2), updated using closed bars only.
+    x2_u = use_special_trend ? bar_index : x0_up
+    // Calculate Y2:
     float y2_u = na
     if use_special_trend
         if not na(slope_up) and not na(x0_up)
-            // y = mx + b -> y2 = slope * distance + start_y
+            // y = m*dx + y0 (anchored at confirmed fractal)
             y2_u := y0_up + slope_up * (x2_u - x0_up)
     else
-        if not na(x1_u) and not na(x0_up) and x1_u != x0_up
-            float m_u = (y0_up - y1_u) / (x0_up - x1_u)
-            y2_u := y1_u + m_u * (x2_u - x1_u)
+        // Second point is the newest confirmed fractal itself.
+        y2_u := y0_up
 
     // Draw
     if not na(x1_u) and not na(x2_u) and x1_u != x2_u and not na(y2_u)
         if na(upper_line)
-            upper_line := line.new(x1 = x1_u, y1 = y1_u, x2 = x2_u, y2 = y2_u, extend = extend.none, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
+            upper_line := line.new(x1 = x1_u, y1 = y1_u, x2 = x2_u, y2 = y2_u, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
         else
             line.set_xy1(upper_line, x1_u, y1_u)
             line.set_xy2(upper_line, x2_u, y2_u)
             line.set_color(upper_line, color.new(color_tr, transp_tr))
             line.set_width(upper_line, width_tr)
+            line.set_extend(upper_line, extend.right)
 
     // --- LOWER LINE ---
     x1_d = use_special_trend ? x0_dn : x1_dn
     y1_d = use_special_trend ? y0_dn : y1_dn
 
-    x2_d = bar_index + 1
+    x2_d = use_special_trend ? bar_index : x0_dn
     float y2_d = na
     if use_special_trend
         if not na(slope_dn) and not na(x0_dn)
             y2_d := y0_dn + slope_dn * (x2_d - x0_dn)
     else
-        if not na(x1_d) and not na(x0_dn) and x1_d != x0_dn
-            float m_d = (y0_dn - y1_d) / (x0_dn - x1_d)
-            y2_d := y1_d + m_d * (x2_d - x1_d)
+        // Second point is the newest confirmed fractal itself.
+        y2_d := y0_dn
 
     if not na(x1_d) and not na(x2_d) and x1_d != x2_d and not na(y2_d)
         if na(lower_line)
-            lower_line := line.new(x1 = x1_d, y1 = y1_d, x2 = x2_d, y2 = y2_d, extend = extend.none, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
+            lower_line := line.new(x1 = x1_d, y1 = y1_d, x2 = x2_d, y2 = y2_d, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
         else
             line.set_xy1(lower_line, x1_d, y1_d)
             line.set_xy2(lower_line, x2_d, y2_d)
             line.set_color(lower_line, color.new(color_tr, transp_tr))
             line.set_width(lower_line, width_tr)
+            line.set_extend(lower_line, extend.right)
 
     // --- Signal Logic for Registry (Trendlines) ---
     // Calculate current projected level
