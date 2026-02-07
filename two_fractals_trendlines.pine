@@ -1519,9 +1519,9 @@ if eff_plot_trendline and tl_closed
     y1_u = use_special_trend ? y0_up : y1_up
 
     // End anchor:
-    //  • Classic mode (Bars Per Side > 0): project between confirmed fractals (old -> newest) and extend right.
+    //  • Classic mode (Bars Per Side > 0): project between confirmed fractals (old -> newest) and stop at the current bar.
     //  • Special mode (Bars Per Side = 0): anchored regression from a confirmed 5-bar fractal (n_tl=2), updated using closed bars only.
-    x2_u = bar_index - 1
+    x2_u = bar_index
     // Calculate Y2:
     float y2_u = na
     if use_special_trend
@@ -1537,19 +1537,19 @@ if eff_plot_trendline and tl_closed
     // Draw
     if not na(x1_u) and not na(x2_u) and x1_u != x2_u and not na(y2_u)
         if na(upper_line)
-            upper_line := line.new(x1 = x1_u, y1 = y1_u, x2 = x2_u, y2 = y2_u, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
+            upper_line := line.new(x1 = x1_u, y1 = y1_u, x2 = x2_u, y2 = y2_u, extend = extend.none, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
         else
             line.set_xy1(upper_line, x1_u, y1_u)
             line.set_xy2(upper_line, x2_u, y2_u)
             line.set_color(upper_line, color.new(color_tr, transp_tr))
             line.set_width(upper_line, width_tr)
-        line.set_extend(upper_line, extend.right)
+        line.set_extend(upper_line, extend.none)
 
     // --- LOWER LINE ---
     x1_d = use_special_trend ? x0_dn : x1_dn
     y1_d = use_special_trend ? y0_dn : y1_dn
 
-    x2_d = bar_index - 1
+    x2_d = bar_index
     float y2_d = na
     if use_special_trend
         if not na(slope_dn) and not na(x0_dn)
@@ -1562,13 +1562,13 @@ if eff_plot_trendline and tl_closed
 
     if not na(x1_d) and not na(x2_d) and x1_d != x2_d and not na(y2_d)
         if na(lower_line)
-            lower_line := line.new(x1 = x1_d, y1 = y1_d, x2 = x2_d, y2 = y2_d, extend = extend.right, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
+            lower_line := line.new(x1 = x1_d, y1 = y1_d, x2 = x2_d, y2 = y2_d, extend = extend.none, color = color.new(color_tr, transp_tr), style = line.style_solid, width = width_tr)
         else
             line.set_xy1(lower_line, x1_d, y1_d)
             line.set_xy2(lower_line, x2_d, y2_d)
             line.set_color(lower_line, color.new(color_tr, transp_tr))
             line.set_width(lower_line, width_tr)
-        line.set_extend(lower_line, extend.right)
+        line.set_extend(lower_line, extend.none)
 
     // --- Signal Logic for Registry (Trendlines) ---
     // Calculate current projected level
