@@ -554,8 +554,8 @@ f_resolve_effective_flags() =>
     bool eff_BB_plot = f_approach_bool(BB_plot,            false,     false,      true,   true)
     bool eff_en_cloud = f_approach_bool(en_cloud,           false,     false,      true,   false)
     bool eff_sig_plot = f_approach_bool(sig_plot,           false,     false,      true,   false)
-    string eff_ma1_type = f_approach_str(ma1_type,            "None",  "None",     "None", ma1_type)
-    string eff_ma2_type = f_approach_str(ma2_type,            "None",  "None",     "None", ma2_type)
+    string eff_ma1_type = f_approach_str(ma1_type,            "None",  "None",     ma1_type, ma1_type)
+    string eff_ma2_type = f_approach_str(ma2_type,            "None",  "None",     ma2_type, ma2_type)
     bool eff_plot_div = f_approach_bool(plot_div,           false,     false,      true,   true)
     bool eff_plot_l12_bar = f_approach_bool(plot_l12_bar,       false,     false,      false,  false)
     bool eff_plot_nr_bar = f_approach_bool(plot_nr_bar,        false,     true,       false,  false)
@@ -1386,6 +1386,7 @@ n_tl = use_special_trend ? 2 : fractalBarsPerSide
 // --- Detection using Pivot Functions ---
 ph_val = ta.pivothigh(high, n_tl, n_tl)
 pl_val = ta.pivotlow(low, n_tl, n_tl)
+bool tl_pivot_confirmed = barstate.isconfirmed
 
 // --- State Variables (Pivot 0 = Newest, Pivot 1 = Old) ---
 var float y0_up = na
@@ -1393,7 +1394,7 @@ var int x0_up = na
 var float y1_up = na
 var int x1_up = na
 
-if not na(ph_val)
+if tl_pivot_confirmed and not na(ph_val)
     y1_up := y0_up
     x1_up := x0_up
     y0_up := ph_val
@@ -1404,7 +1405,7 @@ var int x0_dn = na
 var float y1_dn = na
 var int x1_dn = na
 
-if not na(pl_val)
+if tl_pivot_confirmed and not na(pl_val)
     y1_dn := y0_dn
     x1_dn := x0_dn
     y0_dn := pl_val
