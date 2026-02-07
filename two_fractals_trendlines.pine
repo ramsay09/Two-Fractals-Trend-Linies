@@ -1015,11 +1015,15 @@ if show_rvol_visuals and (rvol_display == "Label" or rvol_display == "Both")
 
 //-------------------------------------------------------- williams fractals (Visuals for Chart) --------------------------------------------------------------
 
-up_fr               = ta.pivothigh(2, 2)
-dn_fr               = ta.pivotlow(2, 2)
+// Closed-candle only: avoid intrabar flicker on the realtime (running) bar.
+// A 2/2 fractal (5-bar structure) is only confirmed after the 5th candle is closed.
+bool fr_closed = (not barstate.isrealtime) or barstate.isconfirmed
 
-last_up_fr_level    = ta.valuewhen(up_fr, high[2], 0)
-last_dn_fr_level    = ta.valuewhen(dn_fr, low[2], 0)
+up_fr               = fr_closed ? ta.pivothigh(2, 2) : na
+dn_fr               = fr_closed ? ta.pivotlow(2, 2) : na
+
+last_up_fr_level    = ta.valuewhen(not na(up_fr), high[2], 0)
+last_dn_fr_level    = ta.valuewhen(not na(dn_fr), low[2], 0)
 
 // Plot fractals
 plotshape(eff_fractals_plot ? up_fr : na, style=shape.triangleup, location=location.abovebar, offset=-2, color=color.new(color_fr, transp_fr), title='Fractal up')
@@ -1028,19 +1032,19 @@ plotshape(eff_fractals_plot ? dn_fr : na, style=shape.triangledown, location=loc
 // Sub Fractals Logic
 // Up Sub Fractals
 // Pattern A: Peak at [2] (1 Left, 2 Right). Strict check (left 2nd bar must be higher to NOT be a standard fractal) to avoid overlap.
-up_sub_a = high[2] > high[3] and high[2] > high[1] and high[2] > high[0]
+up_sub_a = fr_closed ? (high[2] > high[3] and high[2] > high[1] and high[2] > high[0]) : false
 up_sub_a_strict = up_sub_a and high[2] <= high[4]
 
 // Pattern B: Peak at [2] (2 Left, 1 Right) - Strict: Must NOT be 2 Right (high[2] <= high[0])
-up_sub_b = high[2] > high[4] and high[2] > high[3] and high[2] > high[1] and high[2] <= high[0]
+up_sub_b = fr_closed ? (high[2] > high[4] and high[2] > high[3] and high[2] > high[1] and high[2] <= high[0]) : false
 
 // Down Sub Fractals
 // Pattern A: Peak at [2] (1 Left, 2 Right)
-dn_sub_a = low[2] < low[3] and low[2] < low[1] and low[2] < low[0]
+dn_sub_a = fr_closed ? (low[2] < low[3] and low[2] < low[1] and low[2] < low[0]) : false
 dn_sub_a_strict = dn_sub_a and low[2] >= low[4]
 
 // Pattern B: Peak at [2] (2 Left, 1 Right) - Strict: Must NOT be 2 Right (low[2] >= low[0])
-dn_sub_b = low[2] < low[4] and low[2] < low[3] and low[2] < low[1] and low[2] >= low[0]
+dn_sub_b = fr_closed ? (low[2] < low[4] and low[2] < low[3] and low[2] < low[1] and low[2] >= low[0]) : false
 
 // Plot Sub Fractals
 col_sub_fr = color.new(color.gray, 30)
