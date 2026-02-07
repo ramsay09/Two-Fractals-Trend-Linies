@@ -28,7 +28,7 @@ int W_O     = 1
 // --- TOP LEVEL UI ---
 // adx, hma and ema1 x ema2 mtf trend info panel
 trading_approach        = input.string("Custom", "Context", options=["Custom", "Opening Auction", "Compression -> Expansion", "Trend Continuation", "Range Rotation"],
-                          tooltip="Applies focused defaults for a trading\n⠀context. Custom = manual.\n• Opening Auction: OR/IB + RVOL.\n• Compression -> Expansion: Squeeze + RVOL.\n• Trend Continuation: Trend tools + weekly\n⠀VWAP.\n• Range Rotation: VWAP zone + BB touch.")
+                          tooltip="Applies focused defaults for a trading\n⠀context. Custom = manual.\n• Opening Auction: OR/IB + RVOL + MTF (1H)\n⠀+ Trendlines + FVG1 confirm + Inside Bar.\n• Compression -> Expansion: Squeeze + RVOL\n⠀+ Trendlines + FVG1 + Inside Bar + NR7.\n• Trend Continuation: EMA cloud + FVG1 +\n⠀weekly VWAP + MTF + RVOL points + BB touch\n⠀+ Divergences.\n• Range Rotation: VWAP value zone + BB\n⠀touch + Last Fractal + Divergences.")
 
 
 panel_pos               = input.string(title='MTF Panel', inline="panel", defval='Bottom Right', options=['None', 'Top Right', 'Bottom Right', 'Bottom Left'],
@@ -543,23 +543,23 @@ f_resolve_effective_flags() =>
     //                                          Cust           Auction   Comp->Exp   Trend   Range
     bool eff_fractals_plot = f_approach_bool(fractals_plot,      true,      true,       true,   true)
     bool eff_sub_fractals = f_approach_bool(sub_fractals,       false,     false,      false,  false)
-    bool eff_plot_trendline = f_approach_bool(plot_trendline,    false,     true,       true,   false)
-    bool eff_show_mtf_candles = f_approach_bool(show_mtf_candles,  false,     false,      true,   false)
+    bool eff_plot_trendline = f_approach_bool(plot_trendline,    true,      true,       true,   false)
+    bool eff_show_mtf_candles = f_approach_bool(show_mtf_candles,  true,      false,      true,   false)
     bool eff_use_sess_1st = f_approach_bool(use_sess_1st,       true,      false,      false,  false)
     bool eff_show_last_frac = f_approach_bool(show_last_frac,     false,     false,      false,  true)
-    bool eff_show_vol = f_approach_bool(show_vol,           false,     false,      false,  false)
-    bool eff_plot_fvg1 = f_approach_bool(plot_fvg1,          false,     false,      true,   false)
+    bool eff_show_vol = f_approach_bool(show_vol,           true,      true,       false,  false)
+    bool eff_plot_fvg1 = f_approach_bool(plot_fvg1,          true,      true,       true,   false)
     bool eff_plot_fvg2 = f_approach_bool(plot_fvg2,          false,     false,      false,  false)
     string eff_ps_mode = f_approach_str(ps_mode,             "None",   "None",     "None", "None")
-    bool eff_BB_plot = f_approach_bool(BB_plot,            false,     false,      false,  true)
+    bool eff_BB_plot = f_approach_bool(BB_plot,            false,     false,      true,   true)
     bool eff_en_cloud = f_approach_bool(en_cloud,           false,     false,      true,   false)
     bool eff_sig_plot = f_approach_bool(sig_plot,           false,     false,      true,   false)
     string eff_ma1_type = f_approach_str(ma1_type,            "None",  "None",     "None", ma1_type)
     string eff_ma2_type = f_approach_str(ma2_type,            "None",  "None",     "None", ma2_type)
-    bool eff_plot_div = f_approach_bool(plot_div,           false,     false,      false,  false)
+    bool eff_plot_div = f_approach_bool(plot_div,           false,     false,      true,   true)
     bool eff_plot_l12_bar = f_approach_bool(plot_l12_bar,       false,     false,      false,  false)
     bool eff_plot_nr_bar = f_approach_bool(plot_nr_bar,        false,     true,       false,  false)
-    bool eff_plot_i_bar = f_approach_bool(plot_i_bar,         false,     false,      false,  true)
+    bool eff_plot_i_bar = f_approach_bool(plot_i_bar,         true,      true,       true,   true)
     bool eff_plot_o_bar = f_approach_bool(plot_o_bar,         false,     false,      false,  false)
     bool eff_plot_s_bar = f_approach_bool(plot_s_bar,         false,     false,      false,  false)
     bool eff_plot_f_bar = f_approach_bool(plot_f_bar,         false,     false,      false,  false)

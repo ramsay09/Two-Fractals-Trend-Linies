@@ -45,14 +45,12 @@ A multi-tool market structure overlay for TradingView that combines **Bill Willi
 ### Context Lenses (Focused Presets)
 A **Context Lens** applies focused defaults to reduce clutter and align the toolset with a specific market read.  
 - **Custom**: manual control (no automatic switching)
-- **Market Map**: sessions + key levels + volume profile + pivots
-- **Opening Auction**: OR/IB + RVOL + 1st session candle + MTF candles
-- **Value Reversion**: VWAP + bands/z + divergences + volume profile
-- **Compression -> Expansion**: squeeze box + RVOL + trendlines + last fractal
-- **Trend Continuation**: EMA cloud + FVG1 + weekly VWAP + MTF candles
-- **Range Rotation**: volume profile + VWAP line + last fractal + PDC
+- **Opening Auction**: OR/IB + RVOL + 1st session candle + MTF (1H) + trendlines + FVG1 confirm + inside bar
+- **Compression -> Expansion**: squeeze box + RVOL + trendlines + FVG1 + inside bar + NR7
+- **Trend Continuation**: EMA cloud + FVG1 + weekly VWAP + MTF candles + RVOL points + BB touch + divergences
+- **Range Rotation**: VWAP value zone + BB touch + last fractal + PDC + divergences
 
-> **Note:** Lenses are intentionally minimal so they don’t constantly override your personal layout. Custom remains fully manual.
+> **Note:** Lenses are intentionally minimal so they don’t constantly override your personal layout. **Panel position** and **pivot toggles** remain manual (you can disable them in any lens). Custom remains fully manual.
 
 ### Key Levels (Origin-Anchored)
 - **PDH / PDL / PDC** (Previous Day High/Low/Close)
@@ -110,7 +108,7 @@ A **Context Lens** applies focused defaults to reduce clutter and align the tool
 ### Additional Context
 - **Last Fractal S/R** (selectable timeframe)
 - **High Volume Spikes** marker `v` when volume exceeds `x * SMA(volume, 20)`
-- *(If enabled in your build)* optional **Gradient Volume Profile** for the visible range
+
 
 ---
 
@@ -155,7 +153,7 @@ An optional alert that triggers **while the 5th candle is still forming** (real-
 - **Trading Sessions**
 - **MTF Candle Overlay**
 - **FVG**
-- **Additional Context** (last fractal S/R, volume spikes, squeeze box, optional volume profile)
+- **Additional Context** (last fractal S/R, volume spikes, squeeze box)
 
 ### Timeframe-heavy modules
 - SR lines fractal timeframe (manual or auto-adapted)
@@ -170,9 +168,9 @@ An optional alert that triggers **while the 5th candle is still forming** (real-
 ## Recommended Usage Workflow (Typical)
 
 1. **Start with a regime scan**
-   - Use **Market Map** to see sessions, key levels, pivots, and volume profile in context.
+   - Choose a **Context Lens** that matches the regime (open, squeeze, trend, range).
 2. **Pick a focused lens**
-   - Switch to **Opening Auction**, **Value Reversion**, **Compression -> Expansion**, **Trend Continuation**, or **Range Rotation** based on the regime.
+   - Switch to **Opening Auction**, **Compression -> Expansion**, **Trend Continuation**, or **Range Rotation** based on the regime.
 3. **Refine execution**
    - Toggle any extra tools manually in **Custom** if you want full control beyond the presets.
 
@@ -181,7 +179,7 @@ An optional alert that triggers **while the 5th candle is still forming** (real-
 ## Performance Notes
 - The script uses multiple `request.security()` calls and can draw many objects (lines/boxes).
 - If you hit performance issues:
-  - Disable optional heavy visuals (e.g., volume profile, extra overlays)
+  - Disable optional heavy visuals (e.g., extra overlays)
   - Reduce visible complexity (segments, pivots, sessions, MTF overlay)
   - Keep scan depth (if applicable) reasonable for your chart usage
 
